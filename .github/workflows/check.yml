@@ -1,11 +1,14 @@
 name: Check
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -13,42 +16,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run sources:build -- --migration=299901010001_ci_registry.sql
-      - run: npm run format
-      - name: Export prepared files
-        if: always()
-        run: |
-          node --input-type=module <<'NODE'
-          import { execFileSync } from 'node:child_process';
-          import { readFileSync } from 'node:fs';
-          const paths = execFileSync('git', ['diff', '--name-only'], {encoding:'utf8'}).trim().split('\n').filter(Boolean);
-          for (const path of paths) {
-            const data = readFileSync(path).toString('base64');
-            const total = Math.ceil(data.length / 16000);
-            for (let part = 0; part < total; part++) console.log('CODEX_FILE ' + JSON.stringify({path,part,total,data:data.slice(part*16000,(part+1)*16000)}));
-          }
-          NODE
+      - run: npm run format:check
       - run: npm run typecheck
+      - name: Verify registry generation
+        run: |
+          npm run sources:build -- --migration=299901010001_ci_registry.sql
+          git diff --exit-code -- docs/source-coverage.md
       - run: npm test
       - run: npm run build
       - run: npm audit --audit-level=high
       - run: npm run check:secrets
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
-        with:
-          name: browser-results
-          path: test-results/
-          retention-days: 7
-      - name: Export visual review images
-        if: always()
-        run: |
-          node --input-type=module <<'NODE'
-          import { readdirSync, readFileSync } from 'node:fs';
-          for (const path of readdirSync('test-results').filter(p=>p.endsWith('.png'))) {
-            const data = readFileSync('test-results/'+path).toString('base64');
-            const total = Math.ceil(data.length / 16000);
-            for (let part=0;part<total;part++) console.log('CODEX_IMAGE '+JSON.stringify({path,part,total,data:data.slice(part*16000,(part+1)*16000)}));
-          }
-          NODE

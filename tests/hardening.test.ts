@@ -153,3 +153,12 @@ describe("source and publication boundaries", () => {
     expect(failureReason({ status: 429 })).toBe("provider_rate_limit");
   });
 });
+
+it("normalizes C++ and C# without collapsing them into the same subscription", () => {
+  expect(
+    parseEventQuery(new URLSearchParams({ technology: "C++" })).technology,
+  ).toBe("c-plus-plus");
+  expect(
+    parseEventQuery(new URLSearchParams({ technology: "C#" })).technology,
+  ).toBe("c-sharp");
+});

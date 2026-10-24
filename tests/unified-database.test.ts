@@ -127,3 +127,22 @@ it("denies raw queues, budgets and health RPCs to anonymous and authenticated ro
     await db.exec("reset role");
   }
 });
+
+it("corrects a publisher withdrawal that is later reclassified as non-security", async () => {
+  await enqueue("withdrawn");
+  await finish(await claim(), { ...payload, kind: "withdrawal" });
+  await enqueue("irrelevant");
+  await finish(await claim(), { security_relevant: false });
+  const rows = (await db.query<any>("select * from events order by id")).rows;
+  expect(rows).toHaveLength(2);
+  expect(rows[1].extraction_method).toBe("system");
+  expect(rows[1].payload.correction_reason).toBe("reclassified_non_security");
+});
+it("keeps C++ and C# technology subscription keys distinct", async () => {
+  const rows = (
+    await db.query<{ cpp: string; csharp: string }>(
+      "select technology_key('C++') as cpp, technology_key('C#') as csharp",
+    )
+  ).rows;
+  expect(rows[0]).toEqual({ cpp: "c-plus-plus", csharp: "c-sharp" });
+});

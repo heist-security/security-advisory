@@ -21,6 +21,8 @@ export type SearchParams = Record<string, string | string[] | undefined>;
 export function technologyKey(value: string) {
   return value
     .toLowerCase()
+    .replace(/\+/g, "-plus-")
+    .replace(/#/g, "-sharp-")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 }

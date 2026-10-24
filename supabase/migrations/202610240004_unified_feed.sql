@@ -89,7 +89,7 @@ $$;
 -- Preserve the exact source spelling in payload; normalized keys are subscription indexes.
 create function public.technology_key(value text) returns text
 language sql immutable set search_path=public as $$
-  select trim(both '-' from regexp_replace(lower(value),'[^a-z0-9]+','-','g'));
+  select trim(both '-' from regexp_replace(replace(replace(lower(value),'+','-plus-'),'#','-sharp-'),'[^a-z0-9]+','-','g'));
 $$;
 create function public.text_union(a text[],b text[]) returns text[]
 language sql immutable set search_path=public as $$
@@ -133,7 +133,7 @@ begin
     update advisories set latest_document_id=doc.id where id=advisory.id;
   end if;
   select * into previous from events where advisory_id=advisory.id order by id desc limit 1;
-  if not relevant and previous.id is not null and previous.payload->>'kind'<>'withdrawal' then
+  if not relevant and previous.id is not null and (previous.extraction_method<>'system' or previous.payload->>'correction_reason' is distinct from 'reclassified_non_security') then
     -- This is a correction to OUR extraction, not an assertion that the publisher retracted anything.
     next_payload:=jsonb_build_object('security_relevant',true,'kind','withdrawal',
       'title','Previous extraction withdrawn','summary','A newer source revision was classified as non-security. The previous extraction is no longer current; this is not a publisher retraction.',

@@ -1,16 +1,133 @@
 import type { Metadata } from "next";
-import { registry, channelCounts, categories, sourcePage } from "@/lib/registry";
+import {
+  registry,
+  channelCounts,
+  categories,
+  sourcePage,
+} from "@/lib/registry";
 import { pageParams, type SearchParams } from "@/lib/filters";
 export const metadata: Metadata = { title: "Sources" };
-export default async function Sources({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const params = pageParams(await searchParams), result = sourcePage(params);
-  const link = (page: number) => { const next = new URLSearchParams(params); next.set("page", String(page)); return "/sources?" + next; };
-  return <main id="main" className="container">
-    <section className="page-intro"><div className="eyebrow">TRANSPARENT COVERAGE</div><h1>{registry.length} streams.<br /><span>One shared feed.</span></h1><p>{channelCounts["security-advisories"]} advisory streams, {channelCounts["mixed-announcements"]} mixed announcement streams, and {channelCounts["release-notes"]} release-note streams. Each flows into the same RSS and JSON API.</p><p className="fine-print">Catalog checks verify retrieval and parsing, not complete coverage, live uptime, or model accuracy. A project may have multiple streams.</p></section>
-    <form className="filters catalog-filters" action="/sources"><label>Search<input name="q" placeholder="Search technologies…" defaultValue={result.q} maxLength={100} /></label><label>Channel<select name="channel" defaultValue={result.channel}><option value="">All channels</option><option value="security-advisories">Advisories</option><option value="mixed-announcements">Mixed announcements</option><option value="release-notes">Release notes</option></select></label><label>Category<select name="category" defaultValue={result.category}><option value="">All categories</option>{categories.map(category => <option key={category}>{category}</option>)}</select></label><button className="button primary" type="submit">Filter →</button></form>
-    <div className="section-heading catalog-count"><p>{result.total} matching streams · Page {result.page} of {result.pages}</p><a href="/sources">Reset filters</a></div>
-    <div className="catalog-list">{result.rows.map(source => <article className="source-card" key={source.id}><div><span className="eyebrow">{source.category}</span><h2><a href={source.homepage}>{source.name} ↗</a></h2><span className="badge">{source.channel}</span></div><div><div className="source-links"><a href={source.feed_url}>Publisher feed ↗</a><a href={source.verification.sample_url}>Checked document ↗</a><a href={"/?source=" + encodeURIComponent(source.id)}>View in Heist Feed →</a></div><small>Checked {source.verification.checked_at.slice(0, 10)} · Target interval {source.poll_interval_minutes} minutes</small><details><summary>Scope and verification notes</summary><p>{source.rationale}</p><p>{source.limitations}</p>{source.verification.warnings.length ? <p>{source.verification.warnings.join("; ")}</p> : null}</details></div></article>)}</div>
-    {!result.total ? <p className="empty">No sources match these filters.</p> : null}
-    <nav className="pagination" aria-label="Source pages">{result.page > 1 ? <a className="button" href={link(result.page - 1)}>← Previous</a> : <span />}{result.page < result.pages ? <a className="button" href={link(result.page + 1)}>Next →</a> : null}</nav>
-  </main>;
+export default async function Sources({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = pageParams(await searchParams),
+    result = sourcePage(params);
+  const link = (page: number) => {
+    const next = new URLSearchParams(params);
+    next.set("page", String(page));
+    return "/sources?" + next;
+  };
+  return (
+    <main id="main" className="container">
+      <section className="page-intro">
+        <div className="eyebrow">TRANSPARENT COVERAGE</div>
+        <h1>
+          {registry.length} streams.
+          <br />
+          <span>One shared feed.</span>
+        </h1>
+        <p>
+          {channelCounts["security-advisories"]} advisory streams,{" "}
+          {channelCounts["mixed-announcements"]} mixed announcement streams, and{" "}
+          {channelCounts["release-notes"]} release-note streams. Each flows into
+          the same RSS and JSON API.
+        </p>
+        <p className="fine-print">
+          Catalog checks verify retrieval and parsing, not complete coverage,
+          live uptime, or model accuracy. A project may have multiple streams.
+        </p>
+      </section>
+      <form className="filters catalog-filters" action="/sources">
+        <label>
+          Search
+          <input
+            name="q"
+            placeholder="Search technologies…"
+            defaultValue={result.q}
+            maxLength={100}
+          />
+        </label>
+        <label>
+          Channel
+          <select name="channel" defaultValue={result.channel}>
+            <option value="">All channels</option>
+            <option value="security-advisories">Advisories</option>
+            <option value="mixed-announcements">Mixed announcements</option>
+            <option value="release-notes">Release notes</option>
+          </select>
+        </label>
+        <label>
+          Category
+          <select name="category" defaultValue={result.category}>
+            <option value="">All categories</option>
+            {categories.map((category) => (
+              <option key={category}>{category}</option>
+            ))}
+          </select>
+        </label>
+        <button className="button primary" type="submit">
+          Filter →
+        </button>
+      </form>
+      <div className="section-heading catalog-count">
+        <p>
+          {result.total} matching streams · Page {result.page} of {result.pages}
+        </p>
+        <a href="/sources">Reset filters</a>
+      </div>
+      <div className="catalog-list">
+        {result.rows.map((source) => (
+          <article className="source-card" key={source.id}>
+            <div>
+              <span className="eyebrow">{source.category}</span>
+              <h2>
+                <a href={source.homepage}>{source.name} ↗</a>
+              </h2>
+              <span className="badge">{source.channel}</span>
+            </div>
+            <div>
+              <div className="source-links">
+                <a href={source.feed_url}>Publisher feed ↗</a>
+                <a href={source.verification.sample_url}>Checked document ↗</a>
+                <a href={"/?source=" + encodeURIComponent(source.id)}>
+                  View in Heist Feed →
+                </a>
+              </div>
+              <small>
+                Checked {source.verification.checked_at.slice(0, 10)} · Target
+                interval {source.poll_interval_minutes} minutes
+              </small>
+              <details>
+                <summary>Scope and verification notes</summary>
+                <p>{source.rationale}</p>
+                <p>{source.limitations}</p>
+                {source.verification.warnings.length ? (
+                  <p>{source.verification.warnings.join("; ")}</p>
+                ) : null}
+              </details>
+            </div>
+          </article>
+        ))}
+      </div>
+      {!result.total ? (
+        <p className="empty">No sources match these filters.</p>
+      ) : null}
+      <nav className="pagination" aria-label="Source pages">
+        {result.page > 1 ? (
+          <a className="button" href={link(result.page - 1)}>
+            ← Previous
+          </a>
+        ) : (
+          <span />
+        )}
+        {result.page < result.pages ? (
+          <a className="button" href={link(result.page + 1)}>
+            Next →
+          </a>
+        ) : null}
+      </nav>
+    </main>
+  );
 }
