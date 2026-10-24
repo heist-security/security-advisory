@@ -14,6 +14,7 @@ import {
 import { setting } from "./config";
 import { failureReason } from "./errors";
 import { isStructured } from "./structured/config";
+import { selectedVendorIds } from "./vendor-config";
 import {
   stageStructured,
   structuredDocument,
@@ -234,14 +235,11 @@ export async function processJobs() {
     !process.env.VENDOR_SOURCE_IDS?.trim()
   )
     return { ...structured, vendor_disabled: 1 };
-  const vendorIds = new Set(
-    process.env.VENDOR_SOURCE_IDS.split(",")
-      .map((id) => id.trim())
-      .filter(Boolean),
-  );
+  const vendorIds = new Set(selectedVendorIds());
+  if (!vendorIds.size) return { ...structured, vendor_disabled: 1 };
   const maximum = setting("PROCESS_BATCH_SIZE", 24, 1, 100),
     concurrency = setting("PROCESS_CONCURRENCY", 4, 1, 12);
-  const hourlyLimit = setting("EXTRACTION_HOURLY_LIMIT", 1440, 1, 10000);
+  const hourlyLimit = setting("EXTRACTION_HOURLY_LIMIT", 60, 1, 10000);
   let slots = 0,
     processed = 0,
     failed = 0;
@@ -249,8 +247,9 @@ export async function processJobs() {
     Array.from({ length: concurrency }, async () => {
       while (slots < maximum && Date.now() - start < 240000) {
         slots++;
-        const { data, error } = await client.rpc("claim_document", {
+        const { data, error } = await client.rpc("claim_vendor_document", {
           hourly_limit: hourlyLimit,
+          source_ids: [...vendorIds],
         });
         if (error) throw error;
         const job = data?.[0];

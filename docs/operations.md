@@ -1,5 +1,9 @@
 # Operations and launch checks
 
+## Publisher activation follow-up — 24 October 2026
+
+The operator requested a PR to activate all 374 reviewed publisher feeds and create a restricted OpenAI key. See [publisher activation](publisher-activation.md) for the production configuration, 60-attempt/hour limit, shared-project funding boundary, merge-time migration and remaining evaluation gates. This supersedes earlier instructions to leave the vendor selection empty for this deployment. Live activation is not claimed until this PR is merged and its exact release is verified.
+
 ## Cron activation and first publications — 24 October 2026
 
 The [production run for `70439a1`](https://github.com/heist-security/security-advisory/actions/runs/40129932369) completed migrations at 20:29 UTC and reported the exact commit ready on Vercel at 20:30 UTC. The production domain serves the application over HTTPS. The operator then requested cron activation; all three jobs are now enabled every minute. This supersedes the paused-cron status in the earlier records below.
