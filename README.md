@@ -2,15 +2,15 @@
 
 **One open feed for security advisories, patches and mitigations.**
 
-Heist Feed gathers publisher announcements and upstream release notes, extracts security-relevant changes, and publishes them through one RSS feed and one JSON API. Subscribe to everything, or filter the same stream by technology, event type, CVE or source.
+Heist Feed combines structured vulnerability advisories and exploitation updates in one RSS feed and one JSON API. Selected publisher announcements and release notes can supplement that coverage. Subscribe to everything, or filter the same stream by technology, event type, CVE or source.
 
-It catches fixes that matter even when no new CVE is assigned. Every event links to its source; product and version facts include supporting quotations.
+Every event links to its source. Structured records preserve upstream identifiers and affected-version data; optional vendor extraction includes supporting quotations and can capture fixes without a new CVE.
 
-**Status: alpha.** The catalog contains 374 streams: 22 dedicated advisory streams, 26 mixed announcement streams and 326 release-note streams. These are retrieval-checked sources, not 374 comprehensive vulnerability databases. See [coverage](docs/source-coverage.md). Production extraction accuracy, cost and deployment checks must be completed before a hosted launch.
+**Status: alpha.** The default configuration imports structured OSV, official CVE List and CISA KEV records without LLM calls. EPSS and optional NVD data are available through the risk API. The historical 374-stream vendor catalog is retained for opt-in gaps. See [structured ingestion and activation](docs/structured-sources.md) and the [historical vendor coverage audit](docs/source-coverage.md). Hosted database validation, capacity checks and observation remain launch gates.
 
 ## Browse the visual feed
 
-The homepage `/` displays the events and filters directly. Existing `/feed` links redirect to the homepage with their filters intact. Search announcements, filter by type, technology, CVE or source, and expand each event to inspect version details and supporting quotations. URLs preserve the current view, and its RSS/JSON links use the same filters. No account is required.
+The homepage `/` displays the events and filters directly. Existing `/feed` links redirect to the homepage with their filters intact. Search announcements, filter by type, technology, CVE or source, and expand each event to inspect version details and source evidence. Structured imports identify source records and fields; vendor extractions include quotations. URLs preserve the current view, and its RSS/JSON links use the same filters. No account is required.
 
 Search requires migration `202610240005_feed_search.sql`; the production workflow applies it before deploying this version.
 
@@ -39,7 +39,7 @@ Requires Node.js 22+ and a fresh Supabase project.
 1. Run npm ci and copy .env.example to .env.local.
 2. Link the Supabase CLI project and run supabase db push. Existing installations apply only migrations they have not already run. Keep the CLI migration history intact; see the operations guide before automating an installation previously configured through the SQL editor.
 3. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. These are backend-only variables.
-4. Set OPENAI_API_KEY and OPENAI_MODEL to a model supporting Responses structured outputs. Use a provider project with a spending limit.
+4. Review `npm run sources:configure`, then run it with `--apply` to register the core sources using the existing schema. Set `VENDOR_SOURCE_IDS`, `OPENAI_API_KEY` and `OPENAI_MODEL` only for opted-in vendor extraction, with an agreed provider spending limit.
 5. Generate CRON_SECRET with openssl rand -hex 32.
 6. Set PUBLIC_BASE_URL=http://localhost:3000 and run npm run dev.
 
@@ -55,9 +55,9 @@ Export CRON_SECRET in your shell; reading .env.local does not export it there. R
 
 ## How it works
 
-1. **Poll:** fetch approved RSS/Atom sources and stage every entry in the fetched feed into a durable queue. Entries beyond the first batch are retained.
-2. **Collect:** claim queued entries, extract linked articles or inline notes, and enqueue changed document text. Leases fence superseded workers.
-3. **Extract and publish:** classify and extract with structured model output, validate quotations, and atomically publish revisions into the common event stream.
+1. **Poll:** checkpoint structured change indexes and KEV snapshots into a durable queue. Selected vendor feeds use the existing RSS/Atom adapter.
+2. **Collect:** normalize structured records directly, preserving native affected data. Vendor entries collect linked articles or inline notes. Leases fence superseded workers.
+3. **Process and publish:** structured records publish deterministically without a model. Opted-in vendor documents use the evaluated extraction model and quote validation. Both paths use the same atomic publication transaction and event stream.
 
 Transport sizes, queue batches, concurrency, retries and extraction attempts are bounded. A database-backed hourly attempt budget applies across overlapping model workers. It is not a currency spending limit.
 
@@ -69,7 +69,7 @@ Import this repository into Vercel as a Next.js project and complete the [one-ti
 
 The bundled workflow targets heist-security/security-advisory; forks must adapt the repository guards as described in the operations guide. The workflow needs environment-scoped database/Vercel credentials and project identifiers. Missing configuration stops the release. Application credentials stay in Vercel. The three per-minute schedules in vercel.json require a plan supporting that frequency; another scheduler can invoke the same endpoints.
 
-Keep preview credentials separate. Configure edge rate controls, private vulnerability reporting and branch protection before launch. Use the protected /api/cron/health endpoint for queue and source monitoring.
+After database readiness, reconcile source configuration as described above before activating ingestion. Keep preview credentials separate. Configure edge rate controls, private vulnerability reporting and branch protection before launch. Use the protected /api/cron/health endpoint for queue and source monitoring.
 
 Follow the concrete [operations and launch checklist](docs/operations.md). Repository files do not provision hosting, database resources, DNS, firewall rules or GitHub settings.
 
@@ -91,7 +91,7 @@ A separate opt-in live-model evaluation is available:
 
     npm run eval:live -- --allow-paid
 
-It spends provider credits. The bundled synthetic cases are smoke tests, not a production accuracy benchmark. Run a representative manually labeled corpus with --fixtures=path/to/cases.json --launch before releasing a hosted feed. See [evaluation guidance](docs/evaluation.md).
+It spends provider credits. The bundled synthetic cases are smoke tests, not a production accuracy benchmark. Run a representative manually labeled corpus with --fixtures=path/to/cases.json --launch before enabling vendor model extraction for a hosted feed. See [evaluation guidance](docs/evaluation.md).
 
 ## Scope and limitations
 
@@ -100,8 +100,8 @@ It spends provider credits. The bundled synthetic cases are smoke tests, not a p
 - Public feeds expose only a publisher's current feed window. Entries that disappear before polling cannot be recovered without a publisher-specific historical API. Feeds above the explicit transport/entry limits fail visibly; they are not silently truncated.
 - Changed article text may create a revision even when its security meaning is unchanged.
 - Distinct sources remain distinct advisories; related CVEs are links, not deduplication keys.
-- Version strings preserve publisher wording and are not executable semver constraints.
-- There is no structured OSV adapter yet.
+- Vendor display version strings preserve publisher wording. Structured affected data retains each upstream format and ecosystem semantics; consumers need format-aware matching.
+- Structured startup imports changes since an explicit checkpoint, not the full historical database. Expired upstream history and oversized data fail visibly.
 - Raw source text and queue data are private. Operators must set a retention policy and review upstream terms.
 
 ## Contribute and report issues
@@ -109,3 +109,9 @@ It spends provider credits. The bundled synthetic cases are smoke tests, not a p
 See [CONTRIBUTING.md](CONTRIBUTING.md) for source criteria and development checks, and [SECURITY.md](SECURITY.md) for private security reporting.
 
 Code: [MIT](LICENSE). Branding and upstream content: [NOTICE.md](NOTICE.md).
+
+## Structured sources
+
+Configure sources with `npm run sources:configure` (dry-run), then `--apply` after the separately managed database setup. No migration is included in this change. `VENDOR_SOURCE_IDS` is empty by default; OpenAI configuration and paid evaluation are needed only for opted-in vendor extraction. Read [activation and checkpoint recovery](docs/structured-sources.md) before enabling cron.
+
+The public source catalog shows the three core inputs plus selected vendors. Use `/sources?catalog=vendor` or `/api/v1/sources?catalog=vendor` to browse the historical optional catalog. Use `/api/v1/risk?cve=CVE-2021-44228` for exploitation context, optionally adding `&nvd=1` for single-CVE NVD enrichment.

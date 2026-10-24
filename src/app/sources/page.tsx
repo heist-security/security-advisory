@@ -1,10 +1,5 @@
 import type { Metadata } from "next";
-import {
-  registry,
-  channelCounts,
-  categories,
-  sourcePage,
-} from "@/lib/registry";
+import { sourcePage } from "@/lib/registry";
 import { pageParams, type SearchParams } from "@/lib/filters";
 export const metadata: Metadata = { title: "Sources" };
 const channelLabels = {
@@ -28,15 +23,18 @@ export default async function Sources({
     <main id="main" className="container sources-page">
       <header className="catalog-heading">
         <h1>
-          Sources <span className="heading-count">{registry.length}</span>
+          Sources <span className="heading-count">{result.catalog_count}</span>
         </h1>
         <p>
-          {channelCounts["security-advisories"]} advisory ·{" "}
-          {channelCounts["mixed-announcements"]} mixed ·{" "}
-          {channelCounts["release-notes"]} release-note streams
+          {result.catalog_channel_counts["security-advisories"]} advisory ·{" "}
+          {result.catalog_channel_counts["mixed-announcements"]} mixed ·{" "}
+          {result.catalog_channel_counts["release-notes"]} release-note streams
         </p>
       </header>
       <form className="filters catalog-filters" action="/sources">
+        {params.get("catalog") === "vendor" ? (
+          <input type="hidden" name="catalog" value="vendor" />
+        ) : null}
         <label>
           Search
           <input
@@ -59,7 +57,7 @@ export default async function Sources({
           Category
           <select name="category" defaultValue={result.category}>
             <option value="">All categories</option>
-            {categories.map((category) => (
+            {result.catalog_categories.map((category) => (
               <option key={category}>{category}</option>
             ))}
           </select>
@@ -72,7 +70,20 @@ export default async function Sources({
         <p>
           {result.total} matching sources · Page {result.page} of {result.pages}
         </p>
-        <a href="/sources">Reset filters</a>
+        {params.get("catalog") === "vendor" ? (
+          <a href="/sources">Configured sources</a>
+        ) : (
+          <a href="/sources?catalog=vendor">Optional vendor catalog</a>
+        )}
+        <a
+          href={
+            params.get("catalog") === "vendor"
+              ? "/sources?catalog=vendor"
+              : "/sources"
+          }
+        >
+          Reset filters
+        </a>
       </div>
       <div className="catalog-columns" aria-hidden="true">
         <span>Source</span>
@@ -100,9 +111,13 @@ export default async function Sources({
               </a>
               <a
                 href={source.verification.sample_url}
-                aria-label={"Checked document for " + source.name}
+                aria-label={
+                  (source.verification.checked_at
+                    ? "Checked document for "
+                    : "Data documentation for ") + source.name
+                }
               >
-                Sample
+                {source.verification.checked_at ? "Sample" : "Docs"}
               </a>
               <a href={"/?source=" + encodeURIComponent(source.id)}>Events</a>
             </div>
@@ -114,10 +129,16 @@ export default async function Sources({
               </summary>
               <div>
                 <p className="source-check">
-                  Checked{" "}
-                  <time dateTime={source.verification.checked_at}>
-                    {source.verification.checked_at.slice(0, 10)}
-                  </time>{" "}
+                  {source.verification.checked_at ? (
+                    <>
+                      Checked{" "}
+                      <time dateTime={source.verification.checked_at}>
+                        {source.verification.checked_at.slice(0, 10)}
+                      </time>
+                    </>
+                  ) : (
+                    "Structured adapter"
+                  )}{" "}
                   · Target interval {source.poll_interval_minutes} minutes
                 </p>
                 <p>{source.rationale}</p>
@@ -148,8 +169,10 @@ export default async function Sources({
         ) : null}
       </nav>
       <p className="catalog-note">
-        Checks verify retrieval and parsing, not complete coverage, live uptime
-        or extraction accuracy. A project may have multiple streams.
+        Structured advisory databases are configured by default; vendor feeds
+        are opt-in. Catalog entries do not establish live uptime or complete
+        coverage. Vendor checks verify retrieval and parsing, not extraction
+        accuracy.
       </p>
     </main>
   );

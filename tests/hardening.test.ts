@@ -56,7 +56,10 @@ describe("validated subscription filters", () => {
   });
   it("handles repeated browser parameters and bounds source pagination", () => {
     expect(pageParams({ q: ["ruby", "node"] }).get("q")).toBe("ruby");
-    expect(sourcePage(new URLSearchParams()).rows).toHaveLength(24);
+    expect(sourcePage(new URLSearchParams()).rows).toHaveLength(3);
+    expect(sourcePage(new URLSearchParams("catalog=vendor")).rows).toHaveLength(
+      24,
+    );
     expect(sourcePage(new URLSearchParams("page=-999")).page).toBe(1);
   });
 });

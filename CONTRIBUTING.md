@@ -21,6 +21,10 @@ Keep changes focused. Add regression coverage for ingestion, publication, filter
 
 ## Source contributions
 
+The default inputs are structured OSV, official CVE List and CISA KEV. Keep their adapters deterministic and preserve native version semantics, corrections and provenance. Run `npm run sources:verify-structured` for transport/parser checks; it does not test a live database or model quality. Add regression tests for pagination, checkpoints, record identity and withdrawals.
+
+Vendor streams are optional. Document the coverage or timeliness gap they address, select their IDs in `VENDOR_SOURCE_IDS`, and reconcile application configuration with `npm run sources:configure`. See [structured-source operations](docs/structured-sources.md). The historical RSS catalog workflow below is for maintaining that optional catalog, not activating all streams by default.
+
 Edit sources/candidates.json with publisher provenance, channel, adapter, exact HTTPS origins, optional repository path prefix, rationale and limitations. Prefer primary publishers and upstream repositories.
 
 Run npm run sources:verify with outbound network access. Review failed entries and sampled content, then generate a NEW migration using npm run sources:build -- --migration=YYYYMMDDHHMM_descriptive_name.sql. The command refuses to overwrite an existing migration. Do not edit applied migrations or inflate source counts with unreachable or tag-only feeds.

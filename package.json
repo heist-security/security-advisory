@@ -15,7 +15,9 @@
     "format:check": "prettier --check .",
     "test:browser": "playwright test",
     "check:secrets": "node scripts/check-secrets.mjs",
-    "eval:live": "node --env-file-if-exists=.env.local --import tsx scripts/evaluate.ts"
+    "eval:live": "node --env-file-if-exists=.env.local --import tsx scripts/evaluate.ts",
+    "sources:configure": "node --env-file-if-exists=.env.local --import tsx scripts/configure-sources.ts",
+    "sources:verify-structured": "node --import tsx scripts/verify-structured.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0",

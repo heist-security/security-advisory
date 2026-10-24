@@ -1,9 +1,11 @@
 import type { FeedEvent } from "@/lib/events";
 import { technologyKey, type Filters } from "@/lib/filters";
 import { feedLink } from "@/lib/feed-view";
-import { registry } from "@/lib/registry";
+import { registry, vendorRegistry } from "@/lib/registry";
 import { EventDetails } from "./event-details";
-const sourceNames = new Map(registry.map((source) => [source.id, source.name]));
+const sourceNames = new Map(
+  [...vendorRegistry, ...registry].map((source) => [source.id, source.name]),
+);
 export function EventCard({
   event,
   filters = {},
@@ -63,7 +65,9 @@ export function EventCard({
         <span>
           {event.extraction_method === "system"
             ? "Automated correction"
-            : "Machine-extracted"}{" "}
+            : event.extraction_method === "structured"
+              ? "Structured advisory"
+              : "Machine-extracted"}{" "}
           · Revision {event.revision}
         </span>
         <a href={event.source_url}>Original source</a>
