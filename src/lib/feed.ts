@@ -21,14 +21,15 @@ export type Source = z.infer<typeof sourceSchema>;
 export class NoReleaseNotesError extends Error {}
 export function cleanText(html: string) {
   const $ = load(html);
-  $("script,style,nav,footer,header,aside,noscript").remove();
+  $("script,style,nav,footer,aside,noscript").remove();
   $("p,li,div,h1,h2,h3,h4,h5,h6,br,tr,td,pre").append(" ");
   return $.text().replace(/\s+/g, " ").trim();
 }
 export function articleText(html: string) {
   const $ = load(html);
   if (/just a moment|access denied|making sure you.re not a bot|verify you are human|site unavailable/i.test($("title").text())) throw new Error("Source returned a challenge, access-denied or unavailable page");
-  $("script,style,nav,footer,header,aside,noscript").remove();
+  $("script,style,nav,footer,aside,noscript").remove();
+  $("body > header, [role=banner]").not("article header, main header").remove();
   const article = $("article").first(); const main = $("main").first();
   const selected = article.length ? article : main.length ? main : $("body");
   return boundedText(cleanText(selected.html() ?? ""));
@@ -65,6 +66,6 @@ export function inlineText(item: Item, feedTitle?: string) {
 }
 export async function documentText(source: Source, item: Item, feedTitle?: string) {
   const url = itemUrl(source, item);
-  const body = source.adapter === "feed-content" ? inlineText(item, feedTitle) : articleText(await fetchText(url, source.allowed_origins));
+  const body = source.adapter === "feed-content" ? inlineText(item, feedTitle) : articleText(await fetchText(url, source.allowed_origins, 2_000_000, source.item_url_prefix ?? undefined));
   return { url, body };
 }

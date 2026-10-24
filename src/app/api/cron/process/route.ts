@@ -1,8 +1,4 @@
-import { authorized } from "@/lib/cron";
 import { processJobs } from "@/lib/ingest";
+import { runCron } from "@/lib/cron-handler";
 export const maxDuration = 300;
-export async function GET(request: Request) {
-  if (!authorized(request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  try { return Response.json(await processJobs(), { headers: { "Cache-Control": "no-store" } }); }
-  catch { console.error("Extraction worker failed"); return Response.json({ error: "Processing failed" }, { status: 500 }); }
-}
+export async function GET(request: Request) { return runCron(request, "process", processJobs); }

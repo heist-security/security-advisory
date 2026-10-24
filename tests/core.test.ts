@@ -48,7 +48,7 @@ describe("collector boundaries", () => {
 });
 describe("public RSS and private jobs", () => {
   it("escapes XML and uses event identity rather than CVE identity", () => {
-    const row: FeedEvent = { id: 12, advisory_id: "a", revision: 2, source_id: "ruby", source_url: "https://example.com/?a=1&b=2", source_published_at: null, published_at: "2026-10-23T00:00:00Z", extraction_method: "llm", payload: { ...extraction, title: "Fix <script> & upgrade" } };
+    const row: FeedEvent = { id: 12, advisory_id: "a", revision: 2, source_id: "ruby", source_url: "https://example.com/?a=1&b=2", source_published_at: null, published_at: "2026-10-23T00:00:00Z", extraction_method: "llm", technologies: [], cve_ids: [], event_types: [], payload: { ...extraction, title: "Fix <script> & upgrade" } };
     const output = rss([row], "https://feed.heist.security");
     expect(output).toContain("Fix &lt;script&gt; &amp; upgrade");
     expect(output).toContain("heist-event:12"); expect(output).toContain("Revision 2");

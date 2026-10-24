@@ -1,0 +1,8 @@
+node_modules
+.next
+package-lock.json
+sources/
+supabase/migrations/
+docs/source-coverage.md
+test-results/
+playwright-report/

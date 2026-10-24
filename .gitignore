@@ -4,3 +4,7 @@ node_modules/
 !.env.example
 *.tsbuildinfo
 .vercel/
+
+test-results/
+playwright-report/
+evaluation-results.json
