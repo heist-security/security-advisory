@@ -10,7 +10,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "sources:verify": "node --import tsx scripts/verify-sources.ts",
-    "sources:build": "node --import tsx scripts/build-registry.ts"
+    "sources:build": "node --import tsx scripts/build-registry.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:browser": "playwright test",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "eval:live": "node --env-file-if-exists=.env.local --import tsx scripts/evaluate.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0",
@@ -29,9 +34,12 @@
     "@types/react-dom": "^19.2.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "prettier": "3.9.10",
+    "@playwright/test": "1.64.1"
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "license": "MIT"
 }

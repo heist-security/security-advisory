@@ -1,108 +1,246 @@
 import { createHash } from "node:crypto";
+import type { Item } from "rss-parser";
 import { db } from "./db";
 import { fetchResource } from "./http";
 import { extract } from "./extract";
-import { documentText, NoReleaseNotesError, parseFeed, sourceSchema, type Source } from "./feed";
+import {
+  documentText,
+  itemUrl,
+  NoReleaseNotesError,
+  parseFeed,
+  sourceSchema,
+  type Source,
+} from "./feed";
 import { setting } from "./config";
+import { failureReason } from "./errors";
 export { articleText } from "./feed";
-export function digest(text: string) { return createHash("sha256").update(text).digest("hex"); }
-type ClaimedSource = Source & { lease_token: string; etag: string | null; last_modified: string | null };
+export function digest(text: string) {
+  return createHash("sha256").update(text).digest("hex");
+}
+type ClaimedSource = Source & {
+  lease_token: string;
+  etag: string | null;
+  last_modified: string | null;
+};
 type Client = ReturnType<typeof db>;
-function errorMessage(error: unknown) { return error instanceof Error ? error.message.slice(0, 250) : "Database or source operation failed"; }
 
-async function pollSource(client: Client, source: ClaimedSource) {
-  const started = Date.now();
-  let checked = 0; let added = 0; let failed = 0; let skipped = 0;
-  let failure: string | null = null;
+async function pollSource(
+  client: Client,
+  source: ClaimedSource,
+  deadline: number,
+) {
+  let staged = 0;
+  let failures = 0;
   let resource: Awaited<ReturnType<typeof fetchResource>> | undefined;
   try {
     sourceSchema.parse(source);
-    // Article bodies can change even when the publisher leaves the RSS unchanged.
-    // Only inline-content sources can safely skip documents after an RSS 304.
     resource = await fetchResource(source.feed_url, source.allowed_origins, {
-      ...(source.adapter === "feed-content" ? source : {}), max_bytes: source.max_feed_bytes,
+      ...(source.adapter === "feed-content" ? source : {}),
+      max_bytes: source.max_feed_bytes,
     });
     if (resource.text !== null) {
       const feed = await parseFeed(resource.text);
-      const items = feed.items.slice(0, setting("POLL_MAX_ITEMS", 30, 1, 30));
-      if (!items.length) throw new Error("Feed has no entries");
-      for (let index = 0; index < items.length; index += 3) {
-        if (Date.now() - started > 100000) { failed++; failure = "Source window exceeded time budget; remaining entries require retry or a dedicated adapter"; break; }
-        await Promise.all(items.slice(index, index + 3).map(async item => {
-          try {
-            const { url, body } = await documentText(source, item, feed.title);
-            const published = item.isoDate && Number.isFinite(Date.parse(item.isoDate)) ? new Date(item.isoDate).toISOString() : null;
-            const result = await client.rpc("enqueue_document", { source: source.id, url, hash: digest(body), content: body, published });
-            if (result.error) throw result.error;
-            checked++; if (result.data) added++;
-          } catch (error) {
-            if (error instanceof NoReleaseNotesError) skipped++;
-            else { failed++; failure ??= errorMessage(error); }
-          }
-        }));
+      if (!feed.items.length) throw new Error("Feed has no entries");
+      if (feed.items.length > 20000)
+        throw new Error(
+          "Entry limit exceeded; source requires a paginated adapter",
+        );
+      // Enumerate the complete fetched feed, then collect documents from a durable queue.
+      // A crash halfway through staging is safe: validators are only committed after all batches.
+      const unique = new Map<
+        string,
+        { url: string; fingerprint: string; item: Item; feed_title: string }
+      >();
+      for (const item of feed.items) {
+        try {
+          const url = itemUrl(source, item);
+          const feed_title = feed.title ?? source.name;
+          if (!unique.has(url))
+            unique.set(url, {
+              url,
+              fingerprint: digest(JSON.stringify([item, feed_title])),
+              item,
+              feed_title,
+            });
+        } catch {
+          failures++;
+        }
       }
-      if (!checked && skipped) { failed++; failure = "Current feed window has no substantive release notes"; }
+      const entries = [...unique.values()];
+      for (let index = 0; index < entries.length; index += 500) {
+        if (Date.now() >= deadline)
+          throw new Error("Polling deadline exceeded");
+        const { error } = await client.rpc("stage_feed_entries", {
+          p_source: source.id,
+          p_token: source.lease_token,
+          p_entries: entries.slice(index, index + 500),
+        });
+        if (error) throw error;
+        staged += entries.slice(index, index + 500).length;
+      }
     }
-    // Do not cache a partial poll: a 304 next time would prevent retrying failed articles.
-    const complete = await client.rpc("complete_source", {
-      source_id: source.id, token: source.lease_token, succeeded: failed === 0,
-      message: failed ? `${failed} item failures: ${failure}` : null,
-      new_etag: failed ? null : resource.etag, new_last_modified: failed ? null : resource.last_modified,
+    const { error } = await client.rpc("complete_source", {
+      source_id: source.id,
+      token: source.lease_token,
+      succeeded: failures === 0,
+      message: failures ? "source_url_rejected" : null,
+      new_etag: failures ? null : resource.etag,
+      new_last_modified: failures ? null : resource.last_modified,
     });
-    if (complete.error) throw complete.error;
+    if (error) throw error;
   } catch (error) {
-    const result = await client.rpc("complete_source", { source_id: source.id, token: source.lease_token, succeeded: false, message: errorMessage(error), new_etag: null, new_last_modified: null });
+    const result = await client.rpc("complete_source", {
+      source_id: source.id,
+      token: source.lease_token,
+      succeeded: false,
+      message: failureReason(error),
+      new_etag: null,
+      new_last_modified: null,
+    });
     if (result.error) throw result.error;
-    failed++;
+    failures++;
   }
-  return { checked, added, failed, skipped, not_modified: resource?.status === 304 ? 1 : 0 };
+  return { staged, failures, not_modified: resource?.status === 304 ? 1 : 0 };
 }
 
 export async function poll() {
-  const client = db(); const start = Date.now();
-  const maximum = setting("POLL_BATCH_SIZE", 12, 1, 50);
-  const concurrency = setting("POLL_CONCURRENCY", 4, 1, 8);
+  const client = db(),
+    start = Date.now();
+  const maximum = setting("POLL_BATCH_SIZE", 12, 1, 50),
+    concurrency = setting("POLL_CONCURRENCY", 4, 1, 8);
   let slots = 0;
-  const totals = { sources: 0, documents_checked: 0, documents_added: 0, failures: 0, skipped: 0, not_modified: 0 };
-  await Promise.all(Array.from({ length: concurrency }, async () => {
-    // Stop starting sources after 140 seconds. Per-source work is bounded,
-    // with time reserved for the final fetch/RPC group and lease completion.
-    while (slots < maximum && Date.now() - start < 140000) {
-      slots++;
-      const { data, error } = await client.rpc("claim_source");
-      if (error) throw error;
-      const source = data?.[0] as ClaimedSource | undefined; if (!source) break;
-      const result = await pollSource(client, source);
-      totals.sources++; totals.documents_checked += result.checked; totals.documents_added += result.added;
-      totals.failures += result.failed; totals.skipped += result.skipped; totals.not_modified += result.not_modified;
-    }
-  }));
+  const totals = {
+    sources: 0,
+    entries_staged: 0,
+    failures: 0,
+    not_modified: 0,
+  };
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (slots < maximum && Date.now() - start < 60000) {
+        slots++;
+        const { data, error } = await client.rpc("claim_source");
+        if (error) throw error;
+        const source = data?.[0] as ClaimedSource | undefined;
+        if (!source) break;
+        const result = await pollSource(client, source, start + 240000);
+        totals.sources++;
+        totals.entries_staged += result.staged;
+        totals.failures += result.failures;
+        totals.not_modified += result.not_modified;
+      }
+    }),
+  );
+  return totals;
+}
+
+export async function collect() {
+  const client = db(),
+    start = Date.now();
+  const maximum = setting("COLLECT_BATCH_SIZE", 60, 1, 500),
+    concurrency = setting("COLLECT_CONCURRENCY", 4, 1, 12);
+  let slots = 0;
+  const totals = { collected: 0, added: 0, skipped: 0, failed: 0 };
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (slots < maximum && Date.now() - start < 180000) {
+        slots++;
+        const { data, error } = await client.rpc("claim_feed_entry");
+        if (error) throw error;
+        const job = data?.[0];
+        if (!job) break;
+        const { entry, source } = job;
+        try {
+          let body = "";
+          let skipped = false;
+          try {
+            body = (
+              await documentText(
+                sourceSchema.parse(source),
+                entry.item,
+                entry.feed_title,
+              )
+            ).body;
+          } catch (error) {
+            if (error instanceof NoReleaseNotesError) skipped = true;
+            else throw error;
+          }
+          const date = entry.item.isoDate;
+          const published =
+            date && Number.isFinite(Date.parse(date))
+              ? new Date(date).toISOString()
+              : null;
+          const result = await client.rpc("complete_feed_entry", {
+            p_id: entry.id,
+            p_token: entry.lease_token,
+            p_body: body,
+            p_hash: digest(body),
+            p_published: published,
+            p_skipped: skipped,
+          });
+          if (result.error) throw result.error;
+          totals.collected++;
+          if (result.data) totals.added++;
+          if (skipped) totals.skipped++;
+        } catch (error) {
+          const result = await client.rpc("fail_feed_entry", {
+            p_id: entry.id,
+            p_token: entry.lease_token,
+            p_reason: failureReason(error),
+          });
+          if (result.error) throw result.error;
+          totals.failed++;
+        }
+      }
+    }),
+  );
   return totals;
 }
 
 export async function processJobs() {
-  // Fail before claiming work if secrets/model are missing; do not exhaust the queue.
-  if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_MODEL) throw new Error("Extraction is not configured");
-  const client = db(); const start = Date.now(); let slots = 0; let processed = 0; let failed = 0;
-  const maximum = setting("PROCESS_BATCH_SIZE", 24, 1, 100);
-  const concurrency = setting("PROCESS_CONCURRENCY", 4, 1, 12);
-  await Promise.all(Array.from({ length: concurrency }, async () => {
-    while (slots < maximum && Date.now() - start < 180000) {
-      slots++;
-      const { data, error } = await client.rpc("claim_document");
-      if (error) throw error;
-      const job = data?.[0]; if (!job) break;
-      try {
-        const normalized = await extract(job.body);
-        const result = await client.rpc("finish_document", { document_id: job.id, token: job.lease_token, result: normalized, model_name: process.env.OPENAI_MODEL });
-        if (result.error) throw result.error;
-        processed++;
-      } catch {
-        const { error: retryError } = await client.rpc("fail_document", { document_id: job.id, token: job.lease_token });
-        if (retryError) throw retryError;
-        failed++;
+  if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_MODEL)
+    throw new Error("Extraction is not configured");
+  const client = db(),
+    start = Date.now();
+  const maximum = setting("PROCESS_BATCH_SIZE", 24, 1, 100),
+    concurrency = setting("PROCESS_CONCURRENCY", 4, 1, 12);
+  const hourlyLimit = setting("EXTRACTION_HOURLY_LIMIT", 1440, 1, 10000);
+  let slots = 0,
+    processed = 0,
+    failed = 0;
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (slots < maximum && Date.now() - start < 180000) {
+        slots++;
+        const { data, error } = await client.rpc("claim_document", {
+          hourly_limit: hourlyLimit,
+        });
+        if (error) throw error;
+        const job = data?.[0];
+        if (!job) break;
+        try {
+          const normalized = await extract(job.body);
+          const result = await client.rpc("finish_document", {
+            document_id: job.id,
+            token: job.lease_token,
+            result: normalized,
+            model_name: process.env.OPENAI_MODEL,
+          });
+          if (result.error) throw result.error;
+          processed++;
+        } catch (error) {
+          const reason = failureReason(error);
+          const result = await client.rpc("fail_document", {
+            document_id: job.id,
+            token: job.lease_token,
+            reason,
+          });
+          if (result.error) throw result.error;
+          console.warn(JSON.stringify({ operation: "extract", reason }));
+          failed++;
+        }
       }
-    }
-  }));
+    }),
+  );
   return { processed, failed };
 }

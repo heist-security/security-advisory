@@ -49,10 +49,10 @@ GitHub streams with a latest dated entry older than one year received an additio
 
 - GitHub release feeds are reused for their inline notes. GitHub tag-only entries are skipped, and projects whose checked feed contains no substantive release notes are excluded. External changelogs, assets, commits, and repository security advisories are not crawled automatically.
 - Dedicated vendor pages without a working RSS/Atom endpoint need a separate adapter. Rejected candidates below are not enabled or counted. A rejection can reflect network access, temporary failure, or an unsupported format—not the absence of a vendor advisory service.
-- Updates are watched only while entries remain in the current feed window. Very busy streams can outrun a 30-entry window; check lag and add a paginated API adapter where necessary.
+- Updates are watched only while entries remain in the current feed window. Every entry in a fetched feed is durably staged. Publishers can still remove entries between polls; monitor lag and add a historical API adapter where necessary.
 - Exact-quote validation reduces invented fields but cannot prove correct product/version association. Production model evaluation remains required.
 - No vendor coverage is inferred from a distribution package advisory: Debian or Ubuntu backport versions remain distinct from upstream fixed versions.
-- OSV ingestion in the existing Heist repository remains separate; this catalog does not claim to include OSV.
+- This catalog does not yet include a structured OSV adapter.
 
 ## Enabled catalog
 
