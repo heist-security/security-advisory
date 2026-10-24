@@ -1,0 +1,86 @@
+name: Production
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  pull_request:
+permissions:
+  contents: read
+# Hold the lock through migration AND Vercel readiness. Never interrupt running DDL.
+concurrency:
+  group: production-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false
+jobs:
+  check:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/check.yml
+  browser:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/browser.yml
+  migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
+        with:
+          version: 2.122.0
+      - name: Apply migrations and verify a second push is a no-op
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: ci-only-password
+          PGDATABASE: postgres
+        run: |
+          psql -v ON_ERROR_STOP=1 -c 'create role anon; create role authenticated; create role service_role bypassrls;'
+          supabase db push --db-url 'postgresql://postgres:ci-only-password@localhost:5432/postgres?sslmode=disable' --yes
+          first=$(psql -At -c 'select count(*) from supabase_migrations.schema_migrations')
+          expected=$(find supabase/migrations -name '*.sql' -type f | wc -l)
+          test "$first" -eq "$expected"
+          supabase db push --db-url 'postgresql://postgres:ci-only-password@localhost:5432/postgres?sslmode=disable' --yes
+          second=$(psql -At -c 'select count(*) from supabase_migrations.schema_migrations')
+          test "$first" -eq "$second"
+  release:
+    needs: [check, browser, migrations]
+    if: >-
+      github.repository == 'heist-security/security-advisory' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
+        with:
+          version: 2.122.0
+      - name: Migrate, then deploy the checked commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_CA_CERT: ${{ secrets.SUPABASE_DB_CA_CERT }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+        run: node .github/scripts/release.mjs

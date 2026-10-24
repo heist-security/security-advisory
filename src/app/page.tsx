@@ -1,200 +1,198 @@
+import type { Metadata } from "next";
 import { cachedEvents } from "@/lib/cached-events";
 import { configured } from "@/lib/db";
 import type { FeedEvent } from "@/lib/events";
 import {
+  eventTypes,
   filterQuery,
   pageParams,
   parseEventQuery,
   type EventQuery,
   type SearchParams,
 } from "@/lib/filters";
-import { registry, categoryCount, channelCounts } from "@/lib/registry";
-import { FeedFilters } from "@/components/feed-filters";
+import { feedLink, groupEvents, dayLabel, typeLabels } from "@/lib/feed-view";
+import { registry } from "@/lib/registry";
 import { EventCard } from "@/components/event-card";
-
-export default async function Home({
+export const metadata: Metadata = {
+  title: "Security feed",
+  description:
+    "Browse security advisories, patches and mitigations in one open feed. Search by technology, CVE or source and inspect the evidence.",
+};
+const sources = [...registry].sort((a, b) => a.name.localeCompare(b.name));
+export default async function Feed({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
   let query: EventQuery = { limit: 20 },
     error = "",
-    unavailable = false;
+    unavailable = !configured();
   try {
     query = parseEventQuery(pageParams(await searchParams), 20);
+    if (query.after !== undefined)
+      throw new Error("Use the JSON API for incremental cursors");
+    query.limit = Math.min(query.limit, 50);
   } catch (cause) {
     error = (cause as Error).message;
   }
-  let rows: FeedEvent[] = [];
-  if (configured() && !error) {
+  let rows: FeedEvent[] = [],
+    hasMore = false;
+  if (!unavailable && !error) {
     try {
-      rows = await cachedEvents(query);
+      const result = await cachedEvents({ ...query, limit: query.limit + 1 });
+      hasMore = result.length > query.limit;
+      rows = result.slice(0, query.limit);
     } catch {
       unavailable = true;
     }
   }
   const filters = filterQuery(query),
     suffix = filters.size ? "?" + filters : "";
-  const older = new URLSearchParams(filters);
-  if (rows.length)
-    older.set("before", String(Math.min(...rows.map((r) => r.id))));
-  const filtered = filters.size > 0;
+  const groups = groupEvents(rows);
+  const latest = feedLink(query);
   return (
-    <main id="main" className="container">
-      <section className="hero">
-        <div className="hero-copy">
-          <div className="eyebrow">
-            <span className="signal" /> OPEN SECURITY FEED{" "}
-            <span className="alpha">ALPHA</span>
-          </div>
-          <h1>
-            Security changes.
-            <br />
-            <span>One place to listen.</span>
-          </h1>
-          <p>
-            Advisories, patches, and mitigations from across the software
-            ecosystem. One open feed, with the source behind every event.
-          </p>
-          <div className="actions">
-            <a className="button primary" href={"/feed.xml" + suffix}>
-              Subscribe via RSS ↗
-            </a>
-            <a className="button" href="/docs">
-              Explore the API →
-            </a>
-          </div>
+    <main id="main" className="container browser-feed">
+      <section className="browser-heading">
+        <h1>Security feed</h1>
+        <nav className="format-links" aria-label="Feed formats">
+          <a href={"/feed.xml" + suffix}>RSS</a>
+          <a href={"/api/v1/events" + suffix}>JSON</a>
+        </nav>
+      </section>
+      <form
+        className="filters feed-filters"
+        action="/"
+        role="search"
+        aria-label="Filter the feed"
+      >
+        <label>
+          Search
+          <input
+            name="q"
+            type="search"
+            maxLength={120}
+            placeholder="Search announcements…"
+            defaultValue={query.q ?? ""}
+          />
+        </label>
+        <label>
+          Type
+          <select name="type" defaultValue={query.type ?? ""}>
+            <option value="">All types</option>
+            {eventTypes.map((type) => (
+              <option key={type} value={type}>
+                {typeLabels[type]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Technology
+          <input
+            name="technology"
+            placeholder="e.g. Node.js"
+            maxLength={100}
+            defaultValue={query.technology ?? ""}
+          />
+        </label>
+        <label>
+          CVE
+          <input
+            name="cve"
+            placeholder="CVE-2026-12345"
+            maxLength={28}
+            defaultValue={query.cve ?? ""}
+          />
+        </label>
+        <label>
+          Source
+          <select name="source" defaultValue={query.source ?? ""}>
+            <option value="">All sources</option>
+            {query.source &&
+            !sources.some((source) => source.id === query.source) ? (
+              <option value={query.source}>{query.source}</option>
+            ) : null}
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="filter-actions">
+          <button type="submit" className="button">
+            Filter
+          </button>
+          {filters.size > 0 && !error ? <a href="/">Reset filters</a> : null}
         </div>
-        <aside className="subscription-panel">
-          <div className="panel-label">ONE STREAM · YOUR STACK</div>
-          <div className="stream-tags">
-            <span>Runtimes</span>
-            <span>Cloud</span>
-            <span>Libraries</span>
-            <span>Infrastructure</span>
-          </div>
-          <div className="stream-line" aria-hidden="true" />
-          <div className="stream-target">
-            <span className="signal" />
-            <strong>Heist Feed</strong>
-            <span>RSS + JSON</span>
-          </div>
-          <p>
-            Listen to everything, or subscribe to the technologies and CVEs that
-            matter to you.
-          </p>
-          <a className="endpoint" href={"/feed.xml" + suffix}>
-            <code>/feed.xml{suffix}</code>
-            <span>↗</span>
+      </form>
+      <section className="feed-reader" aria-label="Security announcements">
+        {query.before !== undefined && rows.length > 0 ? (
+          <a href={latest} className="latest-link">
+            Back to latest events
           </a>
-          <small>
-            {filtered
-              ? "Your filters also apply to this RSS subscription."
-              : "No account or API key required."}
-          </small>
-        </aside>
-      </section>
-      <section className="coverage" aria-label="Source coverage">
-        <div>
-          <strong>{registry.length}</strong>
-          <span>source streams</span>
-        </div>
-        <div>
-          <strong>{categoryCount}</strong>
-          <span>categories</span>
-        </div>
-        <p>
-          {channelCounts["security-advisories"]} advisory ·{" "}
-          {channelCounts["mixed-announcements"]} mixed ·{" "}
-          {channelCounts["release-notes"]} release-note streams
-        </p>
-        <a href="/sources">Inspect coverage ↗</a>
-      </section>
-      <section className="feed-section">
-        <div className="section-heading">
-          <div>
-            <div className="eyebrow">THE UNIFIED STREAM</div>
-            <h2>
-              {filtered ? "Your security feed" : "Latest security events"}
-            </h2>
-          </div>
-          <a href="/">Clear filters</a>
-        </div>
-        <FeedFilters filters={query} />
-        {error ? (
-          <p className="notice" role="alert">
-            {error}. <a href="/">Reset filters</a>.
-          </p>
         ) : null}
-        <div className="feed-links">
-          <a href={"/feed.xml" + suffix}>
-            RSS{filtered ? " with these filters" : ""} ↗
-          </a>
-          <a href={"/api/v1/events" + suffix}>
-            JSON{filtered ? " with these filters" : ""} ↗
-          </a>
-          <span>Corrections stay in your subscription.</span>
-        </div>
-        {rows.length ? (
-          <div className="events">
-            {rows.map((event) => (
-              <EventCard key={event.id} event={event} />
+        {error ? (
+          <p className="reader-empty" role="alert">
+            {error}. <a href="/">Reset filters</a>
+          </p>
+        ) : unavailable ? (
+          <p className="reader-empty" role="status">
+            Feed temporarily unavailable. <a href={latest}>Try again</a>
+          </p>
+        ) : !rows.length ? (
+          <p className="reader-empty" role="status">
+            {query.before !== undefined ? (
+              <>
+                No earlier events. <a href={latest}>Back to latest events</a>
+              </>
+            ) : filters.size ? (
+              "No events match your filters."
+            ) : (
+              "No events yet."
+            )}
+          </p>
+        ) : (
+          <div className="event-timeline">
+            {groups.map((group, index) => (
+              <section
+                className="event-day"
+                key={group.day + "-" + index}
+                aria-labelledby={"day-" + index}
+              >
+                <h2 id={"day-" + index} className="day-heading">
+                  <time
+                    dateTime={group.day}
+                    title="Date added to the feed (UTC)"
+                  >
+                    {dayLabel(group.day)}
+                  </time>
+                </h2>
+                {group.events.map((event) => (
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    filters={query}
+                    expanded
+                  />
+                ))}
+              </section>
             ))}
           </div>
-        ) : (
-          <div className="empty">
-            <span className="empty-mark" aria-hidden="true">
-              ↳
-            </span>
-            <div>
-              <h3>
-                {unavailable
-                  ? "The feed is temporarily unavailable."
-                  : filtered
-                    ? "No matching events yet."
-                    : "Waiting for the first announcements."}
-              </h3>
-              <p>
-                {unavailable
-                  ? "Please try again shortly."
-                  : filtered
-                    ? "Try another technology or clear your filters."
-                    : "Browse the source catalog while the first source-backed events are collected."}
-              </p>
-            </div>
-          </div>
         )}
-        {rows.length === query.limit && query.after === undefined ? (
-          <a className="button pagination-next" href={"/?" + older}>
-            Older events →
-          </a>
+        {hasMore && rows.length ? (
+          <div className="reader-pagination">
+            <a
+              className="button"
+              href={feedLink(query, {
+                before: String(rows.at(-1)!.id),
+                limit: String(query.limit),
+              })}
+            >
+              Older events
+            </a>
+          </div>
         ) : null}
-      </section>
-      <section className="principles">
-        <div>
-          <span>01 / COVERAGE</span>
-          <h3>More than CVEs</h3>
-          <p>
-            Security fixes can matter even when no new vulnerability ID is
-            assigned.
-          </p>
-        </div>
-        <div>
-          <span>02 / EVIDENCE</span>
-          <h3>Always source-backed</h3>
-          <p>
-            Product and version fields carry quotations. Original publishers
-            remain authoritative.
-          </p>
-        </div>
-        <div>
-          <span>03 / CONTINUITY</span>
-          <h3>Updates stay visible</h3>
-          <p>
-            Stable advisory IDs and revision events let you follow changes and
-            corrections.
-          </p>
-        </div>
       </section>
     </main>
   );

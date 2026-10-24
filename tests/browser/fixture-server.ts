@@ -76,7 +76,31 @@ createServer((req, res) => {
     res.writeHead(404).end();
     return;
   }
+  if (url.searchParams.get("source_id") === "eq.fixture-unavailable") {
+    res
+      .writeHead(503, { "Content-Type": "application/json" })
+      .end(JSON.stringify({ message: "Fixture unavailable" }));
+    return;
+  }
   let data = rows.filter((row) => {
+    const search = url.searchParams.get("search_document");
+    if (search) {
+      // Only a request-boundary stub. Actual PostgreSQL search semantics are tested in PGlite.
+      const words =
+        search
+          .slice(search.indexOf(".") + 1)
+          .toLowerCase()
+          .match(/[a-z0-9]+/g) ?? [];
+      const document = JSON.stringify([
+        row.payload,
+        row.source_id,
+        row.technologies,
+        row.cve_ids,
+        row.event_types,
+      ]).toLowerCase();
+      if (!words.length || !words.every((word) => document.includes(word)))
+        return false;
+    }
     for (const key of ["technologies", "cve_ids", "event_types"] as const) {
       const value = url.searchParams.get(key);
       if (value && !row[key].includes(value.slice(4, -1))) return false;

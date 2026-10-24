@@ -7,6 +7,7 @@ export const eventTypes = [
 ] as const;
 export type EventType = (typeof eventTypes)[number];
 export type Filters = {
+  q?: string;
   type?: EventType;
   technology?: string;
   cve?: string;
@@ -40,6 +41,7 @@ export function parseEventQuery(
   defaultLimit = 30,
 ): EventQuery {
   for (const key of [
+    "q",
     "type",
     "kind",
     "technology",
@@ -52,6 +54,9 @@ export function parseEventQuery(
     if (params.getAll(key).length > 1)
       throw new Error("Repeated filter parameters are not supported");
   }
+  const q = params.get("q")?.trim().replace(/\s+/g, " ") || undefined;
+  if (q && (q.length > 120 || /[\x00-\x1F\x7F]/.test(q)))
+    throw new Error("Search must be 1 to 120 printable characters");
   const type = params.get("type") || params.get("kind") || undefined;
   if (
     params.get("type") &&
@@ -86,6 +91,7 @@ export function parseEventQuery(
     throw new Error("Use after or before, not both");
   if (limit < 1 || limit > 100) throw new Error("Limit must be 1 to 100");
   return {
+    q,
     type: type as EventType | undefined,
     technology: rawTechnology ? technologyKey(rawTechnology) : undefined,
     cve,
@@ -97,7 +103,7 @@ export function parseEventQuery(
 }
 export function filterQuery(filters: Filters) {
   const params = new URLSearchParams();
-  for (const key of ["type", "technology", "cve", "source"] as const)
+  for (const key of ["q", "type", "technology", "cve", "source"] as const)
     if (filters[key]) params.set(key, filters[key]!);
   return params;
 }

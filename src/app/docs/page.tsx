@@ -4,16 +4,16 @@ export default function Docs() {
   return (
     <main id="main" className="container">
       <article className="prose">
-        <div className="eyebrow">BUILT TO BE CONSUMED</div>
-        <h1>
-          One stream.
-          <br />
-          Your subscription.
-        </h1>
+        <h1>API documentation</h1>
         <p>
-          All sources publish into the same RSS and JSON feed. Follow
-          everything, or narrow your subscription with optional filters. No
-          account or API key is required.
+          All sources publish into one feed, available visually, as RSS, or as
+          JSON. Follow everything, or narrow your subscription with optional
+          filters. No account or API key is required.
+        </p>
+        <h2>Browse visually</h2>
+        <p>
+          <a href="/">Open the feed</a> to search the archive, filter by your
+          stack, and expand source evidence and version details.
         </p>
         <h2>Subscribe</h2>
         <pre>
@@ -30,6 +30,13 @@ export default function Docs() {
             </tr>
           </thead>
           <tbody>
+            <tr>
+              <td>q</td>
+              <td>
+                Search published text and subscription keys; up to 120
+                characters
+              </td>
+            </tr>
             <tr>
               <td>type</td>
               <td>advisory, patch, mitigation, withdrawal or other</td>
@@ -56,6 +63,8 @@ export default function Docs() {
           Filters combine with AND. Source and technology keys are available in
           event responses. Corrections retain earlier subscription keys, so an
           update can reach you even if its latest classification changes.
+          Keyword searches match the current event text and retained routing
+          keys; previous free-text wording is not retained.
         </p>
         <h2>Read the JSON archive</h2>
         <pre>
@@ -86,11 +95,11 @@ export default function Docs() {
         </p>
         <p>
           <a href="https://github.com/heist-security/security-advisory/blob/main/docs/api.md">
-            Full response example and API semantics ↗
+            Full response example and API semantics
           </a>
         </p>
         <p>
-          <a href="/sources">Inspect source coverage →</a>
+          <a href="/sources">Source coverage</a>
         </p>
       </article>
     </main>

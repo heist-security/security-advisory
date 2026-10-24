@@ -7,6 +7,11 @@ import {
 } from "@/lib/registry";
 import { pageParams, type SearchParams } from "@/lib/filters";
 export const metadata: Metadata = { title: "Sources" };
+const channelLabels = {
+  "security-advisories": "Advisories",
+  "mixed-announcements": "Mixed announcements",
+  "release-notes": "Release notes",
+};
 export default async function Sources({
   searchParams,
 }: {
@@ -20,31 +25,23 @@ export default async function Sources({
     return "/sources?" + next;
   };
   return (
-    <main id="main" className="container">
-      <section className="page-intro">
-        <div className="eyebrow">TRANSPARENT COVERAGE</div>
+    <main id="main" className="container sources-page">
+      <header className="catalog-heading">
         <h1>
-          {registry.length} streams.
-          <br />
-          <span>One shared feed.</span>
+          Sources <span className="heading-count">{registry.length}</span>
         </h1>
         <p>
-          {channelCounts["security-advisories"]} advisory streams,{" "}
-          {channelCounts["mixed-announcements"]} mixed announcement streams, and{" "}
-          {channelCounts["release-notes"]} release-note streams. Each flows into
-          the same RSS and JSON API.
+          {channelCounts["security-advisories"]} advisory ·{" "}
+          {channelCounts["mixed-announcements"]} mixed ·{" "}
+          {channelCounts["release-notes"]} release-note streams
         </p>
-        <p className="fine-print">
-          Catalog checks verify retrieval and parsing, not complete coverage,
-          live uptime, or model accuracy. A project may have multiple streams.
-        </p>
-      </section>
+      </header>
       <form className="filters catalog-filters" action="/sources">
         <label>
           Search
           <input
             name="q"
-            placeholder="Search technologies…"
+            placeholder="Search sources…"
             defaultValue={result.q}
             maxLength={100}
           />
@@ -67,67 +64,93 @@ export default async function Sources({
             ))}
           </select>
         </label>
-        <button className="button primary" type="submit">
-          Filter →
+        <button className="button" type="submit">
+          Filter
         </button>
       </form>
-      <div className="section-heading catalog-count">
+      <div className="catalog-count">
         <p>
-          {result.total} matching streams · Page {result.page} of {result.pages}
+          {result.total} matching sources · Page {result.page} of {result.pages}
         </p>
         <a href="/sources">Reset filters</a>
       </div>
+      <div className="catalog-columns" aria-hidden="true">
+        <span>Source</span>
+        <span>Category</span>
+        <span>Channel</span>
+        <span>Links</span>
+        <span>Notes</span>
+      </div>
       <div className="catalog-list">
         {result.rows.map((source) => (
-          <article className="source-card" key={source.id}>
-            <div>
-              <span className="eyebrow">{source.category}</span>
-              <h2>
-                <a href={source.homepage}>{source.name} ↗</a>
-              </h2>
-              <span className="badge">{source.channel}</span>
+          <article className="source-row" key={source.id}>
+            <h2>
+              <a href={source.homepage}>{source.name}</a>
+            </h2>
+            <span className="source-category">{source.category}</span>
+            <span className="source-channel">
+              {channelLabels[source.channel]}
+            </span>
+            <div className="source-links">
+              <a
+                href={source.feed_url}
+                aria-label={"Publisher feed for " + source.name}
+              >
+                Feed
+              </a>
+              <a
+                href={source.verification.sample_url}
+                aria-label={"Checked document for " + source.name}
+              >
+                Sample
+              </a>
+              <a href={"/?source=" + encodeURIComponent(source.id)}>Events</a>
             </div>
-            <div>
-              <div className="source-links">
-                <a href={source.feed_url}>Publisher feed ↗</a>
-                <a href={source.verification.sample_url}>Checked document ↗</a>
-                <a href={"/?source=" + encodeURIComponent(source.id)}>
-                  View in Heist Feed →
-                </a>
-              </div>
-              <small>
-                Checked {source.verification.checked_at.slice(0, 10)} · Target
-                interval {source.poll_interval_minutes} minutes
-              </small>
-              <details>
-                <summary>Scope and verification notes</summary>
+            <details className="source-notes">
+              <summary
+                aria-label={"Scope and verification notes for " + source.name}
+              >
+                Details
+              </summary>
+              <div>
+                <p className="source-check">
+                  Checked{" "}
+                  <time dateTime={source.verification.checked_at}>
+                    {source.verification.checked_at.slice(0, 10)}
+                  </time>{" "}
+                  · Target interval {source.poll_interval_minutes} minutes
+                </p>
                 <p>{source.rationale}</p>
                 <p>{source.limitations}</p>
                 {source.verification.warnings.length ? (
                   <p>{source.verification.warnings.join("; ")}</p>
                 ) : null}
-              </details>
-            </div>
+              </div>
+            </details>
           </article>
         ))}
       </div>
       {!result.total ? (
-        <p className="empty">No sources match these filters.</p>
+        <p className="catalog-empty">No sources match these filters.</p>
       ) : null}
       <nav className="pagination" aria-label="Source pages">
         {result.page > 1 ? (
           <a className="button" href={link(result.page - 1)}>
-            ← Previous
+            Previous
           </a>
         ) : (
           <span />
         )}
         {result.page < result.pages ? (
           <a className="button" href={link(result.page + 1)}>
-            Next →
+            Next
           </a>
         ) : null}
       </nav>
+      <p className="catalog-note">
+        Checks verify retrieval and parsing, not complete coverage, live uptime
+        or extraction accuracy. A project may have multiple streams.
+      </p>
     </main>
   );
 }

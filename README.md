@@ -8,11 +8,19 @@ It catches fixes that matter even when no new CVE is assigned. Every event links
 
 **Status: alpha.** The catalog contains 374 streams: 22 dedicated advisory streams, 26 mixed announcement streams and 326 release-note streams. These are retrieval-checked sources, not 374 comprehensive vulnerability databases. See [coverage](docs/source-coverage.md). Production extraction accuracy, cost and deployment checks must be completed before a hosted launch.
 
+## Browse the visual feed
+
+The homepage `/` displays the events and filters directly. Existing `/feed` links redirect to the homepage with their filters intact. Search announcements, filter by type, technology, CVE or source, and expand each event to inspect version details and supporting quotations. URLs preserve the current view, and its RSS/JSON links use the same filters. No account is required.
+
+Search requires migration `202610240005_feed_search.sql`; the production workflow applies it before deploying this version.
+
 ## One stream, optional filters
 
 | Use                            | Endpoint                                  |
 | ------------------------------ | ----------------------------------------- |
 | Everything, latest 100 events  | /feed.xml                                 |
+| Visual feed                    | /                                         |
+| Keyword search                 | /?q=authentication                        |
 | Everything, JSON               | /api/v1/events                            |
 | Technology subscription        | /feed.xml?technology=node-js              |
 | CVE subscription               | /feed.xml?cve=CVE-2026-12345              |
@@ -29,7 +37,7 @@ Stable advisory IDs identify a source URL. Each published revision has a new eve
 Requires Node.js 22+ and a fresh Supabase project.
 
 1. Run npm ci and copy .env.example to .env.local.
-2. Initialize/link the Supabase CLI project and run supabase db push, or apply every SQL file in supabase/migrations in filename order. Existing installations apply only migrations they have not already run.
+2. Link the Supabase CLI project and run supabase db push. Existing installations apply only migrations they have not already run. Keep the CLI migration history intact; see the operations guide before automating an installation previously configured through the SQL editor.
 3. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. These are backend-only variables.
 4. Set OPENAI_API_KEY and OPENAI_MODEL to a model supporting Responses structured outputs. Use a provider project with a spending limit.
 5. Generate CRON_SECRET with openssl rand -hex 32.
@@ -57,7 +65,9 @@ An irrelevant newer document advances the publication watermark, preventing olde
 
 ## Deploy
 
-Import this repository into Vercel as a Next.js project. Apply the database migrations first, then configure production environment variables and PUBLIC_BASE_URL. The three per-minute schedules in vercel.json require a plan supporting that frequency; another scheduler can invoke the same endpoints.
+Import this repository into Vercel as a Next.js project and complete the [one-time production setup](docs/operations.md#one-time-setup-before-merging). After that, reviewed merges to main run validation, apply pending Supabase migrations, then deploy the checked commit to Vercel. Production Git auto-deployment is disabled so deployment cannot race migrations; preview branches keep their normal Vercel integration.
+
+The bundled workflow targets heist-security/security-advisory; forks must adapt the repository guards as described in the operations guide. The workflow needs environment-scoped database/Vercel credentials and project identifiers. Missing configuration stops the release. Application credentials stay in Vercel. The three per-minute schedules in vercel.json require a plan supporting that frequency; another scheduler can invoke the same endpoints.
 
 Keep preview credentials separate. Configure edge rate controls, private vulnerability reporting and branch protection before launch. Use the protected /api/cron/health endpoint for queue and source monitoring.
 
@@ -68,6 +78,7 @@ Follow the concrete [operations and launch checklist](docs/operations.md). Repos
     npm run format:check
     npm run typecheck
     npm test
+    node --test tests/deployment.test.mjs
     npm run build
     npx playwright install chromium
     npm run test:browser
