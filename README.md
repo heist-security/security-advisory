@@ -6,7 +6,7 @@ Heist Feed combines structured vulnerability advisories and exploitation updates
 
 Every event links to its source. Structured records preserve upstream identifiers and affected-version data; optional vendor extraction includes supporting quotations and can capture fixes without a new CVE.
 
-**Status: alpha.** The default configuration imports structured OSV, official CVE List and CISA KEV records without LLM calls. EPSS and optional NVD data are available through the risk API. The historical 374-stream vendor catalog is retained for opt-in gaps. See [structured ingestion and activation](docs/structured-sources.md) and the [historical vendor coverage audit](docs/source-coverage.md). Hosted database validation, capacity checks and observation remain launch gates.
+**Status: alpha.** Structured OSV, official CVE List and CISA KEV records require no LLM calls. Production can select all 374 publisher feeds with `VENDOR_SOURCE_IDS=all`; see [publisher activation and remaining evaluation gates](docs/publisher-activation.md). EPSS and optional NVD data are available through the risk API. See [structured ingestion](docs/structured-sources.md) and the [publisher coverage audit](docs/source-coverage.md). Hosted validation, extraction evaluation and observation remain launch gates.
 
 ## Browse the visual feed
 
@@ -112,6 +112,6 @@ Code: [MIT](LICENSE). Branding and upstream content: [NOTICE.md](NOTICE.md).
 
 ## Structured sources
 
-Configure sources with `npm run sources:configure` (dry-run), then `--apply` after the separately managed database setup. No migration is included in this change. `VENDOR_SOURCE_IDS` is empty by default; OpenAI configuration and paid evaluation are needed only for opted-in vendor extraction. Read [activation and checkpoint recovery](docs/structured-sources.md) before enabling cron.
+Configure sources with `npm run sources:configure` (dry-run), then `--apply` after database setup. The publisher activation migration enables the reviewed catalog on merge; Production also sets `VENDOR_SOURCE_IDS=all` and the OpenAI settings. `VENDOR_SOURCE_IDS` is empty by default for local and Preview environments. Read [publisher activation](docs/publisher-activation.md) and [checkpoint recovery](docs/structured-sources.md).
 
 The public source catalog shows the three core inputs plus selected vendors. Use `/sources?catalog=vendor` or `/api/v1/sources?catalog=vendor` to browse the historical optional catalog. Use `/api/v1/risk?cve=CVE-2021-44228` for exploitation context, optionally adding `&nvd=1` for single-CVE NVD enrichment.

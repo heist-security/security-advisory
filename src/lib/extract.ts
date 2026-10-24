@@ -1,14 +1,21 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { extractionSchema, validateEvidence } from "./schema";
+import { z } from "zod";
 export async function extract(text: string) {
   if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_MODEL)
     throw new Error("Extraction is not configured");
   const client = new OpenAI({ timeout: 45000, maxRetries: 0 });
+  const effort = process.env.OPENAI_REASONING_EFFORT
+    ? z
+        .enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"])
+        .parse(process.env.OPENAI_REASONING_EFFORT)
+    : undefined;
   const response = await client.responses.parse({
     model: process.env.OPENAI_MODEL,
     store: false,
     max_output_tokens: 5000,
+    ...(effort ? { reasoning: { effort } } : {}),
     input: [
       {
         role: "system",
@@ -18,6 +25,18 @@ export async function extract(text: string) {
     ],
     text: { format: zodTextFormat(extractionSchema, "security_announcement") },
   });
+  // Counts only: never log source text, generated content or credentials.
+  if (response.usage)
+    console.info(
+      JSON.stringify({
+        operation: "extract_usage",
+        model: response.model,
+        input_tokens: response.usage.input_tokens,
+        output_tokens: response.usage.output_tokens,
+        cached_input_tokens: response.usage.input_tokens_details.cached_tokens,
+        reasoning_tokens: response.usage.output_tokens_details.reasoning_tokens,
+      }),
+    );
   if (!response.output_parsed)
     throw new Error("No complete structured extraction");
   return validateEvidence(response.output_parsed, text);

@@ -1,6 +1,7 @@
 import data from "../../sources/registry.json";
 import type { Source } from "./feed";
 import { structuredSources } from "./structured/config";
+import { selectedVendorIds } from "./vendor-config";
 export type RegistrySource = Source & {
   verification: {
     checked_at: string;
@@ -12,12 +13,7 @@ export type RegistrySource = Source & {
   };
 };
 export const vendorRegistry = data as RegistrySource[];
-const selectedVendors = new Set(
-  (process.env.VENDOR_SOURCE_IDS ?? "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean),
-);
+const selectedVendors = new Set(selectedVendorIds());
 export const registry: RegistrySource[] = [
   ...structuredSources.map((source) => ({
     ...source,

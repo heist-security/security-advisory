@@ -163,3 +163,35 @@ it("publishes structured work without model credentials and leaves the paid queu
   expect(mocks.extract).not.toHaveBeenCalled();
   expect(mocks.rpc).not.toHaveBeenCalled();
 });
+it("claims only selected publisher work with the shared conservative hourly budget", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_MODEL", "test-model");
+  vi.stubEnv("VENDOR_SOURCE_IDS", "all");
+  vi.stubEnv("PROCESS_BATCH_SIZE", "1");
+  vi.stubEnv("PROCESS_CONCURRENCY", "1");
+  vi.stubEnv("EXTRACTION_HOURLY_LIMIT", "60");
+  mocks.rpc.mockImplementation(async (method) =>
+    method === "claim_vendor_document"
+      ? {
+          data: [
+            {
+              id: 4,
+              source_id: "ruby",
+              body: "Ruby security notice",
+              lease_token: "token",
+            },
+          ],
+        }
+      : { data: true },
+  );
+  mocks.extract.mockResolvedValue({ security_relevant: false });
+  expect((await processJobs()).processed).toBe(3);
+  const claim = mocks.rpc.mock.calls.find(
+    ([method]) => method === "claim_vendor_document",
+  )![1];
+  expect(claim.hourly_limit).toBe(60);
+  expect(claim.source_ids).toHaveLength(374);
+  expect(claim.source_ids).toContain("ruby");
+  expect(claim.source_ids).not.toContain("core-osv");
+  expect(mocks.extract).toHaveBeenCalledWith("Ruby security notice");
+});

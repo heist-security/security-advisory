@@ -1,19 +1,9 @@
 import { db } from "../src/lib/db";
-import { vendorRegistry } from "../src/lib/registry";
+import { selectedVendorIds } from "../src/lib/vendor-config";
 import { structuredSources } from "../src/lib/structured/config";
 
 // Application configuration only. Uses existing tables; never creates or changes a schema.
-const vendors = [
-  ...new Set(
-    (process.env.VENDOR_SOURCE_IDS ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-  ),
-];
-for (const id of vendors)
-  if (!vendorRegistry.some((s) => s.id === id))
-    throw new Error("Unknown vendor source ID");
+const vendors = selectedVendorIds();
 const argument = process.argv.find((a) => a.startsWith("--since="))?.slice(8);
 const since = argument ?? new Date(Date.now() - 86400000).toISOString();
 if (!Number.isFinite(Date.parse(since)) || Date.parse(since) > Date.now())
