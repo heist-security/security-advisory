@@ -5,16 +5,22 @@ test("unified feed filters update both subscription formats without layout overf
   await page.goto("/");
   await expect(page.locator(".event-card")).toHaveCount(3);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "One place to listen.",
+    "Security feed",
   );
+  await page.locator(".refine-panel summary").click();
   await page.getByLabel("Technology", { exact: true }).fill("Node.js");
   await page.getByLabel("CVE", { exact: true }).fill("CVE-2026-12345");
   await page.getByRole("button", { name: "Apply filters" }).click();
-  await expect(page.locator(".feed-links a").first()).toHaveAttribute(
-    "href",
-    "/feed.xml?technology=node-js&cve=CVE-2026-12345",
-  );
-  await expect(page.locator(".feed-links a").nth(1)).toHaveAttribute(
+  await expect(
+    page
+      .getByRole("navigation", { name: "Feed formats" })
+      .getByRole("link", { name: "RSS", exact: true }),
+  ).toHaveAttribute("href", "/feed.xml?technology=node-js&cve=CVE-2026-12345");
+  await expect(
+    page
+      .getByRole("navigation", { name: "Feed formats" })
+      .getByRole("link", { name: "JSON", exact: true }),
+  ).toHaveAttribute(
     "href",
     "/api/v1/events?technology=node-js&cve=CVE-2026-12345",
   );
@@ -35,8 +41,16 @@ test("source pages are bounded and repeated query parameters never crash", async
   const response = await request.get("/sources?q=ruby&q=node");
   expect(response.status()).toBe(200);
   await page.goto("/sources");
-  await expect(page.locator(".source-card")).toHaveCount(24);
-  await page.getByRole("link", { name: "Next →", exact: true }).click();
+  await expect(page.locator(".source-row")).toHaveCount(24);
+  const first = page.locator(".source-row").first();
+  await first.locator("summary").click();
+  await expect(first.locator(".source-check")).toBeVisible();
+  await first.locator("summary").click();
+  await page.screenshot({
+    path: "test-results/" + info.project.name + "-sources-first.png",
+    fullPage: true,
+  });
+  await page.getByRole("link", { name: "Next", exact: true }).click();
   await expect(page).toHaveURL(/page=2/);
   expect(
     await page.evaluate(

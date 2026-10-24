@@ -11,7 +11,7 @@ it("normalizes bounded search and shares it between browser and subscriptions", 
     "q=certificate+validation&type=patch",
   );
   expect(feedLink(query, { before: "42", limit: "20" })).toBe(
-    "/feed?q=certificate+validation&type=patch&before=42&limit=20",
+    "/?q=certificate+validation&type=patch&before=42&limit=20",
   );
   for (const params of [
     new URLSearchParams("q=a&q=b"),

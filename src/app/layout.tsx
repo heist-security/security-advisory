@@ -15,7 +15,7 @@ const mono = JetBrains_Mono({
 });
 export const metadata: Metadata = {
   title: {
-    default: "Heist Feed — One open security feed",
+    default: "Heist Feed",
     template: "%s · Heist Feed",
   },
   description:

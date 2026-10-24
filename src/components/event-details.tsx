@@ -1,3 +1,4 @@
+import { LinkIcon } from "./icons";
 import type { FeedEvent } from "@/lib/events";
 type Fact = { value: string; evidence: string };
 function Facts({ label, facts }: { label: string; facts: Fact[] }) {
@@ -41,13 +42,13 @@ export function EventDetails({ event }: { event: FeedEvent }) {
             {p.supersedes_event_id ? (
               <a
                 href={
-                  "/feed?before=" +
+                  "/?before=" +
                   (p.supersedes_event_id + 1) +
                   "#event-" +
                   p.supersedes_event_id
                 }
               >
-                View the preceding event →
+                View the preceding event
               </a>
             ) : null}
           </div>
@@ -116,7 +117,9 @@ export function EventDetails({ event }: { event: FeedEvent }) {
             </div>
           ) : null}
         </dl>
-        <a href={event.source_url}>Read the original announcement ↗</a>
+        <a href={event.source_url}>
+          Read the original announcement <LinkIcon />
+        </a>
       </div>
     </details>
   );

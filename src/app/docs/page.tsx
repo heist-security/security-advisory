@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
+import { LinkIcon } from "@/components/icons";
 export const metadata: Metadata = { title: "API documentation" };
 export default function Docs() {
   return (
     <main id="main" className="container">
       <article className="prose">
-        <div className="eyebrow">BUILT TO BE CONSUMED</div>
-        <h1>
-          One stream.
-          <br />
-          Your subscription.
-        </h1>
+        <h1>API documentation</h1>
         <p>
           All sources publish into one feed, available visually, as RSS, or as
           JSON. Follow everything, or narrow your subscription with optional
@@ -17,8 +13,8 @@ export default function Docs() {
         </p>
         <h2>Browse visually</h2>
         <p>
-          <a href="/feed">Open the visual feed →</a> to search the archive,
-          filter by your stack, and expand source evidence and version details.
+          <a href="/">Open the feed</a> to search the archive, filter by your
+          stack, and expand source evidence and version details.
         </p>
         <h2>Subscribe</h2>
         <pre>
@@ -100,11 +96,11 @@ export default function Docs() {
         </p>
         <p>
           <a href="https://github.com/heist-security/security-advisory/blob/main/docs/api.md">
-            Full response example and API semantics ↗
+            Full response example and API semantics <LinkIcon />
           </a>
         </p>
         <p>
-          <a href="/sources">Inspect source coverage →</a>
+          <a href="/sources">Source coverage</a>
         </p>
       </article>
     </main>

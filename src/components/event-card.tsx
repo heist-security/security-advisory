@@ -1,3 +1,4 @@
+import { LinkIcon } from "./icons";
 import type { FeedEvent } from "@/lib/events";
 import { technologyKey, type Filters } from "@/lib/filters";
 import { feedLink } from "@/lib/feed-view";
@@ -36,7 +37,7 @@ export function EventCard({
       </div>
       <h3>
         <a href={event.source_url}>
-          {event.payload.title} <span aria-hidden="true">↗</span>
+          {event.payload.title} <LinkIcon />
         </a>
       </h3>
       <p>{event.payload.summary}</p>
@@ -51,7 +52,7 @@ export function EventCard({
           >
             {p.name.value}
             {p.fixed_versions.length
-              ? " → " + p.fixed_versions.map((v) => v.value).join(", ")
+              ? " · Fixed in " + p.fixed_versions.map((v) => v.value).join(", ")
               : ""}
           </a>
         ))}
@@ -68,7 +69,9 @@ export function EventCard({
             : "Machine-extracted"}{" "}
           · Revision {event.revision}
         </span>
-        <a href={event.source_url}>Verify original source ↗</a>
+        <a href={event.source_url}>
+          Original source <LinkIcon />
+        </a>
       </div>
       {expanded ? <EventDetails event={event} /> : null}
     </article>

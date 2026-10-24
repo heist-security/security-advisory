@@ -10,7 +10,7 @@ export const typeLabels = {
 export function feedLink(filters: Filters, extra: Record<string, string> = {}) {
   const params = filterQuery(filters);
   for (const [key, value] of Object.entries(extra)) params.set(key, value);
-  return "/feed" + (params.size ? "?" + params : "");
+  return "/" + (params.size ? "?" + params : "");
 }
 export function eventDay(value: string) {
   return new Date(value).toISOString().slice(0, 10);

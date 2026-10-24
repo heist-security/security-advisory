@@ -1,6 +1,6 @@
 # Consumer API
 
-All publishers contribute to one event stream. The visual page at `/feed`, RSS and JSON expose the same events and filters; they are three representations of the same feed.
+All publishers contribute to one event stream. The visual page at `/`, RSS and JSON expose the same events and filters; they are three representations of the same feed.
 
 ## Filters
 
@@ -19,11 +19,11 @@ Different filters combine with AND. Repeated API parameters, conflicting type/ki
 
 ## Visual browsing and keyword search
 
-`/feed` provides a newest-first timeline, expandable evidence, active-filter links and cursor navigation. Dates use UTC and reflect when events were added to Heist Feed. It defaults to 20 events per page and caps visual pages at 50; RSS/JSON keep their existing limits. The visual page uses `before` for older results; use JSON for `after` cursors.
+`/` provides a newest-first timeline, expandable evidence, active-filter links and cursor navigation. Dates use UTC and reflect when events were added to Heist Feed. It defaults to 20 events per page and caps visual pages at 50; RSS/JSON keep their existing limits. Existing `/feed` URLs redirect to `/` and preserve query parameters. The visual page uses `before` for older results; use JSON for `after` cursors.
 
 `q` searches words in published event text, product/version evidence, source IDs and historical subscription keys. All supplied words must match; punctuation is handled by PostgreSQL's simple text-search dictionary. It searches the event archive, not just the currently displayed page, and does not search private raw documents. Use the structured technology/CVE filters for precise subscriptions. A correction retains historical routing keys but not all previous free-text wording, so a title-specific keyword search may omit a later correction.
 
-Examples: `/feed?q=authentication`, `/feed.xml?q=authentication&type=patch`, `/api/v1/events?q=authentication&after=0`.
+Examples: `/?q=authentication`, `/feed.xml?q=authentication&type=patch`, `/api/v1/events?q=authentication&after=0`.
 
 ## Incremental consumption
 

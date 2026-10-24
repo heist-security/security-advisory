@@ -10,7 +10,7 @@ It catches fixes that matter even when no new CVE is assigned. Every event links
 
 ## Browse the visual feed
 
-Open `/feed` to browse the same events in a responsive timeline. Search announcements, filter by type, technology, CVE or source, and expand each event to inspect version details and supporting quotations. URLs preserve the current view, and its RSS/JSON links use the same filters. No account is required.
+The homepage `/` displays the events and filters directly. Existing `/feed` links redirect to the homepage with their filters intact. Search announcements, filter by type, technology, CVE or source, and expand each event to inspect version details and supporting quotations. URLs preserve the current view, and its RSS/JSON links use the same filters. No account is required.
 
 Search requires migration `202610240005_feed_search.sql`; the production workflow applies it before deploying this version.
 
@@ -19,8 +19,8 @@ Search requires migration `202610240005_feed_search.sql`; the production workflo
 | Use                            | Endpoint                                  |
 | ------------------------------ | ----------------------------------------- |
 | Everything, latest 100 events  | /feed.xml                                 |
-| Visual feed                    | /feed                                     |
-| Keyword search                 | /feed?q=authentication                    |
+| Visual feed                    | /                                         |
+| Keyword search                 | /?q=authentication                        |
 | Everything, JSON               | /api/v1/events                            |
 | Technology subscription        | /feed.xml?technology=node-js              |
 | CVE subscription               | /feed.xml?cve=CVE-2026-12345              |
