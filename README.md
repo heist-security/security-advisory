@@ -10,15 +10,15 @@ It catches fixes that matter even when no new CVE is assigned. Every event links
 
 ## One stream, optional filters
 
-| Use | Endpoint |
-| --- | --- |
-| Everything, latest 100 events | /feed.xml |
-| Everything, JSON | /api/v1/events |
-| Technology subscription | /feed.xml?technology=node-js |
-| CVE subscription | /feed.xml?cve=CVE-2026-12345 |
-| Combined filters | /api/v1/events?type=patch&technology=ruby |
-| Complete archive, oldest first | /api/v1/events?after=0&limit=100 |
-| Source catalog | /api/v1/sources?page=1 |
+| Use                            | Endpoint                                  |
+| ------------------------------ | ----------------------------------------- |
+| Everything, latest 100 events  | /feed.xml                                 |
+| Everything, JSON               | /api/v1/events                            |
+| Technology subscription        | /feed.xml?technology=node-js              |
+| CVE subscription               | /feed.xml?cve=CVE-2026-12345              |
+| Combined filters               | /api/v1/events?type=patch&technology=ruby |
+| Complete archive, oldest first | /api/v1/events?after=0&limit=100          |
+| Source catalog                 | /api/v1/sources?page=1                    |
 
 There are no separate feeds per publisher. Source categories describe provenance; all published events enter the same stream. Use any combination of filters to narrow a subscription. Read [API semantics and examples](docs/api.md).
 

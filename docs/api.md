@@ -4,15 +4,15 @@ All publishers contribute to one event stream. RSS and JSON expose the same even
 
 ## Filters
 
-| Parameter | Meaning | Example |
-| --- | --- | --- |
-| type | Advisory classification; kind remains a compatible alias | patch |
-| technology | Normalized product-name key, or an exact source ID | node-js |
-| cve | CVE identifier, case-insensitive input | CVE-2026-12345 |
-| source | Exact source ID from the catalog | ruby |
-| limit | Number of events, 1-100 | 100 |
-| after | JSON only: ascending incremental cursor, exclusive | 0 |
-| before | JSON only: newest-first pagination, exclusive | 123 |
+| Parameter  | Meaning                                                  | Example        |
+| ---------- | -------------------------------------------------------- | -------------- |
+| type       | Advisory classification; kind remains a compatible alias | patch          |
+| technology | Normalized product-name key, or an exact source ID       | node-js        |
+| cve        | CVE identifier, case-insensitive input                   | CVE-2026-12345 |
+| source     | Exact source ID from the catalog                         | ruby           |
+| limit      | Number of events, 1-100                                  | 100            |
+| after      | JSON only: ascending incremental cursor, exclusive       | 0              |
+| before     | JSON only: newest-first pagination, exclusive            | 123            |
 
 Different filters combine with AND. Repeated API parameters, conflicting type/kind, invalid values and simultaneous after/before produce 400. Technology input is lowercased, runs of non-ASCII-alphanumeric characters become hyphens, and edge hyphens are trimmed. For example Node.js becomes node-js. Keys derive from evidenced product names; this is not a curated alias/ontology service. Source IDs provide a stable alternative.
 

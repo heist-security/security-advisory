@@ -49,9 +49,7 @@
       "security_relevant": true,
       "kind": "advisory",
       "product": "Widget",
-      "cves": [
-        "CVE-2026-12345"
-      ],
+      "cves": ["CVE-2026-12345"],
       "severity": "critical"
     }
   },
@@ -81,9 +79,7 @@
       "security_relevant": true,
       "kind": "withdrawal",
       "product": "Widget",
-      "cves": [
-        "CVE-2026-23456"
-      ]
+      "cves": ["CVE-2026-23456"]
     }
   }
 ]
