@@ -1,5 +1,28 @@
 # Operations and launch checks
 
+## Verification record — 24 October 2026
+
+This is a dated snapshot, not a declaration that the hosted feed is ready to launch.
+
+- [x] Code and browser CI passed on `4b21f9a4765ffbcfefd4107fc630918a9ee8568c`: [Check](https://github.com/heist-security/security-advisory/actions/runs/40077692870) and [Browser](https://github.com/heist-security/security-advisory/actions/runs/40077692884). Recheck the eventual release commit.
+- [x] The active [Protect main ruleset](https://github.com/heist-security/security-advisory/rules/25775691) requires a pull request, one approving review, and the `validate` and `browser` checks from GitHub Actions. Deletion and force pushes are blocked; the bypass list is empty.
+- [x] GitHub Secret Protection and push protection are enabled.
+- [x] Private vulnerability reporting is enabled and visible as enabled on the repository security overview.
+- [x] The MIT license, branding notice and upstream-content attribution notice are present.
+- [ ] Verify the reporting entry point using a separate non-maintainer account. Enabling the setting alone does not complete this check.
+- [ ] Provision the dedicated production database and hosting project, then complete the live checks below.
+- [ ] Evaluate a reviewed real-announcement corpus and observe the deployed pipeline for at least 24 hours.
+
+### Next deployment steps
+
+1. Create a dedicated Supabase project; do not apply these migrations to the existing Heist application database. Keep the Data API enabled and disable automatic exposure of new tables. Review all migrations before applying them in order.
+2. Grant the existing Vercel GitHub installation access to this repository only, then import the existing repository into the Heist Vercel team. Do not create a duplicate repository using the public-repository clone flow.
+3. Configure production-only database, model and cron credentials. Use a separate database for previews; never copy production credentials into preview environments.
+4. Select and pin the extraction model, set provider spending controls and a conservative initial extraction-attempt limit, then run the reviewed evaluation corpus.
+5. Configure the production domain, TLS, edge rate controls and authenticated health monitoring before exercising the live pipeline and starting the 24-hour observation window.
+
+Do not mark the release gate complete based on this record. Hosting controls, live database role checks, populated-page inspection, extraction quality, cost, cache/load testing and the observation window still require evidence.
+
 ## Automatic production deployment
 
 The [Production workflow](../.github/workflows/production.yml) runs on pushes to `main`. It runs the Check and Browser workflows plus a disposable PostgreSQL migration check, then applies pending migrations and deploys the **same commit** to Vercel. Pull requests run checks without production secrets. Manual retries are available through **Actions → Production → Run workflow**, selecting `main`.
