@@ -10,8 +10,31 @@ This is a dated snapshot, not a declaration that the hosted feed is ready to lau
 - [x] Private vulnerability reporting is enabled and visible as enabled on the repository security overview.
 - [x] The MIT license, branding notice and upstream-content attribution notice are present.
 - [ ] Verify the reporting entry point using a separate non-maintainer account. Enabling the setting alone does not complete this check.
-- [ ] Provision the dedicated production database and hosting project, then complete the live checks below.
+- [x] The existing Vercel GitHub installation can access this repository; the existing-repository import is available.
+- [x] The `security-advisory` Vercel project is connected to this repository in the Heist team. No initial deployment has been started.
+- [ ] Provision the dedicated production database, configure production credentials and deploy, then complete the live checks below.
 - [ ] Evaluate a reviewed real-announcement corpus and observe the deployed pipeline for at least 24 hours.
+
+### Pending edge rate limit
+
+The proposed initial budget is 120 requests per minute per IP, shared across `/`, `/sources`, `/feed.xml` and `/api/v1/*`. The request-path expression is `^(/|/sources/?|/feed\\.xml|/api/v1/.*)# Operations and launch checks
+
+## Verification record — 24 October 2026
+
+This is a dated snapshot, not a declaration that the hosted feed is ready to launch.
+
+- [x] Code and browser CI passed on `4b21f9a4765ffbcfefd4107fc630918a9ee8568c`: [Check](https://github.com/heist-security/security-advisory/actions/runs/40077692870) and [Browser](https://github.com/heist-security/security-advisory/actions/runs/40077692884). Recheck the eventual release commit.
+- [x] The active [Protect main ruleset](https://github.com/heist-security/security-advisory/rules/25775691) requires a pull request, one approving review, and the `validate` and `browser` checks from GitHub Actions. Deletion and force pushes are blocked; the bypass list is empty.
+- [x] GitHub Secret Protection and push protection are enabled.
+- [x] Private vulnerability reporting is enabled and visible as enabled on the repository security overview.
+- [x] The MIT license, branding notice and upstream-content attribution notice are present.
+- [ ] Verify the reporting entry point using a separate non-maintainer account. Enabling the setting alone does not complete this check.
+- [x] The existing Vercel GitHub installation can access this repository; the existing-repository import is available.
+- [x] The `security-advisory` Vercel project is connected to this repository in the Heist team. No initial deployment has been started.
+- [ ] Provision the dedicated production database, configure production credentials and deploy, then complete the live checks below.
+- [ ] Evaluate a reviewed real-announcement corpus and observe the deployed pipeline for at least 24 hours.
+
+; protected `/api/cron/*` routes are excluded. Use a rate-limit response rather than a browser challenge so RSS and API clients can handle it. Vercel displayed $0.50 per million allowed requests and no charge for blocked requests; activation and representative-load validation are still pending. Revisit the budget after observing legitimate polling and shared-IP traffic.
 
 ### Next deployment steps
 
