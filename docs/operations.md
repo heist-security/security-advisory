@@ -20,16 +20,16 @@ PR #10 was found open and ready for review, and was returned to draft while thes
 - [x] Verified Data API enabled and automatic exposure of new tables disabled. The API settings show no application tables or functions. The existing Heist application database was not used or modified.
 - [x] Saved the following variables in the existing Vercel project, all scoped only to Production. Secret values were stored using Vercel's non-revealable Secret type.
 
-| Variable | Saved configuration |
-| --- | --- |
-| `SUPABASE_URL` | Dedicated heist-feed project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase server secret; replacement required before deployment |
-| `CRON_SECRET` | Random 32-byte secret encoded as 64 hex characters; replacement required before deployment |
-| `PUBLIC_BASE_URL` | `https://feed.heist.security` |
-| `OPENAI_MODEL` | `gpt-5.4-mini-2026-03-17`, unevaluated candidate |
-| `EXTRACTION_HOURLY_LIMIT` | `60` |
-| `PROCESS_BATCH_SIZE` | `1` |
-| `PROCESS_CONCURRENCY` | `1` |
+| Variable                    | Saved configuration                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| `SUPABASE_URL`              | Dedicated heist-feed project URL                                                           |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase server secret; replacement required before deployment                             |
+| `CRON_SECRET`               | Random 32-byte secret encoded as 64 hex characters; replacement required before deployment |
+| `PUBLIC_BASE_URL`           | `https://feed.heist.security`                                                              |
+| `OPENAI_MODEL`              | `gpt-5.4-mini-2026-03-17`, unevaluated candidate                                           |
+| `EXTRACTION_HOURLY_LIMIT`   | `60`                                                                                       |
+| `PROCESS_BATCH_SIZE`        | `1`                                                                                        |
+| `PROCESS_CONCURRENCY`       | `1`                                                                                        |
 
 `SUPABASE_SERVICE_ROLE_KEY` holds a modern Supabase server secret rather than a legacy JWT. The application passes it directly to `createClient`; Supabase documents this server-side usage and its `service_role` privileges in [API keys](https://supabase.com/docs/guides/getting-started/api-keys). Live role and RPC verification is still pending.
 
