@@ -70,12 +70,8 @@ export default async function Feed({
       <section className="browser-heading">
         <h1>Security feed</h1>
         <nav className="format-links" aria-label="Feed formats">
-          <a href={"/feed.xml" + suffix}>
-            RSS
-          </a>
-          <a href={"/api/v1/events" + suffix}>
-            JSON
-          </a>
+          <a href={"/feed.xml" + suffix}>RSS</a>
+          <a href={"/api/v1/events" + suffix}>JSON</a>
         </nav>
       </section>
       <div className="browser-layout">

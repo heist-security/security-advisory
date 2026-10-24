@@ -9,9 +9,7 @@ export function SiteHeader() {
         <a href="/">Feed</a>
         <a href="/sources">Sources</a>
         <a href="/docs">API docs</a>
-        <a href="https://github.com/heist-security/security-advisory">
-          GitHub
-        </a>
+        <a href="https://github.com/heist-security/security-advisory">GitHub</a>
       </nav>
     </header>
   );

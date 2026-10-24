@@ -116,9 +116,7 @@ export function EventDetails({ event }: { event: FeedEvent }) {
             </div>
           ) : null}
         </dl>
-        <a href={event.source_url}>
-          Read the original announcement
-        </a>
+        <a href={event.source_url}>Read the original announcement</a>
       </div>
     </details>
   );

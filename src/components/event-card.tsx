@@ -35,9 +35,7 @@ export function EventCard({
         </time>
       </div>
       <h3>
-        <a href={event.source_url}>
-          {event.payload.title}
-        </a>
+        <a href={event.source_url}>{event.payload.title}</a>
       </h3>
       <p>{event.payload.summary}</p>
       <div className="tags">
@@ -68,9 +66,7 @@ export function EventCard({
             : "Machine-extracted"}{" "}
           · Revision {event.revision}
         </span>
-        <a href={event.source_url}>
-          Original source
-        </a>
+        <a href={event.source_url}>Original source</a>
       </div>
       {expanded ? <EventDetails event={event} /> : null}
     </article>

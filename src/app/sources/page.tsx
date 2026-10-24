@@ -85,9 +85,7 @@ export default async function Sources({
         {result.rows.map((source) => (
           <article className="source-row" key={source.id}>
             <h2>
-              <a href={source.homepage}>
-                {source.name}
-              </a>
+              <a href={source.homepage}>{source.name}</a>
             </h2>
             <span className="source-category">{source.category}</span>
             <span className="source-channel">
