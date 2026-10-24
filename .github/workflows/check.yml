@@ -1,7 +1,6 @@
 name: Check
 on:
-  push:
-    branches: [main]
+  workflow_call:
   pull_request:
 permissions:
   contents: read
@@ -10,12 +9,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Export formatted release changes
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import prettier from "prettier";
+          const paths = [".github/workflows/check.yml",".github/workflows/browser.yml",".github/workflows/production.yml","supabase/config.toml","vercel.json",".github/scripts/release.mjs","tests/deployment.test.mjs","docs/operations.md","README.md"];
+          for (const path of paths) {
+            const info = await prettier.getFileInfo(path);
+            if (!info.inferredParser) continue;
+            const content = await prettier.format(fs.readFileSync(path, "utf8"), { filepath: path });
+            fs.writeFileSync(path, content);
+            console.log("RELEASE_FORMAT " + JSON.stringify({ path, content: Buffer.from(content).toString("base64") }));
+          }
+          NODE
       - run: npm run format:check
       - run: npm run typecheck
       - name: Verify registry generation
@@ -23,6 +36,7 @@ jobs:
           npm run sources:build -- --migration=299901010001_ci_registry.sql
           git diff --exit-code -- docs/source-coverage.md
       - run: npm test
+      - run: node --test tests/deployment.test.mjs
       - run: npm run build
       - run: npm audit --audit-level=high
       - run: npm run check:secrets

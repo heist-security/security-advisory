@@ -1,0 +1,8 @@
+# Only migrations are deployed by CI; this file does not configure the hosted project.
+project_id = "heist-feed"
+
+[db]
+major_version = 17
+
+[db.seed]
+enabled = false
