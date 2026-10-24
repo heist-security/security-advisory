@@ -15,8 +15,8 @@ Configure these only in Vercel **Production** before merging:
 | `OPENAI_REASONING_EFFORT` | `none`                                                                         |
 | `VENDOR_SOURCE_IDS`       | `all`                                                                          |
 | `EXTRACTION_HOURLY_LIMIT` | `60`                                                                           |
-| `PROCESS_BATCH_SIZE`      | `8`                                                                            |
-| `PROCESS_CONCURRENCY`     | `2`                                                                            |
+| `PROCESS_BATCH_SIZE`      | `1`                                                                            |
+| `PROCESS_CONCURRENCY`     | `1`                                                                            |
 
 `all` expands to the checked-in registry, not arbitrary database rows. Explicit comma-separated IDs are also supported; unknown IDs fail configuration. An empty selection disables the model path. Keep the API key and vendor selection out of Preview; Preview uses a separate database.
 
@@ -26,7 +26,7 @@ Every claim reserves an attempt in the existing database-enforced hourly budget,
 
 The restricted key is in the existing Heist project, so funding is shared with its other keys; this is not a dedicated project spending limit. Funding is managed by the operator. No additional credit purchase or auto-reload change is part of this setup.
 
-Setup evidence on 24 October 2026: the restricted key was created and saved as a non-revealable Vercel Production secret. Vercel requires the operator's authenticator verification to update the existing model/worker configuration. The settings table above is the intended activation configuration, not a claim that those remaining changes are saved. Keep this PR in draft until that handoff is completed. No production redeployment or database activation was performed while preparing it.
+Setup evidence on 24 October 2026: the restricted key was created and saved as a non-revealable Vercel Production secret, and `OPENAI_MODEL=gpt-6-luna` was saved. The Vercel verification prompt cleared before that model update. Automatic approval review then blocked saving `VENDOR_SOURCE_IDS=all` and `OPENAI_REASONING_EFFORT=none`, stating that paid model activation and provider spending require explicit approval. Those flags remain unsaved. The table above is the intended configuration, not a claim that activation is complete. Keep this PR in draft until that approval and configuration are completed. No production redeployment or database activation was performed while preparing it.
 
 ## Backfill and checks
 
