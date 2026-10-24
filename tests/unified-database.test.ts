@@ -12,6 +12,8 @@ beforeEach(async () => {
     .filter((f) => f.endsWith(".sql"))
     .sort())
     await db.exec(readFileSync(new URL(file, folder), "utf8"));
+  // Production starts structured-only; these publication tests opt into Ruby.
+  await db.exec("update sources set enabled=true where id='ruby'");
 }, 30000);
 afterEach(async () => db.close());
 const payload = {

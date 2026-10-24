@@ -10,6 +10,11 @@ export const syncStateSchema = z.object({
   since: timestamp,
   until: timestamp.optional(),
   after: z.string().optional(),
+  // Reviewed, immutable delta snapshot for an initial import outside live history.
+  cve_bootstrap_ref: z
+    .string()
+    .regex(/^[a-f0-9]{40}$/)
+    .optional(),
   kev_ids: z.array(z.string().regex(/^CVE-\d{4}-\d{4,}$/)).optional(),
 });
 export type SyncState = z.infer<typeof syncStateSchema>;
@@ -193,9 +198,14 @@ export async function discover(
     return page(await osvChanges(state.since), state, until, limit);
   }
   if (source === "core-cve") {
+    // Finish the archived window before switching to the rolling log. page()
+    // preserves this ref on partial pages and removes it only once staging ends.
+    const endpoint = state.cve_bootstrap_ref
+      ? `https://raw.githubusercontent.com/CVEProject/cvelistV5/${state.cve_bootstrap_ref}/cves/deltaLog.json`
+      : endpoints.cve;
     const raw = JSON.parse(
       await fetchText(
-        endpoints.cve,
+        endpoint,
         ["https://raw.githubusercontent.com"],
         64_000_000,
       ),

@@ -1,5 +1,17 @@
 # Operations and launch checks
 
+## Production bootstrap follow-up — 24 October 2026
+
+The separately requested migration PR adds `202610240006_structured_bootstrap.sql`. On merge to `main`, the existing Production workflow applies the committed migrations, activates only OSV/CVE/KEV from **2026-09-24T00:00:00Z**, and deploys the checked commit. Existing checkpoints and historical data are retained. A pinned upstream CVE delta snapshot covers the start of the requested month before the importer switches to live updates; see [structured-source activation](structured-sources.md#activation-after-database-readiness). No production migration or import has been run as part of preparing this PR.
+
+- [x] Configured the GitHub `production` environment for the `main` branch only and verified that `SUPABASE_DB_URL`, `SUPABASE_DB_CA_CERT`, `VERCEL_TOKEN`, `VERCEL_PROJECT_ID` and `VERCEL_TEAM_ID` are saved. Presence is verified; live database connectivity and deployment permissions still need release validation.
+- [x] Created the approved Vercel token scoped to the `security-advisory` project, expiring **23 November 2026**, and saved it only in the GitHub production environment. Assign its renewal owner before expiry.
+- [ ] Replace the provisional `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` in Vercel Production and revoke the old Supabase server key **before merging this release PR**. Leave `VENDOR_SOURCE_IDS` empty and hosting cron disabled.
+- [ ] Verify a recoverable database backup, require the migration CI check, and validate the first production release, database role isolation, source checkpoints and populated feed.
+- [ ] Configure authenticated monitoring, test edge/cache controls, then enable cron and complete the 24-hour observation period.
+
+The Production workflow is enabled; adding the credentials did not pause it. A new push to `main` or a manual dispatch will attempt production migrations and deployment. PR checks only use disposable PostgreSQL and do not receive production credentials. The earlier inspection below remains a dated record, not evidence that these launch gates have passed.
+
 ## Verification record — 24 October 2026
 
 This is a dated snapshot of the earlier hosting inspection, not a declaration that the hosted feed is ready to launch. Database migrations are explicitly outside this setup PR: none were implemented or applied by this work. Database-role verification, live pipeline validation and the 24-hour observation period still require database readiness and hosted evidence.
@@ -77,7 +89,7 @@ Complete these remaining steps in order:
 
 1. Replace the provisional production secrets and revoke the provisional Supabase server key. Keep all production credentials out of Preview.
 2. Verify the protected production environment and release credentials described below, inspect the latest Production workflow outcome and reconcile database readiness through the separately managed migration process. Then verify the real REST API rejects anon/authenticated access and allows the required server operations. Merged workflow code alone is not evidence that migrations ran.
-3. Review `npm run sources:configure` with the intended start timestamp, then apply the reviewed configuration after database readiness. Keep `VENDOR_SOURCE_IDS` empty for OSV/CVE/KEV only. This command configures existing tables; it does not apply migrations or import the full historical databases.
+3. Verify the bootstrap migration has registered OSV/CVE/KEV with the approved initial timestamp and CVE snapshot, preserving any existing checkpoints. Keep `VENDOR_SOURCE_IDS` empty. Use `npm run sources:configure` only for subsequent reviewed selection changes; it does not apply migrations or import the full historical databases.
 4. **Only for opted-in vendor extraction:** agree the provider budget/funding, create the dedicated provider project/key, enforce its limits and evaluate the pinned candidate. Follow [docs/evaluation.md](evaluation.md): at least 100 representative, manually labeled real announcements, including known negatives, multiple products/fixed versions, withdrawals, short and non-English notices, ambiguous severity and prompt-injection cases. Retain source URLs, acquisition dates and permissions. Synthetic fixtures are only smoke tests.
 5. **Only for opted-in vendor extraction:** after spending approval, run the paid launch evaluation with `--allow-paid --fixtures=/absolute/path/cases.json --launch`. Review titles/summaries, false positives/negatives and product-version associations; record actual provider token usage and cost separately. No such results are claimed here.
 6. Verify the reviewed `main` release through the Production workflow with replacement credentials. With cron paused, run authenticated poll, collect and process; verify source checkpoints, health and populated RSS/JSON/UI behavior, then configure and test the monitor.
@@ -98,8 +110,8 @@ The bundled release is restricted to `heist-security/security-advisory`. Fork op
 These settings require an administrator; committing the workflow does not create them.
 
 - [x] Dedicated Supabase production project, Vercel repository connection, `main` production branch and GitHub App access were verified in the dated setup record above. Reuse those projects.
-- [ ] In GitHub **Settings → Environments**, create `production`. Under deployment branches/tags, select **Selected branches and tags** and allow the **branch** `main` only. Do not add tags or pull-request refs. A required deployment reviewer is optional if reviewed merges should deploy automatically.
-- [ ] Add the following settings to that environment. Do not place production credentials in repository-wide secrets, source files, PR workflows or preview deployments.
+- [x] In GitHub **Settings → Environments**, configured `production` with **Selected branches and tags**, allowing the **branch** `main` only. No tags or pull-request refs are allowed. A required deployment reviewer is optional if reviewed merges should deploy automatically.
+- [x] Added the following settings to that environment. Production credentials are not placed in repository-wide secrets, source files, PR workflows or preview deployments. Successful use still needs release validation.
 
 | Kind     | Name                  | Value                                                                                                                                                                                                                                                 |
 | -------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

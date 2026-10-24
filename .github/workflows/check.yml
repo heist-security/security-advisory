@@ -21,6 +21,9 @@ jobs:
         run: |
           npm run sources:build -- --migration=299901010001_ci_registry.sql
           git diff --exit-code -- docs/source-coverage.md
+          # This generated fixture is not a committed migration. Do not apply it
+          # after the production bootstrap when testing the real migration set.
+          rm supabase/migrations/299901010001_ci_registry.sql
       - run: npm test
       - run: node --test tests/deployment.test.mjs
       - run: npm run build

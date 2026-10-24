@@ -24,9 +24,6 @@ beforeAll(async () => {
     .filter((f) => f.endsWith(".sql"))
     .sort())
     await sql.exec(readFileSync(new URL(file, folder), "utf8"));
-  await sql.exec(
-    "insert into sources(id,name,feed_url,allowed_origins,adapter) values('core-osv','OSV','https://osv.dev',array['https://osv.dev'],'feed-content')",
-  );
 }, 30000);
 afterAll(async () => sql.close());
 beforeEach(async () => {
