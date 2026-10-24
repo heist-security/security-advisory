@@ -6,6 +6,7 @@ export function SiteHeader() {
         <span>/ feed</span>
       </a>
       <nav aria-label="Main navigation">
+        <a href="/feed">Feed</a>
         <a href="/sources">Sources</a>
         <a href="/docs">API docs</a>
         <a href="https://github.com/heist-security/security-advisory">

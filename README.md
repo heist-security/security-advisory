@@ -8,11 +8,19 @@ It catches fixes that matter even when no new CVE is assigned. Every event links
 
 **Status: alpha.** The catalog contains 374 streams: 22 dedicated advisory streams, 26 mixed announcement streams and 326 release-note streams. These are retrieval-checked sources, not 374 comprehensive vulnerability databases. See [coverage](docs/source-coverage.md). Production extraction accuracy, cost and deployment checks must be completed before a hosted launch.
 
+## Browse the visual feed
+
+Open `/feed` to browse the same events in a responsive timeline. Search announcements, filter by type, technology, CVE or source, and expand each event to inspect version details and supporting quotations. URLs preserve the current view, and its RSS/JSON links use the same filters. No account is required.
+
+Search requires migration `202610240005_feed_search.sql`; apply it before deploying this version.
+
 ## One stream, optional filters
 
 | Use                            | Endpoint                                  |
 | ------------------------------ | ----------------------------------------- |
 | Everything, latest 100 events  | /feed.xml                                 |
+| Visual feed | /feed |
+| Keyword search | /feed?q=authentication |
 | Everything, JSON               | /api/v1/events                            |
 | Technology subscription        | /feed.xml?technology=node-js              |
 | CVE subscription               | /feed.xml?cve=CVE-2026-12345              |

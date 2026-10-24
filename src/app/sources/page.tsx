@@ -91,7 +91,7 @@ export default async function Sources({
               <div className="source-links">
                 <a href={source.feed_url}>Publisher feed ↗</a>
                 <a href={source.verification.sample_url}>Checked document ↗</a>
-                <a href={"/?source=" + encodeURIComponent(source.id)}>
+                <a href={"/feed?source=" + encodeURIComponent(source.id)}>
                   View in Heist Feed →
                 </a>
               </div>

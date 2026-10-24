@@ -2,7 +2,7 @@
 
 ## Deployment order
 
-1. Apply migrations in order, including 202610240004_unified_feed.sql, to a dedicated Supabase project.
+1. Apply migrations in order, including 202610240004_unified_feed.sql and 202610240005_feed_search.sql, to a dedicated Supabase project.
 2. Deploy the application with server-only production keys. Preview deployments use a separate database and no production cron/model secret.
 3. Run poll, collect and process. Inspect /api/cron/health with the cron bearer token.
 4. Confirm real events appear through JSON, RSS and the homepage, then exercise technology/CVE/type filters and a correction.
@@ -40,7 +40,7 @@ These are not enabled by committing repository files:
 
 - GitHub: protect main with pull requests, one approving review, required Check / validate and Browser / browser checks, and force-push/deletion protection.
 - GitHub: enable secret scanning/push protection and private vulnerability reporting. Confirm a test reporter can see Security → Report a vulnerability. Do not publish a real test vulnerability.
-- Vercel: create edge rate limits covering /, /sources, /feed.xml and /api/v1/*. Start with a documented per-IP budget appropriate to expected polling, then adjust using real traffic. Exempt protected scheduled endpoints from public rules; they still require bearer authentication.
+- Vercel: create edge rate limits covering /, /feed, /sources, /feed.xml and /api/v1/*. Start with a documented per-IP budget appropriate to expected polling, then adjust using real traffic. Exempt protected scheduled endpoints from public rules; they still require bearer authentication.
 - Vercel: verify cron frequency/timeout support and monitoring. Configure budget alerts and production domain/TLS.
 - Supabase: verify anon/authenticated roles cannot access tables, queues or RPCs through the real REST API. Verify service-role operations work.
 - Self hosting: enforce HTTPS and an egress policy denying private-network/metadata destinations. Origin allowlists alone are not DNS pinning.

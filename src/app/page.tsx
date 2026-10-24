@@ -57,11 +57,11 @@ export default async function Home({
             ecosystem. One open feed, with the source behind every event.
           </p>
           <div className="actions">
-            <a className="button primary" href={"/feed.xml" + suffix}>
-              Subscribe via RSS ↗
+            <a className="button primary" href={"/feed" + suffix}>
+              Browse the feed →
             </a>
-            <a className="button" href="/docs">
-              Explore the API →
+            <a className="button" href={"/feed.xml" + suffix}>
+              Subscribe via RSS ↗
             </a>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default async function Home({
           <div className="stream-target">
             <span className="signal" />
             <strong>Heist Feed</strong>
-            <span>RSS + JSON</span>
+            <span>WEB + RSS + JSON</span>
           </div>
           <p>
             Listen to everything, or subscribe to the technologies and CVEs that
@@ -118,7 +118,7 @@ export default async function Home({
               {filtered ? "Your security feed" : "Latest security events"}
             </h2>
           </div>
-          <a href="/">Clear filters</a>
+          <a href={"/feed" + suffix}>Open the full feed →</a>
         </div>
         <FeedFilters filters={query} />
         {error ? (

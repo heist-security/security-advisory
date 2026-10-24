@@ -33,6 +33,7 @@ export async function events(options: Partial<EventQuery> = {}) {
     query = query.contains("technologies", [options.technology]);
   if (options.cve) query = query.contains("cve_ids", [options.cve]);
   if (options.source) query = query.eq("source_id", options.source);
+  if (options.q) query = query.textSearch("search_document", options.q, { type: "plain", config: "simple" });
   const { data, error } = await query;
   if (error) throw error;
   return data as FeedEvent[];

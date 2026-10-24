@@ -11,11 +11,11 @@ export default function Docs() {
           Your subscription.
         </h1>
         <p>
-          All sources publish into the same RSS and JSON feed. Follow
+          All sources publish into one feed, available visually, as RSS, or as JSON. Follow
           everything, or narrow your subscription with optional filters. No
           account or API key is required.
         </p>
-        <h2>Subscribe</h2>
+        <h2>Browse visually</h2><p><a href="/feed">Open the visual feed →</a> to search the archive, filter by your stack, and expand source evidence and version details.</p><h2>Subscribe</h2>
         <pre>
           {
             "/feed.xml\n/feed.xml?technology=node-js\n/feed.xml?type=patch&technology=ruby\n/feed.xml?cve=CVE-2026-12345"
@@ -29,7 +29,7 @@ export default function Docs() {
               <th>Meaning</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody><tr><td>q</td><td>Search published text and subscription keys; up to 120 characters</td></tr>
             <tr>
               <td>type</td>
               <td>advisory, patch, mitigation, withdrawal or other</td>
@@ -55,7 +55,7 @@ export default function Docs() {
         <p>
           Filters combine with AND. Source and technology keys are available in
           event responses. Corrections retain earlier subscription keys, so an
-          update can reach you even if its latest classification changes.
+          update can reach you even if its latest classification changes. Keyword searches match the current event text and retained routing keys; previous free-text wording is not retained.
         </p>
         <h2>Read the JSON archive</h2>
         <pre>

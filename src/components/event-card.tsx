@@ -1,13 +1,17 @@
 import type { FeedEvent } from "@/lib/events";
-import { technologyKey } from "@/lib/filters";
-export function EventCard({ event }: { event: FeedEvent }) {
+import { technologyKey, type Filters } from "@/lib/filters";
+import { feedLink } from "@/lib/feed-view";
+import { registry } from "@/lib/registry";
+import { EventDetails } from "./event-details";
+const sourceNames = new Map(registry.map(source => [source.id, source.name]));
+export function EventCard({ event, filters = {}, expanded = false }: { event: FeedEvent; filters?: Filters; expanded?: boolean }) {
   return (
-    <article className="event-card">
+    <article className="event-card" id={"event-" + event.id}>
       <div className="event-meta">
         <span className={"badge " + event.payload.kind}>
           {event.payload.kind}
         </span>
-        <span>{event.source_id}</span>
+        <a className="event-source" href={feedLink({ ...filters, source: event.source_id })}>{sourceNames.get(event.source_id) ?? event.source_id}</a>
         <time dateTime={event.published_at}>
           {new Date(event.published_at).toLocaleDateString("en-GB", {
             day: "2-digit",
@@ -28,7 +32,7 @@ export function EventCard({ event }: { event: FeedEvent }) {
           <a
             key={i}
             href={
-              "/?technology=" + encodeURIComponent(technologyKey(p.name.value))
+              feedLink({ ...filters, technology: technologyKey(p.name.value) })
             }
           >
             {p.name.value}
@@ -38,7 +42,7 @@ export function EventCard({ event }: { event: FeedEvent }) {
           </a>
         ))}
         {event.payload.related_cves.map((c) => (
-          <a key={c.value} href={"/?cve=" + encodeURIComponent(c.value)}>
+          <a key={c.value} href={feedLink({ ...filters, cve: c.value })}>
             {c.value}
           </a>
         ))}
@@ -52,6 +56,7 @@ export function EventCard({ event }: { event: FeedEvent }) {
         </span>
         <a href={event.source_url}>Verify original source ↗</a>
       </div>
+      {expanded ? <EventDetails event={event} /> : null}
     </article>
   );
 }

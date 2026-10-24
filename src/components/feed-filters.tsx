@@ -2,6 +2,7 @@ import { eventTypes, type Filters } from "@/lib/filters";
 export function FeedFilters({ filters }: { filters: Filters }) {
   return (
     <form className="filters" action="/" aria-label="Filter the unified feed">
+      {filters.q ? <input type="hidden" name="q" value={filters.q}/> : null}
       <label>
         Event type
         <select name="type" defaultValue={filters.type ?? ""}>

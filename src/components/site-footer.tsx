@@ -10,6 +10,7 @@ export function SiteFooter() {
         </p>
       </div>
       <div>
+        <a href="/feed">Browse the feed</a>
         <a href="/docs">API documentation</a>
         <a href="/sources">Source coverage</a>
       </div>

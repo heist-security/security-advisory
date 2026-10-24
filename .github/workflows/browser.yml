@@ -25,3 +25,13 @@ jobs:
           name: browser-results
           path: test-results/
           retention-days: 7
+      - name: Export visual review images
+        if: always()
+        run: |
+          node --input-type=module <<'NODE'
+          import { readdirSync, readFileSync } from 'node:fs';
+          for (const path of readdirSync('test-results').filter(p=>p.endsWith('-visual-reader.png'))) {
+            const data=readFileSync('test-results/'+path).toString('base64');const total=Math.ceil(data.length/16000);
+            for(let part=0;part<total;part++) console.log('UI_IMAGE '+JSON.stringify({path,part,total,data:data.slice(part*16000,(part+1)*16000)}));
+          }
+          NODE
