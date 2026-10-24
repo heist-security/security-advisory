@@ -26,7 +26,7 @@ Every claim reserves an attempt in the existing database-enforced hourly budget,
 
 The restricted key is in the existing Heist project, so funding is shared with its other keys; this is not a dedicated project spending limit. Funding is managed by the operator. No additional credit purchase or auto-reload change is part of this setup.
 
-Setup evidence on 24 October 2026: the restricted key was created and saved as a non-revealable Vercel Production secret, and `OPENAI_MODEL=gpt-6-luna` was saved. The Vercel verification prompt cleared before that model update. Automatic approval review then blocked saving `VENDOR_SOURCE_IDS=all` and `OPENAI_REASONING_EFFORT=none`, stating that paid model activation and provider spending require explicit approval. Those flags remain unsaved. The table above is the intended configuration, not a claim that activation is complete. Keep this PR in draft until that approval and configuration are completed. No production redeployment or database activation was performed while preparing it.
+Setup evidence on 24 October 2026: the operator explicitly approved paid extraction for all 374 publisher sources, bounded to 60 attempts/hour. The restricted key is saved as a non-revealable Vercel Production secret. The Production settings above are saved and verified, including `VENDOR_SOURCE_IDS=all`, `OPENAI_MODEL=gpt-6-luna`, `OPENAI_REASONING_EFFORT=none`, and the existing 60/1/1 attempt, batch and concurrency limits. These environment changes require a new deployment; activation follows this PR's merge, migration and checked deployment. No production migration, redeployment or paid model call was performed while preparing the PR.
 
 ## Backfill and checks
 
