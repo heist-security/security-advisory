@@ -19,13 +19,15 @@ This is a dated snapshot, not a declaration that the hosted feed is ready to lau
 
 The published rule uses a fixed 60-second window of 120 requests per IP, shared across `/`, `/sources`, `/feed.xml` and `/api/v1/*`. The request-path expression is `^(/|/sources/?|/feed\.xml|/api/v1/.*)$`; protected `/api/cron/*` routes are excluded. The action is HTTP 429 (Too Many Requests), with no persistent action, so RSS and API clients are not sent a browser challenge. Vercel displayed $0.50 per million allowed requests and no charge for blocked requests; activation was approved and completed on 24 October 2026; representative-load validation is still pending. Revisit the budget after observing legitimate polling and shared-IP traffic.
 
-### Next deployment steps
+### Remaining hosting steps
 
-1. Create a dedicated Supabase project; do not apply these migrations to the existing Heist application database. Keep the Data API enabled and disable automatic exposure of new tables. Review all migrations before applying them in order.
-2. Grant the existing Vercel GitHub installation access to this repository only, then import the existing repository into the Heist Vercel team. Do not create a duplicate repository using the public-repository clone flow.
-3. Configure production-only database, model and cron credentials. Use a separate database for previews; never copy production credentials into preview environments.
-4. Select and pin the extraction model, set provider spending controls and a conservative initial extraction-attempt limit, then run the reviewed evaluation corpus.
-5. Configure the production domain, TLS, edge rate controls and authenticated health monitoring before exercising the live pipeline and starting the 24-hour observation window.
+Database migrations are handled in a separate PR. This hosting setup does not apply migrations. Live database-role checks, pipeline validation and the 24-hour observation window remain pending until the migrations have been reviewed and applied.
+
+1. Confirm the dedicated `heist-feed` Supabase project was created. Keep the Data API enabled and automatic exposure of new tables disabled. Do not use the existing Heist application database.
+2. Configure production-only database, model and cron credentials in the existing `security-advisory` Vercel project. Use a separate database for previews; never copy production credentials into preview environments.
+3. Select and pin the extraction model, set provider spending controls and a conservative initial extraction-attempt limit, then run the reviewed evaluation corpus.
+4. Configure the production domain, TLS, budget alerts and authenticated health monitoring. Verify the published edge rule under representative load once a deployment is available.
+5. After the separate migration work is complete, deploy the configured release, verify the database roles and live pipeline, then start the 24-hour observation window.
 
 Do not mark the release gate complete based on this record. Hosting controls, live database role checks, populated-page inspection, extraction quality, cost, cache/load testing and the observation window still require evidence.
 
