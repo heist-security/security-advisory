@@ -15,9 +15,9 @@ This is a dated snapshot, not a declaration that the hosted feed is ready to lau
 - [ ] Provision the dedicated production database, configure production credentials and deploy, then complete the live checks below.
 - [ ] Evaluate a reviewed real-announcement corpus and observe the deployed pipeline for at least 24 hours.
 
-### Pending edge rate limit
+### Configured edge rate limit
 
-The proposed initial budget is 120 requests per minute per IP, shared across `/`, `/sources`, `/feed.xml` and `/api/v1/*`. The request-path expression is `^(/|/sources/?|/feed\.xml|/api/v1/.*)$`; protected `/api/cron/*` routes are excluded. Use a rate-limit response rather than a browser challenge so RSS and API clients can handle it. Vercel displayed $0.50 per million allowed requests and no charge for blocked requests; activation and representative-load validation are still pending. Revisit the budget after observing legitimate polling and shared-IP traffic.
+The published rule uses a fixed 60-second window of 120 requests per IP, shared across `/`, `/sources`, `/feed.xml` and `/api/v1/*`. The request-path expression is `^(/|/sources/?|/feed\.xml|/api/v1/.*)$`; protected `/api/cron/*` routes are excluded. The action is HTTP 429 (Too Many Requests), with no persistent action, so RSS and API clients are not sent a browser challenge. Vercel displayed $0.50 per million allowed requests and no charge for blocked requests; activation was approved and completed on 24 October 2026; representative-load validation is still pending. Revisit the budget after observing legitimate polling and shared-IP traffic.
 
 ### Next deployment steps
 
