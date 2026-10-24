@@ -58,7 +58,9 @@ test("search and filters persist in the URL and subscription formats", async ({
   expect(data.data.map((event: { id: number }) => event.id)).toEqual([3]);
   await page.getByRole("link", { name: "Reset filters", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(3);
-  await page.getByLabel("Type", { exact: true }).selectOption("patch");
+  await page
+    .getByRole("combobox", { name: "Type", exact: true })
+    .selectOption("patch");
   await page.getByLabel("Technology", { exact: true }).fill("Node.js");
   await page.getByLabel("CVE", { exact: true }).fill("CVE-2026-12345");
   await page.getByRole("button", { name: "Filter", exact: true }).click();
@@ -77,9 +79,10 @@ test("search and filters persist in the URL and subscription formats", async ({
     "node-js",
   );
   await expect(page.locator(".event-card")).toHaveCount(2);
-  // The fixture source is outside the production registry; preserve it from the URL.
-  await page.goto(page.url() + "&source=nodejs");
   await page.getByLabel("Search", { exact: true }).fill("node");
+  await page
+    .getByRole("combobox", { name: "Source", exact: true })
+    .selectOption("nodejs");
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(2);
   const rss = await page
