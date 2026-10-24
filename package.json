@@ -1,0 +1,37 @@
+{
+  "name": "heist-feed",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "sources:verify": "node --import tsx scripts/verify-sources.ts",
+    "sources:build": "node --import tsx scripts/build-registry.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0",
+    "cheerio": "^1.2.0",
+    "next": "16.4.3",
+    "openai": "^6.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "rss-parser": "^3.13.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

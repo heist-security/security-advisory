@@ -1,0 +1,213 @@
+{
+  "checked_at": "2026-10-23T21:00:13.726474+00:00",
+  "scope": "Manual follow-up on GitHub release streams whose latest dated item was older than one year. Other repositories have not all been checked for archive status.",
+  "results": [
+    {
+      "id": "github-node-fetch-node-fetch",
+      "repo": "node-fetch/node-fetch",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "A light-weight module that brings the Fetch API to Node.js",
+      "homepage": ""
+    },
+    {
+      "id": "github-node-saml-node-saml",
+      "repo": "node-saml/node-saml",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "A SAML library not dependent on any frameworks that runs in Node.",
+      "homepage": ""
+    },
+    {
+      "id": "github-kelektiv-node-bcrypt-js",
+      "repo": "kelektiv/node.bcrypt.js",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "bcrypt for NodeJs",
+      "homepage": ""
+    },
+    {
+      "id": "github-pallets-jinja",
+      "repo": "pallets/jinja",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "A very fast and expressive template engine.",
+      "homepage": "https://jinja.palletsprojects.com"
+    },
+    {
+      "id": "github-encode-httpx",
+      "repo": "encode/httpx",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "A next generation HTTP client for Python. \ud83e\udd8b",
+      "homepage": "https://www.python-httpx.org/"
+    },
+    {
+      "id": "github-pallets-itsdangerous",
+      "repo": "pallets/itsdangerous",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "Safely pass trusted data to untrusted environments and back.",
+      "homepage": "https://itsdangerous.palletsprojects.com"
+    },
+    {
+      "id": "github-encode-httpcore",
+      "repo": "encode/httpcore",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "A minimal HTTP client. \u2699\ufe0f",
+      "homepage": "https://www.encode.io/httpcore/"
+    },
+    {
+      "id": "github-ruby-rexml",
+      "repo": "ruby/rexml",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "REXML is an XML toolkit for Ruby",
+      "homepage": ""
+    },
+    {
+      "id": "github-yaml-pyyaml",
+      "repo": "yaml/pyyaml",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "Canonical source repository for PyYAML",
+      "homepage": ""
+    },
+    {
+      "id": "github-square-retrofit",
+      "repo": "lysine-dev/retrofit",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "A type-safe HTTP client for Android and the JVM",
+      "homepage": "https://lysine.dev/retrofit/"
+    },
+    {
+      "id": "github-jamesnk-newtonsoft-json",
+      "repo": "JamesNK/Newtonsoft.Json",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "Json.NET is a popular high-performance JSON framework for .NET",
+      "homepage": "https://www.newtonsoft.com/json"
+    },
+    {
+      "id": "github-jwtk-jjwt",
+      "repo": "jwtk/jjwt",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "Java JWT: JSON Web Token for Java and Android",
+      "homepage": ""
+    },
+    {
+      "id": "github-microsoft-reverse-proxy",
+      "repo": "dotnet/yarp",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "A toolkit for developing high-performance HTTP reverse proxy applications.",
+      "homepage": "https://yarp.dot.net"
+    },
+    {
+      "id": "github-gorilla-websocket",
+      "repo": "gorilla/websocket",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "Package gorilla/websocket is a fast, well-tested and widely used WebSocket implementation for Go.",
+      "homepage": "https://gorilla.github.io"
+    },
+    {
+      "id": "github-gorilla-mux",
+      "repo": "gorilla/mux",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "Package gorilla/mux is a powerful HTTP router and URL matcher for building Go web servers with \ud83e\udd8d",
+      "homepage": "https://gorilla.github.io"
+    },
+    {
+      "id": "github-mholt-archiver",
+      "repo": "mholt/archiver",
+      "status": 200,
+      "archived": true,
+      "disabled": false,
+      "description": "DEPRECATED. Please use mholt/archives instead.",
+      "homepage": "https://github.com/mholt/archives"
+    },
+    {
+      "id": "github-gogo-protobuf",
+      "repo": "gogo/protobuf",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "[Deprecated] Protocol Buffers for Go with Gadgets",
+      "homepage": ""
+    },
+    {
+      "id": "github-facebook-zstd",
+      "repo": "facebook/zstd",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "Zstandard - Fast real-time compression algorithm",
+      "homepage": "http://www.zstd.net"
+    },
+    {
+      "id": "github-libssh2-libssh2",
+      "repo": "libssh2/libssh2",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "the SSH library",
+      "homepage": "https://libssh2.org/"
+    },
+    {
+      "id": "github-nlohmann-json",
+      "repo": "nlohmann/json",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "JSON for Modern C++",
+      "homepage": "https://json.nlohmann.me"
+    },
+    {
+      "id": "github-puppetlabs-puppet",
+      "repo": "puppetlabs/puppet",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "Server automation framework and application",
+      "homepage": "https://puppet.com/open-source/#osp"
+    },
+    {
+      "id": "github-matrix-org-synapse",
+      "repo": "matrix-org/synapse",
+      "status": 200,
+      "archived": true,
+      "disabled": false,
+      "description": "Synapse: Matrix homeserver written in Python/Twisted.",
+      "homepage": "https://matrix-org.github.io/synapse"
+    },
+    {
+      "id": "publisher-apache-apisix-dashboard-releases",
+      "repo": "apache/apisix-dashboard",
+      "status": 200,
+      "archived": false,
+      "disabled": false,
+      "description": "Dashboard for Apache APISIX",
+      "homepage": "https://apisix.apache.org/"
+    }
+  ]
+}
