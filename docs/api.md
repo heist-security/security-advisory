@@ -6,7 +6,7 @@ All publishers contribute to one event stream. The visual page at `/feed`, RSS a
 
 | Parameter  | Meaning                                                  | Example        |
 | ---------- | -------------------------------------------------------- | -------------- |
-| q | Keyword search, up to 120 characters | authentication |
+| q          | Keyword search, up to 120 characters                     | authentication |
 | type       | Advisory classification; kind remains a compatible alias | patch          |
 | technology | Normalized product-name key, or an exact source ID       | node-js        |
 | cve        | CVE identifier, case-insensitive input                   | CVE-2026-12345 |

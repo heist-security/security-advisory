@@ -19,8 +19,8 @@ Search requires migration `202610240005_feed_search.sql`; apply it before deploy
 | Use                            | Endpoint                                  |
 | ------------------------------ | ----------------------------------------- |
 | Everything, latest 100 events  | /feed.xml                                 |
-| Visual feed | /feed |
-| Keyword search | /feed?q=authentication |
+| Visual feed                    | /feed                                     |
+| Keyword search                 | /feed?q=authentication                    |
 | Everything, JSON               | /api/v1/events                            |
 | Technology subscription        | /feed.xml?technology=node-js              |
 | CVE subscription               | /feed.xml?cve=CVE-2026-12345              |

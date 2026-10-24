@@ -149,21 +149,50 @@ it("keeps C++ and C# technology subscription keys distinct", async () => {
 
 it("searches indexed public text and retained CVE keys across corrections", async () => {
   await enqueue("searchable");
-  await finish(await claim(), { ...payload, title: "Widget authentication bypass", summary: "Install the security update." });
-  const matches = async (query:string) => (await db.query<any>("select id,payload from events where search_document @@ plainto_tsquery('simple',$1) order by id", [query])).rows;
+  await finish(await claim(), {
+    ...payload,
+    title: "Widget authentication bypass",
+    summary: "Install the security update.",
+  });
+  const matches = async (query: string) =>
+    (
+      await db.query<any>(
+        "select id,payload from events where search_document @@ plainto_tsquery('simple',$1) order by id",
+        [query],
+      )
+    ).rows;
   expect(await matches("authentication")).toHaveLength(1);
   expect(await matches("totally-unrelated-word")).toHaveLength(0);
   await enqueue("search-correction");
-  await finish(await claim(), { security_relevant:false });
+  await finish(await claim(), { security_relevant: false });
   const corrected = await matches("CVE-2026-12345");
   expect(corrected).toHaveLength(2);
   expect(corrected[1].payload.kind).toBe("withdrawal");
   expect(await matches("authentication")).toHaveLength(1);
 });
 it("backfills search for existing events when the migration is applied", async () => {
-  await db.exec("alter table events drop column search_document; drop function event_search_document(text,jsonb,text[],text[],text[]);");
+  await db.exec(
+    "alter table events drop column search_document; drop function event_search_document(text,jsonb,text[],text[],text[]);",
+  );
   await enqueue("existing-event");
-  await finish(await claim(), { ...payload, title:"Certificate verification update" });
-  await db.exec(readFileSync(new URL("../supabase/migrations/202610240005_feed_search.sql",import.meta.url),"utf8"));
-  expect((await db.query("select id from events where search_document @@ plainto_tsquery('simple','certificate')")).rows).toHaveLength(1);
+  await finish(await claim(), {
+    ...payload,
+    title: "Certificate verification update",
+  });
+  await db.exec(
+    readFileSync(
+      new URL(
+        "../supabase/migrations/202610240005_feed_search.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  expect(
+    (
+      await db.query(
+        "select id from events where search_document @@ plainto_tsquery('simple','certificate')",
+      )
+    ).rows,
+  ).toHaveLength(1);
 });

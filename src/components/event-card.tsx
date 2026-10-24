@@ -3,15 +3,28 @@ import { technologyKey, type Filters } from "@/lib/filters";
 import { feedLink } from "@/lib/feed-view";
 import { registry } from "@/lib/registry";
 import { EventDetails } from "./event-details";
-const sourceNames = new Map(registry.map(source => [source.id, source.name]));
-export function EventCard({ event, filters = {}, expanded = false }: { event: FeedEvent; filters?: Filters; expanded?: boolean }) {
+const sourceNames = new Map(registry.map((source) => [source.id, source.name]));
+export function EventCard({
+  event,
+  filters = {},
+  expanded = false,
+}: {
+  event: FeedEvent;
+  filters?: Filters;
+  expanded?: boolean;
+}) {
   return (
     <article className="event-card" id={"event-" + event.id}>
       <div className="event-meta">
         <span className={"badge " + event.payload.kind}>
           {event.payload.kind}
         </span>
-        <a className="event-source" href={feedLink({ ...filters, source: event.source_id })}>{sourceNames.get(event.source_id) ?? event.source_id}</a>
+        <a
+          className="event-source"
+          href={feedLink({ ...filters, source: event.source_id })}
+        >
+          {sourceNames.get(event.source_id) ?? event.source_id}
+        </a>
         <time dateTime={event.published_at}>
           {new Date(event.published_at).toLocaleDateString("en-GB", {
             day: "2-digit",
@@ -31,9 +44,10 @@ export function EventCard({ event, filters = {}, expanded = false }: { event: Fe
         {event.payload.products.map((p, i) => (
           <a
             key={i}
-            href={
-              feedLink({ ...filters, technology: technologyKey(p.name.value) })
-            }
+            href={feedLink({
+              ...filters,
+              technology: technologyKey(p.name.value),
+            })}
           >
             {p.name.value}
             {p.fixed_versions.length

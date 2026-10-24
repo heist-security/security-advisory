@@ -55,7 +55,8 @@ export function parseEventQuery(
       throw new Error("Repeated filter parameters are not supported");
   }
   const q = params.get("q")?.trim().replace(/\s+/g, " ") || undefined;
-  if (q && (q.length > 120 || /[\x00-\x1F\x7F]/.test(q))) throw new Error("Search must be 1 to 120 printable characters");
+  if (q && (q.length > 120 || /[\x00-\x1F\x7F]/.test(q)))
+    throw new Error("Search must be 1 to 120 printable characters");
   const type = params.get("type") || params.get("kind") || undefined;
   if (
     params.get("type") &&
