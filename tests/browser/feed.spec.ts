@@ -45,8 +45,8 @@ test("search and filters persist in the URL and subscription formats", async ({
   request,
 }) => {
   await page.goto("/");
-  await page.getByLabel("Search announcements", { exact: true }).fill("Ruby");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.getByLabel("Search", { exact: true }).fill("Ruby");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(1);
   await expect(page.locator(".event-card h3")).toContainText("Ruby advisory");
   await expect(
@@ -56,16 +56,12 @@ test("search and filters persist in the URL and subscription formats", async ({
   ).toHaveAttribute("href", "/feed.xml?q=Ruby");
   const data = await (await request.get("/api/v1/events?q=Ruby")).json();
   expect(data.data.map((event: { id: number }) => event.id)).toEqual([3]);
-  await page.getByRole("link", { name: "Remove Search filter" }).click();
+  await page.getByRole("link", { name: "Reset filters", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(3);
-  await page
-    .getByRole("navigation", { name: "Event types" })
-    .getByRole("link", { name: "Patches" })
-    .click();
-  await page.locator(".refine-panel summary").click();
+  await page.getByLabel("Type", { exact: true }).selectOption("patch");
   await page.getByLabel("Technology", { exact: true }).fill("Node.js");
   await page.getByLabel("CVE", { exact: true }).fill("CVE-2026-12345");
-  await page.getByRole("button", { name: "Apply filters" }).click();
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(2);
   await expect(page.locator("#event-2")).toBeVisible();
   await expect(
@@ -81,6 +77,21 @@ test("search and filters persist in the URL and subscription formats", async ({
     "node-js",
   );
   await expect(page.locator(".event-card")).toHaveCount(2);
+  await page.getByLabel("Search", { exact: true }).fill("node");
+  await page.getByLabel("Source", { exact: true }).selectOption("nodejs");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await expect(page.locator(".event-card")).toHaveCount(2);
+  const rss = await page
+    .getByRole("navigation", { name: "Feed formats" })
+    .getByRole("link", { name: "RSS", exact: true })
+    .getAttribute("href");
+  expect(Object.fromEntries(new URL(rss!, page.url()).searchParams)).toEqual({
+    q: "node",
+    type: "patch",
+    technology: "node-js",
+    cve: "CVE-2026-12345",
+    source: "nodejs",
+  });
 });
 test("cursor navigation retains filters and does not offer an empty extra page", async ({
   page,
@@ -102,12 +113,24 @@ test("cursor navigation retains filters and does not offer an empty extra page",
 });
 test("empty, invalid and unavailable states offer useful recovery", async ({
   page,
-}) => {
+}, info) => {
   await page.goto("/?q=NoSuchTechnology");
   await expect(
-    page.getByRole("heading", { name: "No events match these filters." }),
+    page
+      .getByRole("status")
+      .filter({ hasText: "No events match your filters." }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Clear all", exact: true }).click();
+  await page.screenshot({
+    path: "test-results/" + info.project.name + "-empty-feed.png",
+    fullPage: true,
+  });
+  await page.getByRole("link", { name: "Reset filters", exact: true }).click();
+  await expect(page.locator(".event-card")).toHaveCount(3);
+  await page.goto("/?before=1");
+  await expect(page.getByRole("status")).toContainText("No earlier events.");
+  await page
+    .getByRole("link", { name: "Back to latest events", exact: true })
+    .click();
   await expect(page.locator(".event-card")).toHaveCount(3);
   await page.goto("/?type=invalid");
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
@@ -115,7 +138,9 @@ test("empty, invalid and unavailable states offer useful recovery", async ({
   );
   await page.goto("/?source=fixture-unavailable");
   await expect(
-    page.getByRole("heading", { name: "The feed is temporarily unavailable." }),
+    page
+      .getByRole("status")
+      .filter({ hasText: "Feed temporarily unavailable." }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Try again", exact: false }),

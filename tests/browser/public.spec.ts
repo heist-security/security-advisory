@@ -7,10 +7,18 @@ test("unified feed filters update both subscription formats without layout overf
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "Security feed",
   );
-  await page.locator(".refine-panel summary").click();
+  if (info.project.name === "desktop") {
+    const controls = await page
+      .getByRole("search")
+      .locator("input, select, button")
+      .evaluateAll((elements) =>
+        elements.map((element) => element.getBoundingClientRect().top),
+      );
+    expect(Math.max(...controls) - Math.min(...controls)).toBeLessThan(1);
+  }
   await page.getByLabel("Technology", { exact: true }).fill("Node.js");
   await page.getByLabel("CVE", { exact: true }).fill("CVE-2026-12345");
-  await page.getByRole("button", { name: "Apply filters" }).click();
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(
     page
       .getByRole("navigation", { name: "Feed formats" })
