@@ -23,7 +23,8 @@ export const sourceSchema = z.object({
   rationale: z.string().min(20),
   limitations: z.string().min(20),
   exclude_reason: z.string().optional(),
-  discovery_notes: z.string().optional(),
+  // Optional in the registry, nullable in rows returned by PostgreSQL.
+  discovery_notes: z.string().nullish(),
 });
 export type Source = z.infer<typeof sourceSchema>;
 export class NoReleaseNotesError extends Error {}

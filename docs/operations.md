@@ -1,5 +1,17 @@
 # Operations and launch checks
 
+## Cron activation and first publications — 24 October 2026
+
+The [production run for `70439a1`](https://github.com/heist-security/security-advisory/actions/runs/40129932369) completed migrations at 20:29 UTC and reported the exact commit ready on Vercel at 20:30 UTC. The production domain serves the application over HTTPS. The operator then requested cron activation; all three jobs are now enabled every minute. This supersedes the paused-cron status in the earlier records below.
+
+The first poll rejected all three database source rows because `discovery_notes` was SQL `NULL`, while the application accepted only an omitted field or a string. A targeted update changed only those three null metadata values to empty strings and made the failed sources due for retry; no schema, checkpoint or historical data changed. The application now accepts null metadata, with a regression test against actual migration-created rows.
+
+After retry, CVE and KEV staged 3,756 entries. Scheduled collection and deterministic processing published real events: a read-only database check at approximately 20:47 UTC found 27 CVE and 500 KEV events. The public JSON API and homepage showed populated results, and RSS returned HTTP 200 with 100 items. No model calls are required by this configuration. These counts are a point-in-time observation, not a completed backfill.
+
+OSV remains blocked on the deployed commit by `structured_backfill_required`: the requested month contains approximately 595,000 index rows, above the old 200,000-row cap. Its September 24 checkpoint has not been advanced or reset. This follow-up changes OSV discovery to retain only the next page of records while scanning a bounded index prefix. A read-only local replay of the downloaded production index returned two 2,000-record pages without overlap and preserved the initial timestamp. This fix must be reviewed and deployed before claiming live OSV success; see [capacity limits](structured-sources.md#checkpoints-and-capacity).
+
+Full backfill completion, authenticated external monitoring, live database-role isolation, corrections/withdrawals, cache/rate-limit load checks and the 24-hour observation period remain unverified. The operator reported completing the credential handoff before activation; independent verification of old-key revocation is not recorded here. No additional migrations were implemented or applied during cron activation.
+
 ## Production bootstrap follow-up — 24 October 2026
 
 The separately requested migration PR adds `202610240006_structured_bootstrap.sql`. On merge to `main`, the existing Production workflow applies the committed migrations, activates only OSV/CVE/KEV from **2026-09-24T00:00:00Z**, and deploys the checked commit. Existing checkpoints and historical data are retained. A pinned upstream CVE delta snapshot covers the start of the requested month before the importer switches to live updates; see [structured-source activation](structured-sources.md#activation-after-database-readiness). No production migration or import has been run as part of preparing this PR.

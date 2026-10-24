@@ -92,7 +92,17 @@ export function page(
 }
 // Read only the recent prefix. Cancel the stream once the checkpoint is reached.
 // No full-database ZIP is downloaded by a serverless invocation.
-export async function osvChanges(since: string): Promise<RecordItem[]> {
+export async function osvChanges(
+  since: string,
+  selection?: { until: string; after?: string; limit: number },
+): Promise<RecordItem[]> {
+  if (
+    selection &&
+    (!Number.isInteger(selection.limit) ||
+      selection.limit < 1 ||
+      selection.limit > 2001)
+  )
+    throw new Error("Structured page limit is invalid");
   const response = await fetch(endpoints.osv, {
     redirect: "error",
     signal: AbortSignal.timeout(60000),
@@ -101,7 +111,43 @@ export async function osvChanges(since: string): Promise<RecordItem[]> {
   const reader = response.body.getReader(),
     decoder = new TextDecoder();
   const rows: RecordItem[] = [];
+  const lower = Date.parse(since) - 300000;
+  const upper = selection ? Date.parse(selection.until) : Infinity;
+  const pageSize = selection?.limit ?? 0;
+  // The index is newest-first, while our durable cursor advances oldest-first.
+  // Keep only the next page (+ one lookahead) in a max-heap. Retain IDs to
+  // deduplicate ecosystem copies before selecting their newest index entry.
+  const seen = new Set<string>();
+  const heap: { entry: RecordItem; key: string }[] = [];
+  const retain = (entry: RecordItem) => {
+    const candidate = { entry, key: key(entry) };
+    if (selection?.after && candidate.key <= selection.after) return;
+    if (heap.length < pageSize) {
+      let index = heap.length;
+      heap.push(candidate);
+      while (index > 0) {
+        const parent = Math.floor((index - 1) / 2);
+        if (heap[parent].key >= candidate.key) break;
+        heap[index] = heap[parent];
+        index = parent;
+      }
+      heap[index] = candidate;
+    } else if (candidate.key < heap[0].key) {
+      let index = 0;
+      while (index * 2 + 1 < heap.length) {
+        let child = index * 2 + 1;
+        if (child + 1 < heap.length && heap[child + 1].key > heap[child].key)
+          child++;
+        if (heap[child].key <= candidate.key) break;
+        heap[index] = heap[child];
+        index = child;
+      }
+      heap[index] = candidate;
+    }
+  };
+  const result = () => (selection ? heap.map((row) => row.entry) : rows);
   let bytes = 0,
+    scanned = 0,
     pending = "",
     previous = Infinity;
   const accept = (line: string) => {
@@ -113,13 +159,18 @@ export async function osvChanges(since: string): Promise<RecordItem[]> {
     if (comma < 0 || !Number.isFinite(time) || time > previous)
       throw new Error("Invalid OSV index ordering");
     previous = time;
-    if (time < Date.parse(since) - 300000) return false;
-    const id = path.slice(path.lastIndexOf("/") + 1).replace(/\.json$/, "");
-    rows.push(item("core-osv", id, modified));
-    if (rows.length > 200000)
+    if (time < lower) return false;
+    if (++scanned > (selection ? 1000000 : 200000))
       throw new Error(
         "Structured index exceeds entry limit; explicit backfill required",
       );
+    const id = path.slice(path.lastIndexOf("/") + 1).replace(/\.json$/, "");
+    const entry = item("core-osv", id, modified);
+    if (!selection) rows.push(entry);
+    else if (time <= upper && !seen.has(id)) {
+      seen.add(id);
+      retain(entry);
+    }
     return true;
   };
   try {
@@ -140,11 +191,11 @@ export async function osvChanges(since: string): Promise<RecordItem[]> {
       while ((newline = pending.indexOf("\n")) >= 0) {
         const line = pending.slice(0, newline);
         pending = pending.slice(newline + 1);
-        if (!accept(line)) return rows;
+        if (!accept(line)) return result();
       }
       if (pending.length > 4096) throw new Error("Invalid OSV index line");
     }
-    return rows;
+    return result();
   } finally {
     await reader.cancel().catch(() => {});
   }
@@ -195,7 +246,16 @@ export async function discover(
   const state = syncStateSchema.parse(stateValue);
   if (source === "core-osv") {
     const until = state.until ?? new Date().toISOString();
-    return page(await osvChanges(state.since), state, until, limit);
+    return page(
+      await osvChanges(state.since, {
+        until,
+        after: state.after,
+        limit: limit + 1,
+      }),
+      state,
+      until,
+      limit,
+    );
   }
   if (source === "core-cve") {
     // Finish the archived window before switching to the rolling log. page()

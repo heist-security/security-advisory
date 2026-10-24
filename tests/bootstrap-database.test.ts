@@ -3,6 +3,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { structuredSources } from "../src/lib/structured/config";
 import { syncStateSchema } from "../src/lib/structured/discover";
+import { sourceSchema } from "../src/lib/feed";
 
 const filename = "202610240006_structured_bootstrap.sql";
 const folder = new URL("../supabase/migrations/", import.meta.url);
@@ -36,6 +37,9 @@ describe.sequential("structured production bootstrap", () => {
     for (const source of structuredSources) {
       const row = rows.find((r) => r.id === source.id)!;
       expect(row).toMatchObject(source);
+      // The poller validates complete database rows, including nullable columns.
+      expect(row.discovery_notes).toBeNull();
+      expect(sourceSchema.parse(row)).toMatchObject(source);
       const sync = syncStateSchema.parse(
         (row.verification as { sync: unknown }).sync,
       );
