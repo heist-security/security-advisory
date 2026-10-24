@@ -231,6 +231,85 @@ describe("resumable discovery", () => {
     expect(recordUrl("core-cve", "CVE-2026-0001")).toContain("/2026/0xxx/");
     expect(() => recordUrl("core-osv", "../../metadata")).toThrow();
   });
+  it("pages an immutable CVE bootstrap before handing off to the live delta log", async () => {
+    const ref = "a".repeat(40);
+    const snapshot = [
+      { fetchTime: "2026-09-23T00:00:00Z", new: [], updated: [] },
+      {
+        fetchTime: "2026-09-24T01:00:00Z",
+        new: [{ cveId: "CVE-2026-11111", dateUpdated: "2020-01-01T00:00:00Z" }],
+        updated: [],
+      },
+      {
+        fetchTime: "2026-10-23T23:00:00Z",
+        new: [{ cveId: "CVE-2026-22222", dateUpdated: changed }],
+        updated: [],
+      },
+    ];
+    const live = [
+      { fetchTime: "2026-09-25T00:00:00Z", new: [], updated: [] },
+      {
+        fetchTime: changed,
+        new: [{ cveId: "CVE-2026-33333", dateUpdated: changed }],
+        updated: [],
+      },
+    ];
+    const fetch = vi.fn(async (url: string) =>
+      respond(url.includes(`/${ref}/`) ? snapshot : live),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const first = await discover(
+      "core-cve",
+      {
+        since: "2026-09-24T00:00:00Z",
+        cve_bootstrap_ref: ref,
+      },
+      1,
+    );
+    expect(first.items.map((r) => r.structured.id)).toEqual(["CVE-2026-11111"]);
+    expect(first.state).toMatchObject({
+      since: "2026-09-24T00:00:00Z",
+      until: "2026-10-23T23:00:00.000Z",
+      cve_bootstrap_ref: ref,
+    });
+    const second = await discover("core-cve", first.state, 1);
+    expect(second.items.map((r) => r.structured.id)).toEqual([
+      "CVE-2026-22222",
+    ]);
+    expect(second.state).toEqual({ since: "2026-10-23T23:00:00.000Z" });
+    const third = await discover("core-cve", second.state, 1);
+    expect(third.items.map((r) => r.structured.id)).toEqual(["CVE-2026-33333"]);
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      `https://raw.githubusercontent.com/CVEProject/cvelistV5/${ref}/cves/deltaLog.json`,
+      `https://raw.githubusercontent.com/CVEProject/cvelistV5/${ref}/cves/deltaLog.json`,
+      endpoints.cve,
+    ]);
+  });
+  it("rejects unpinned CVE bootstrap refs and never skips an unavailable archive", async () => {
+    const fetch = vi.fn(
+      async () => new Response("Unavailable", { status: 503 }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    for (const ref of ["main", "../../another/repo", "a".repeat(39)]) {
+      await expect(
+        discover("core-cve", {
+          since: "2026-09-24T00:00:00Z",
+          cve_bootstrap_ref: ref,
+        }),
+      ).rejects.toThrow();
+    }
+    expect(fetch).not.toHaveBeenCalled();
+    const state = {
+      since: "2026-09-24T00:00:00Z",
+      cve_bootstrap_ref: "a".repeat(40),
+    };
+    await expect(discover("core-cve", state)).rejects.toThrow(/503/);
+    expect(state).toEqual({
+      since: "2026-09-24T00:00:00Z",
+      cve_bootstrap_ref: "a".repeat(40),
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it("emits a removal only after comparing complete KEV snapshots", async () => {
     vi.stubGlobal(
       "fetch",

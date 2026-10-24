@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
+import { structuredSources } from "../src/lib/structured/config";
 
 let database: PGlite;
 beforeAll(async () => {
@@ -13,6 +14,8 @@ beforeAll(async () => {
     .filter((name) => name.endsWith(".sql"))
     .sort())
     await database.exec(readFileSync(new URL(name, directory), "utf8"));
+  // These legacy-worker tests explicitly opt into their vendor fixture.
+  await database.exec("update sources set enabled=true where id='ruby'");
 }, 30000);
 afterAll(async () => {
   await database.close();
@@ -137,7 +140,7 @@ describe.sequential("durable ingestion and publication", () => {
     ).rejects.toThrow("permission denied");
     await database.exec("reset role");
   });
-  it("loads exactly the reviewed catalog with metadata and adapter configuration", async () => {
+  it("loads the reviewed vendor catalog and structured sources with metadata", async () => {
     const registry = JSON.parse(
       readFileSync(
         new URL("../sources/registry.json", import.meta.url),
@@ -149,9 +152,13 @@ describe.sequential("durable ingestion and publication", () => {
         "select id,adapter from sources",
       )
     ).rows;
-    expect(rows.length).toBe(registry.length);
+    expect(rows.length).toBe(registry.length + structuredSources.length);
     expect(new Set(rows.map((row) => row.id))).toEqual(
-      new Set(registry.map((source: { id: string }) => source.id)),
+      new Set(
+        [...registry, ...structuredSources].map(
+          (source: { id: string }) => source.id,
+        ),
+      ),
     );
     expect(
       (
