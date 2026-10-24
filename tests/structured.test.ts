@@ -224,6 +224,106 @@ describe("resumable discovery", () => {
     ).toBe("2026-10-24T10:00:00.000Z");
     expect(() => cveChanges(logs, "2026-09-01T00:00:00Z")).toThrow(/backfill/);
   });
+  it("streams a large OSV window into bounded oldest-first pages without duplicate ecosystem records", async () => {
+    const until = "2026-10-24T10:00:00.000Z";
+    const csv = [
+      "2026-10-24T11:00:00Z,npm/OSV-FUTURE.json",
+      "2026-10-24T10:00:00Z,npm/OSV-DUPLICATE.json",
+      ...Array.from(
+        { length: 200005 },
+        (_, i) =>
+          `2026-10-24T10:00:00Z,npm/OSV-${String(200004 - i).padStart(6, "0")}.json`,
+      ),
+      "2026-10-24T09:00:00Z,npm/OSV-MIDDLE.json",
+      "2026-10-24T09:00:00Z,Debian/OSV-DUPLICATE.json",
+      "2026-10-24T08:00:00Z,npm/OSV-EARLIEST.json",
+      "2026-09-23T00:00:00Z,npm/OSV-OLD.json",
+    ].join("\n");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(csv)),
+    );
+    const state = { since: "2026-09-24T00:00:00Z", until };
+    const first = await discover("core-osv", state, 2);
+    expect(first.items.map((r) => r.structured.id)).toEqual([
+      "OSV-EARLIEST",
+      "OSV-MIDDLE",
+    ]);
+    expect(first.more).toBe(true);
+    const second = await discover("core-osv", first.state, 2);
+    expect(second.items.map((r) => r.structured.id)).toEqual([
+      "OSV-000000",
+      "OSV-000001",
+    ]);
+    expect(second.more).toBe(true);
+    expect(second.state.since).toBe(state.since);
+    expect(second.state.until).toBe(until);
+  }, 30000);
+  it("matches complete OSV paging across timestamp ties and removes the cursor only at the end", async () => {
+    const state = { since: "2026-10-24T08:00:00Z", until: changed };
+    const csv = [
+      `${changed},npm/OSV-Z.json`,
+      `${changed},PyPI/OSV-A.json`,
+      `${changed},npm/OSV-M.json`,
+      `${changed},npm/OSV-A.json`,
+      "2026-10-24T09:00:00Z,npm/OSV-OLD.json",
+      "2026-10-24T08:00:00Z,Debian/OSV-Z.json",
+      "2026-10-23T00:00:00Z,npm/TOO-OLD.json",
+    ].join("\n");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(csv)),
+    );
+    const expected = page(
+      [
+        entry("OSV-Z", "2026-10-24T10:00:00.000Z"),
+        entry("OSV-A", "2026-10-24T10:00:00.000Z"),
+        entry("OSV-M", "2026-10-24T10:00:00.000Z"),
+        entry("OSV-OLD", "2026-10-24T09:00:00.000Z"),
+      ],
+      state,
+      changed,
+      10,
+    );
+    for (const limit of [1, 2, 3]) {
+      let cursor: typeof expected.state = state;
+      const actual: typeof expected.items = [];
+      for (let n = 0; n < 10; n++) {
+        const batch = await discover("core-osv", cursor, limit);
+        actual.push(...batch.items);
+        cursor = batch.state;
+        if (!batch.more) break;
+      }
+      expect(actual).toEqual(expected.items);
+      expect(cursor).toEqual({ since: changed });
+    }
+  });
+  it("fails closed at the bounded OSV scan limit without advancing the checkpoint", async () => {
+    const cancel = vi.fn();
+    const chunk = new TextEncoder().encode(
+      `${changed},npm/OSV-REPEATED.json\n`.repeat(1000),
+    );
+    let chunks = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            new ReadableStream({
+              pull(controller) {
+                if (chunks++ < 1003) controller.enqueue(chunk);
+                else controller.close();
+              },
+              cancel,
+            }),
+          ),
+      ),
+    );
+    const state = Object.freeze({ since: "2026-09-24T00:00:00Z" });
+    await expect(discover("core-osv", state)).rejects.toThrow(/entry limit/);
+    expect(state).toEqual({ since: "2026-09-24T00:00:00Z" });
+    expect(cancel).toHaveBeenCalled();
+  }, 30000);
   it("derives CVE record paths from validated IDs", () => {
     expect(recordUrl("core-cve", "CVE-2026-12345")).toContain(
       "/2026/12xxx/CVE-2026-12345.json",
