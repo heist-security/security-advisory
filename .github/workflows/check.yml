@@ -13,6 +13,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run sources:build -- --migration=299901010001_ci_registry.sql
       - run: npm run format
       - name: Export prepared files
         if: always()

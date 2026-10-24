@@ -69,6 +69,7 @@ Follow the concrete [operations and launch checklist](docs/operations.md). Repos
     npm run typecheck
     npm test
     npm run build
+    npx playwright install chromium
     npm run test:browser
     npm run check:secrets
     npm audit

@@ -20,12 +20,15 @@ export default defineConfig({
         PUBLIC_BASE_URL: "http://127.0.0.1:3039",
         CRON_SECRET: "browser-test-placeholder",
         OPENAI_API_KEY: "",
-        OPENAI_MODEL: ""
+        OPENAI_MODEL: "",
       },
-    }
+    },
   ],
   projects: [
     { name: "desktop", use: { viewport: { width: 1440, height: 1000 } } },
-    { name: "mobile", use: { viewport: { width: 390, height: 844 }, isMobile: true } },
+    {
+      name: "mobile",
+      use: { viewport: { width: 390, height: 844 }, isMobile: true },
+    },
   ],
 });

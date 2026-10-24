@@ -1,7 +1,7 @@
 node_modules
 .next
 package-lock.json
-sources/
+/sources/
 supabase/migrations/
 docs/source-coverage.md
 test-results/
