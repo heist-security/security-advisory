@@ -12,6 +12,8 @@ test("visual reader displays the shared stream and expands source evidence", asy
       .getByRole("navigation", { name: "Feed formats" })
       .getByRole("link", { name: "RSS" }),
   ).toHaveAttribute("href", "/feed.xml");
+  await page.screenshot({ path: "test-results/" + info.project.name + "-visual-reader.png", fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const patch = page.locator("#event-1");
   await patch.getByText("Evidence and details", { exact: false }).click();
   await expect(
@@ -100,7 +102,9 @@ test("empty, invalid and unavailable states offer useful recovery", async ({
   await page.getByRole("link", { name: "Clear all", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(3);
   await page.goto("/feed?type=invalid");
-  await expect(page.getByRole("main").getByRole("alert")).toContainText("Invalid event type");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "Invalid event type",
+  );
   await page.goto("/feed?source=fixture-unavailable");
   await expect(
     page.getByRole("heading", { name: "The feed is temporarily unavailable." }),

@@ -809,6 +809,7 @@ small {
   grid-template-columns: 256px minmax(0, 1fr);
 }
 .feed-sidebar {
+  min-width: 0;
   border-right: 1px solid var(--border);
   padding: 28px 24px;
   background: #fcfcfb;

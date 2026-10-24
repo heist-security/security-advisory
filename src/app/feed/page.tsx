@@ -108,7 +108,10 @@ export default async function Feed({
               </a>
             ))}
           </nav>
-          <details className="refine-panel" open={Boolean(query.technology || query.cve || query.source)}>
+          <details
+            className="refine-panel"
+            open={Boolean(query.technology || query.cve || query.source)}
+          >
             <summary>
               Technology, CVE &amp; source <span aria-hidden="true">⌄</span>
             </summary>
@@ -340,7 +343,7 @@ export default async function Feed({
             </div>
           ) : null}
           <p className="reader-footnote">
-            Machine extraction can make mistakes. Verify original sources.
+            This timeline includes revisions and corrections. Verify the latest source before acting.
             Cached results may take up to a minute to refresh.
           </p>
         </section>
