@@ -2,34 +2,84 @@
 
 ## Verification record — 24 October 2026
 
-This is a dated snapshot, not a declaration that the hosted feed is ready to launch.
+This is a dated snapshot, not a declaration that the hosted feed is ready to launch. Database migrations are explicitly outside this setup PR: none were implemented or applied. Database-role verification, live pipeline validation and the 24-hour observation period remain blocked on the separate migration work.
 
-- [x] Code and browser CI passed on `4b21f9a4765ffbcfefd4107fc630918a9ee8568c`: [Check](https://github.com/heist-security/security-advisory/actions/runs/40077692870) and [Browser](https://github.com/heist-security/security-advisory/actions/runs/40077692884). Recheck the eventual release commit.
+### Verified repository controls
+
 - [x] The active [Protect main ruleset](https://github.com/heist-security/security-advisory/rules/25775691) requires a pull request, one approving review, and the `validate` and `browser` checks from GitHub Actions. Deletion and force pushes are blocked; the bypass list is empty.
-- [x] GitHub Secret Protection and push protection are enabled.
-- [x] Private vulnerability reporting is enabled and visible as enabled on the repository security overview.
+- [x] Secret Protection, push protection and private vulnerability reporting are enabled in repository settings.
 - [x] The MIT license, branding notice and upstream-content attribution notice are present.
-- [ ] Verify the reporting entry point using a separate non-maintainer account. Enabling the setting alone does not complete this check.
-- [x] The existing Vercel GitHub installation can access this repository; the existing-repository import is available.
-- [x] The `security-advisory` Vercel project is connected to this repository in the Heist team. No initial deployment has been started.
-- [ ] Provision the dedicated production database, configure production credentials and deploy, then complete the live checks below.
-- [ ] Evaluate a reviewed real-announcement corpus and observe the deployed pipeline for at least 24 hours.
+- [x] Both required CI jobs passed on the previously inspected PR head `29c026526da5fbcb0511eb7a1cc1f29f111985ec`: [validate](https://github.com/heist-security/security-advisory/actions/runs/40080012437) and [browser](https://github.com/heist-security/security-advisory/actions/runs/40080012476). The current PR checks and eventual release commit must be checked separately.
+- [ ] Independently verify the reporting entry point using a non-maintainer account. No test vulnerability was submitted.
 
-### Configured edge rate limit
+PR #10 was found open and ready for review, and was returned to draft while these launch gates remain open. No PR was merged.
 
-The published rule uses a fixed 60-second window of 120 requests per IP, shared across `/`, `/sources`, `/feed.xml` and `/api/v1/*`. The request-path expression is `^(/|/sources/?|/feed\.xml|/api/v1/.*)$`; protected `/api/cron/*` routes are excluded. The action is HTTP 429 (Too Many Requests), with no persistent action, so RSS and API clients are not sent a browser challenge. Vercel displayed $0.50 per million allowed requests and no charge for blocked requests; activation was approved and completed on 24 October 2026; representative-load validation is still pending. Revisit the budget after observing legitimate polling and shared-IP traffic.
+### Dedicated database and production configuration
 
-### Remaining hosting steps
+- [x] Created the dedicated [heist-feed Supabase project](https://supabase.com/dashboard/project/vkwijiiwtblvjmateyrs) in the Heist Pro organization after checking the project inventory for duplicates. The approved Micro instance reports Healthy in West EU (Ireland), `eu-west-1`, at the displayed additional $10/month.
+- [x] Verified Data API enabled and automatic exposure of new tables disabled. The API settings show no application tables or functions. The existing Heist application database was not used or modified.
+- [x] Saved the following variables in the existing Vercel project, all scoped only to Production. Secret values were stored using Vercel's non-revealable Secret type.
 
-Database migrations are handled in a separate PR. This hosting setup does not apply migrations. Live database-role checks, pipeline validation and the 24-hour observation window remain pending until the migrations have been reviewed and applied.
+| Variable | Saved configuration |
+| --- | --- |
+| `SUPABASE_URL` | Dedicated heist-feed project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase server secret; replacement required before deployment |
+| `CRON_SECRET` | Random 32-byte secret encoded as 64 hex characters; replacement required before deployment |
+| `PUBLIC_BASE_URL` | `https://feed.heist.security` |
+| `OPENAI_MODEL` | `gpt-5.4-mini-2026-03-17`, unevaluated candidate |
+| `EXTRACTION_HOURLY_LIMIT` | `60` |
+| `PROCESS_BATCH_SIZE` | `1` |
+| `PROCESS_CONCURRENCY` | `1` |
 
-1. Confirm the dedicated `heist-feed` Supabase project was created. Keep the Data API enabled and automatic exposure of new tables disabled. Do not use the existing Heist application database.
-2. Configure production-only database, model and cron credentials in the existing `security-advisory` Vercel project. Use a separate database for previews; never copy production credentials into preview environments.
-3. Select and pin the extraction model, set provider spending controls and a conservative initial extraction-attempt limit, then run the reviewed evaluation corpus.
-4. Configure the production domain, TLS, budget alerts and authenticated health monitoring. Verify the published edge rule under representative load once a deployment is available.
-5. After the separate migration work is complete, deploy the configured release, verify the database roles and live pipeline, then start the 24-hour observation window.
+`SUPABASE_SERVICE_ROLE_KEY` holds a modern Supabase server secret rather than a legacy JWT. The application passes it directly to `createClient`; Supabase documents this server-side usage and its `service_role` privileges in [API keys](https://supabase.com/docs/guides/getting-started/api-keys). Live role and RPC verification is still pending.
 
-Do not mark the release gate complete based on this record. Hosting controls, live database role checks, populated-page inspection, extraction quality, cost, cache/load testing and the observation window still require evidence.
+The provisional database and cron secret values must be replaced before the first configured deployment, and the provisional Supabase secret must be revoked. This credential handoff is an unresolved launch gate. Do not copy values into documentation, PRs, logs or preview settings.
+
+`OPENAI_API_KEY` is absent. No paid model calls or evaluation runs were made. Vercel explicitly requires a new deployment for the saved variables to take effect; no new production deployment was started during this continuation.
+
+- [x] Preview environment inspection showed no project variables and no linked shared variables. Production credentials were not copied to previews.
+- [ ] Provision a separate preview database before previews are expected to exercise database-backed behavior. No second paid database was created.
+
+### Domain, deployment and edge controls
+
+- [x] The existing Vercel GitHub integration is connected to this repository. Production branch tracking is `main`.
+- [x] Confirmed `heist.security` belongs to the Heist team in Vercel and is managed in the Heist Cloudflare account. There was no existing `feed` DNS record.
+- [x] Added `feed.heist.security` to the project's Production environment and created a Cloudflare CNAME: `feed` → `d6d9e956aa422a08.vercel-dns-016.com`, DNS only, TTL Auto. Vercel completed certificate generation and reports Valid Configuration. The HTTPS homepage loaded without a certificate warning.
+- [x] Inspected the existing [production deployment](https://vercel.com/heist/security-advisory/FyaShG4vnTTSnrcu6rkAFt9p4H9z): Ready but Stale, from `codex/operations-launch-status` at `173e17d8990a8ed9df836482468a518bb97d42ca`. The domain currently serves that existing empty feed, not a validated pipeline or the newly saved configuration.
+- [x] Rechecked the published firewall rule and audit log. Version #1 contains the enabled public-feed rule.
+- [ ] Verify the edge rule, cache behavior and legitimate shared-IP traffic under representative load.
+
+The published rule uses a fixed 60-second window of 120 requests per IP, shared across `/`, `/sources`, `/feed.xml` and `/api/v1/*`. Its request-path expression is `^(/|/sources/?|/feed\.xml|/api/v1/.*)$`; protected `/api/cron/*` routes are excluded. The action is HTTP 429, with no persistent action. The previously approved pricing was $0.50 per million allowed requests. No browser challenge was introduced.
+
+### Worker scheduling, budgets and monitoring
+
+- [x] Vercel lists `/api/cron/poll`, `/api/cron/collect` and `/api/cron/process` every minute, matching `vercel.json`. All three source routes declare `maxDuration = 300`.
+- [x] Paused cron execution in the project's Cron Jobs settings. The dashboard shows Disabled and all Run buttons disabled. Keep it paused until credentials, migrations, provider controls and evaluation are ready.
+- [x] Verified an existing Vercel team spend budget with alerts at 50%, 75% and 100%. Automatic pause and webhook delivery are off. The existing team budget was not changed; alert receipt and a project-specific budget were not tested.
+- [x] An unauthenticated HTTPS request to `/api/cron/health` returned `{"error":"Unauthorized"}`.
+- [ ] Configure and test an external authenticated health monitor. No monitoring destination is configured by this work. Vercel's project alert screen requires Observability Plus; no additional paid feature was enabled.
+
+For the health monitor, use GET `https://feed.heist.security/api/cron/health` every 5 minutes with `Authorization: Bearer <replacement CRON_SECRET>` stored in the monitor's secret store, never in the URL. Expect HTTP 200 and `status: ok`; alert on 401, 503, timeout or TLS failure. Verify notification delivery and recovery after the separate migration work and configured deployment. This is a proposed monitor configuration, not evidence of an active monitor.
+
+### Extraction candidate and remaining release work
+
+The pinned candidate `gpt-5.4-mini-2026-03-17` supports the Responses API and structured outputs according to the [model documentation](https://developers.openai.com/api/docs/models/gpt-5.4-mini). It is a candidate for evaluation, not a validated production model. No quality, latency, token-use or currency-cost results exist from this setup.
+
+The signed-in provider account has no dedicated feed project configured. The inspected project's Limits screen has no project spend limit and offers an explicit **Enforce a hard limit** option. A provider spending amount and funding decision are still required. Use a dedicated provider project/key, restrict model access, set the agreed currency limit with enforcement and alerts, and verify the control. [Provider documentation](https://help.openai.com/en/articles/9186755-managing-projects-in-the-api-platform) distinguishes alerts from enforcement and warns that enforcement can lag tracked spend. No provider budget, funding or credentials were changed.
+
+The saved extraction limit is 60 attempts per UTC hour, at most 1,440 attempts over 24 complete hourly windows, including failures. It depends on the migration-provided PostgreSQL claim function, applies across overlapping workers, and is not a currency cap. Zero is not a valid configured limit in the current code. Leaving the provider key unset and cron execution disabled keeps paid extraction inactive.
+
+Complete these remaining steps in order:
+
+1. Replace the provisional production secrets and revoke the provisional Supabase server key. Keep all production credentials out of Preview.
+2. Complete the separately reviewed migration work. Then verify the real REST API rejects anon/authenticated access and allows the required server operations.
+3. Agree the provider budget/funding, create the dedicated provider project/key and enforce its limits. Evaluate the pinned candidate before approving it for publication.
+4. Follow [docs/evaluation.md](evaluation.md): use at least 100 representative, manually labeled real announcements with known negatives, multiple products/fixed versions, withdrawals, short and non-English notices, ambiguous severity and prompt-injection cases. Retain source URLs, acquisition dates and permissions with the reviewed corpus. Synthetic fixtures are only smoke tests.
+5. Run the paid launch evaluation only after spending is approved, with `--allow-paid --fixtures=/absolute/path/cases.json --launch`. Review titles/summaries, false positives/negatives and product-version associations; record actual provider token usage and cost separately. No such results are claimed here.
+6. Deploy the reviewed release from `main` with the replacement production credentials, verify authenticated health and populated RSS/JSON/UI behavior, and configure the monitor.
+7. Re-enable cron only when the preceding gates are met. Drain initial backlogs, test corrections and filters, perform cache/rate-limit load checks, and observe scheduled jobs, failures and source lag for at least 24 hours. The observation period has not started.
+
+The deployment sequence below describes the eventual release process. It does not authorize migration work as part of this hosting-status PR.
 
 ## Automatic production deployment
 
