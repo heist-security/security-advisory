@@ -12,8 +12,13 @@ test("visual reader displays the shared stream and expands source evidence", asy
       .getByRole("navigation", { name: "Feed formats" })
       .getByRole("link", { name: "RSS" }),
   ).toHaveAttribute("href", "/feed.xml");
-  await page.screenshot({ path: "test-results/" + info.project.name + "-visual-reader.png", fullPage: true });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: "test-results/" + info.project.name + "-visual-reader.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(page.viewportSize()!.width);
   const patch = page.locator("#event-1");
   await patch.getByText("Evidence and details", { exact: false }).click();
   await expect(
@@ -28,10 +33,8 @@ test("visual reader displays the shared stream and expands source evidence", asy
     correction.getByText("Correction to Heist’s extraction", { exact: true }),
   ).toBeVisible();
   expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(page.viewportSize()!.width);
   await page.screenshot({
     path: "test-results/" + info.project.name + "-visual-reader.png",
     fullPage: true,

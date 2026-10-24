@@ -343,8 +343,9 @@ export default async function Feed({
             </div>
           ) : null}
           <p className="reader-footnote">
-            This timeline includes revisions and corrections. Verify the latest source before acting.
-            Cached results may take up to a minute to refresh.
+            This timeline includes revisions and corrections. Verify the latest
+            source before acting. Cached results may take up to a minute to
+            refresh.
           </p>
         </section>
       </div>
