@@ -67,7 +67,7 @@ An irrelevant newer document advances the publication watermark, preventing olde
 
 Import this repository into Vercel as a Next.js project and complete the [one-time production setup](docs/operations.md#one-time-setup-before-merging). After that, reviewed merges to main run validation, apply pending Supabase migrations, then deploy the checked commit to Vercel. Production Git auto-deployment is disabled so deployment cannot race migrations; preview branches keep their normal Vercel integration.
 
-The workflow needs environment-scoped database/Vercel credentials and project identifiers. Missing configuration stops the release. Application credentials stay in Vercel. The three per-minute schedules in vercel.json require a plan supporting that frequency; another scheduler can invoke the same endpoints.
+The bundled workflow targets heist-security/security-advisory; forks must adapt the repository guards as described in the operations guide. The workflow needs environment-scoped database/Vercel credentials and project identifiers. Missing configuration stops the release. Application credentials stay in Vercel. The three per-minute schedules in vercel.json require a plan supporting that frequency; another scheduler can invoke the same endpoints.
 
 Keep preview credentials separate. Configure edge rate controls, private vulnerability reporting and branch protection before launch. Use the protected /api/cron/health endpoint for queue and source monitoring.
 

@@ -6,6 +6,8 @@ The [Production workflow](../.github/workflows/production.yml) runs on pushes to
 
 The workflow serializes production releases and does not cancel an in-progress migration when another commit arrives. Superseded runs skip deployment. GitHub can replace a pending run with a newer one; that newer run applies all outstanding migration files. Vercel's automatic Git deployment is disabled for `main` in `vercel.json`, so it cannot deploy ahead of migrations. Preview branches still use the Vercel integration.
 
+The bundled release is restricted to `heist-security/security-advisory`. Fork operators must update the repository condition in `production.yml` and the repository checks and `gitSource` in `.github/scripts/release.mjs` to their own repository, then configure their own protected environment and credentials.
+
 ### One-time setup before merging
 
 These settings require an administrator; committing the workflow does not create them.
