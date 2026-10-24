@@ -472,10 +472,9 @@ h1 {
 .catalog-columns,
 .source-row {
   display: grid;
-  grid-template-columns: minmax(180px, 2fr) minmax(120px, 1.2fr) minmax(
-      110px,
-      1fr
-    ) 176px 64px;
+  grid-template-columns:
+    minmax(180px, 2fr) minmax(120px, 1.2fr) minmax(110px, 1fr)
+    176px 64px;
   column-gap: 16px;
 }
 .catalog-columns {
@@ -760,10 +759,9 @@ pre {
 @media (max-width: 1000px) {
   .catalog-columns,
   .source-row {
-    grid-template-columns: minmax(150px, 2fr) minmax(100px, 1fr) minmax(
-        100px,
-        1fr
-      ) 150px 58px;
+    grid-template-columns:
+      minmax(150px, 2fr) minmax(100px, 1fr) minmax(100px, 1fr)
+      150px 58px;
     column-gap: 12px;
   }
   .source-links {

@@ -25,10 +25,8 @@ test("unified feed filters update both subscription formats without layout overf
     "/api/v1/events?technology=node-js&cve=CVE-2026-12345",
   );
   expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(page.viewportSize()!.width);
   await page.screenshot({
     path: "test-results/" + info.project.name + "-feed.png",
     fullPage: true,
@@ -53,10 +51,8 @@ test("source pages are bounded and repeated query parameters never crash", async
   await page.getByRole("link", { name: "Next", exact: true }).click();
   await expect(page).toHaveURL(/page=2/);
   expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(page.viewportSize()!.width);
   await page.screenshot({
     path: "test-results/" + info.project.name + "-sources.png",
     fullPage: true,
