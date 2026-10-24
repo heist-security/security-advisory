@@ -1,4 +1,3 @@
-import { LinkIcon } from "./icons";
 import type { FeedEvent } from "@/lib/events";
 type Fact = { value: string; evidence: string };
 function Facts({ label, facts }: { label: string; facts: Fact[] }) {
@@ -118,7 +117,7 @@ export function EventDetails({ event }: { event: FeedEvent }) {
           ) : null}
         </dl>
         <a href={event.source_url}>
-          Read the original announcement <LinkIcon />
+          Read the original announcement
         </a>
       </div>
     </details>

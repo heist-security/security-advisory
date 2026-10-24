@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { LinkIcon } from "@/components/icons";
 export const metadata: Metadata = { title: "API documentation" };
 export default function Docs() {
   return (
@@ -96,7 +95,7 @@ export default function Docs() {
         </p>
         <p>
           <a href="https://github.com/heist-security/security-advisory/blob/main/docs/api.md">
-            Full response example and API semantics <LinkIcon />
+            Full response example and API semantics
           </a>
         </p>
         <p>

@@ -1,5 +1,3 @@
-import { LinkIcon } from "./icons";
-
 export function SiteHeader() {
   return (
     <header className="site-header container">
@@ -12,7 +10,7 @@ export function SiteHeader() {
         <a href="/sources">Sources</a>
         <a href="/docs">API docs</a>
         <a href="https://github.com/heist-security/security-advisory">
-          GitHub <LinkIcon />
+          GitHub
         </a>
       </nav>
     </header>

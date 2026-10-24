@@ -1,4 +1,3 @@
-import { LinkIcon } from "./icons";
 import type { FeedEvent } from "@/lib/events";
 import { technologyKey, type Filters } from "@/lib/filters";
 import { feedLink } from "@/lib/feed-view";
@@ -37,7 +36,7 @@ export function EventCard({
       </div>
       <h3>
         <a href={event.source_url}>
-          {event.payload.title} <LinkIcon />
+          {event.payload.title}
         </a>
       </h3>
       <p>{event.payload.summary}</p>
@@ -70,7 +69,7 @@ export function EventCard({
           · Revision {event.revision}
         </span>
         <a href={event.source_url}>
-          Original source <LinkIcon />
+          Original source
         </a>
       </div>
       {expanded ? <EventDetails event={event} /> : null}

@@ -1,10 +1,8 @@
-import { LinkIcon } from "./icons";
-
 export function SiteFooter() {
   return (
     <footer className="site-footer container">
       <a href="https://heist.security">
-        Heist <LinkIcon />
+        Heist
       </a>
       <p>Machine-extracted. Verify original sources.</p>
       <a href="https://github.com/heist-security/security-advisory/blob/main/SECURITY.md">

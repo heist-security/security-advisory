@@ -6,8 +6,6 @@ import {
   sourcePage,
 } from "@/lib/registry";
 import { pageParams, type SearchParams } from "@/lib/filters";
-import { LinkIcon } from "@/components/icons";
-
 export const metadata: Metadata = { title: "Sources" };
 const channelLabels = {
   "security-advisories": "Advisories",
@@ -88,7 +86,7 @@ export default async function Sources({
           <article className="source-row" key={source.id}>
             <h2>
               <a href={source.homepage}>
-                {source.name} <LinkIcon />
+                {source.name}
               </a>
             </h2>
             <span className="source-category">{source.category}</span>
@@ -100,13 +98,13 @@ export default async function Sources({
                 href={source.feed_url}
                 aria-label={"Publisher feed for " + source.name}
               >
-                Feed <LinkIcon />
+                Feed
               </a>
               <a
                 href={source.verification.sample_url}
                 aria-label={"Checked document for " + source.name}
               >
-                Sample <LinkIcon />
+                Sample
               </a>
               <a href={"/?source=" + encodeURIComponent(source.id)}>Events</a>
             </div>

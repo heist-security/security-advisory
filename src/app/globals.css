@@ -45,15 +45,6 @@ summary {
   width: min(100% - 64px, 1160px);
   margin-inline: auto;
 }
-.link-icon {
-  display: inline-block;
-  flex: none;
-  vertical-align: -2px;
-  color: var(--muted);
-}
-a:hover .link-icon {
-  color: var(--blue);
-}
 .search-icon {
   flex: none;
   color: var(--muted);
@@ -367,9 +358,6 @@ h1 {
   letter-spacing: -0.2px;
   margin: 8px 0 6px;
 }
-.event-card h3 .link-icon {
-  margin-left: 3px;
-}
 .event-card > p {
   max-width: 960px;
   color: var(--muted);
@@ -500,9 +488,6 @@ h1 {
   margin: 0;
   overflow-wrap: anywhere;
 }
-.source-row h2 .link-icon {
-  margin-left: 3px;
-}
 .source-category,
 .source-channel {
   font-size: 11px;
@@ -518,10 +503,6 @@ h1 {
 }
 .source-links a {
   white-space: nowrap;
-}
-.source-links .link-icon {
-  width: 12px;
-  height: 12px;
 }
 .source-notes {
   color: var(--muted);

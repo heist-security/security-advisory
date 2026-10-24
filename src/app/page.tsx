@@ -14,7 +14,7 @@ import {
 import { feedLink, groupEvents, dayLabel, typeLabels } from "@/lib/feed-view";
 import { registry } from "@/lib/registry";
 import { EventCard } from "@/components/event-card";
-import { LinkIcon, SearchIcon } from "@/components/icons";
+import { SearchIcon } from "@/components/icons";
 export const metadata: Metadata = {
   title: "Security feed",
   description:
@@ -71,10 +71,10 @@ export default async function Feed({
         <h1>Security feed</h1>
         <nav className="format-links" aria-label="Feed formats">
           <a href={"/feed.xml" + suffix}>
-            RSS <LinkIcon />
+            RSS
           </a>
           <a href={"/api/v1/events" + suffix}>
-            JSON <LinkIcon />
+            JSON
           </a>
         </nav>
       </section>
