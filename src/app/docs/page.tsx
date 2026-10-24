@@ -83,8 +83,17 @@ export default function Docs() {
           advisory_id identifies a source announcement. Each revision has a new
           event ID and RSS GUID. A system withdrawal corrects an earlier Heist
           extraction; it does not imply the publisher retracted the
-          announcement. Product and version facts in the payload are supported
-          by source quotations, but machine extraction can still make mistakes.
+          announcement. Structured imports retain native affected-version data
+          and upstream identifiers; optional vendor extraction includes source
+          quotations. Both require checking the original source and the actual
+          deployed configuration.
+        </p>
+        <h2>Exploitation context</h2>
+        <p>
+          Use /api/v1/risk?cve=CVE-2021-44228 for CISA KEV details and dated
+          EPSS probability. Up to 40 CVEs can be comma-separated. Add nvd=1 for
+          one CVE to include NVD metadata. Missing or unavailable data is not
+          zero risk.
         </p>
         <h2>Delivery and limits</h2>
         <p>

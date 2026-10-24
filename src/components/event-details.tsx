@@ -1,6 +1,29 @@
 import type { FeedEvent } from "@/lib/events";
 type Fact = { value: string; evidence: string };
-function Facts({ label, facts }: { label: string; facts: Fact[] }) {
+function Evidence({
+  value,
+  structured,
+}: {
+  value: string;
+  structured: boolean;
+}) {
+  return structured ? (
+    <p>
+      Source reference: <code>{value}</code>
+    </p>
+  ) : (
+    <blockquote>{value}</blockquote>
+  );
+}
+function Facts({
+  label,
+  facts,
+  structured,
+}: {
+  label: string;
+  facts: Fact[];
+  structured: boolean;
+}) {
   return (
     <div className="fact-group">
       <dt>{label}</dt>
@@ -9,11 +32,15 @@ function Facts({ label, facts }: { label: string; facts: Fact[] }) {
           facts.map((fact, i) => (
             <div className="fact" key={i}>
               <strong>{fact.value}</strong>
-              <blockquote>{fact.evidence}</blockquote>
+              <Evidence value={fact.evidence} structured={structured} />
             </div>
           ))
         ) : (
-          <span className="unspecified">Not stated in this extraction</span>
+          <span className="unspecified">
+            {structured
+              ? "Not stated in this record"
+              : "Not stated in this extraction"}
+          </span>
         )}
       </dd>
     </div>
@@ -21,6 +48,7 @@ function Facts({ label, facts }: { label: string; facts: Fact[] }) {
 }
 export function EventDetails({ event }: { event: FeedEvent }) {
   const p = event.payload;
+  const structured = event.extraction_method === "structured";
   return (
     <details className="event-details">
       <summary>
@@ -28,8 +56,9 @@ export function EventDetails({ event }: { event: FeedEvent }) {
       </summary>
       <div className="event-details-body">
         <p className="detail-disclaimer">
-          These are machine-extracted claims. Quotations show the recorded
-          source text; verify the original announcement before acting.
+          {structured
+            ? "Imported from structured advisory data. Source references identify upstream records or fields; verify affected versions and your deployed configuration."
+            : "These are machine-extracted claims. Quotations show the recorded source text; verify the original announcement before acting."}
         </p>
         {event.extraction_method === "system" ? (
           <div className="correction-note">
@@ -55,26 +84,39 @@ export function EventDetails({ event }: { event: FeedEvent }) {
         {p.evidence ? (
           <div className="supporting-quote">
             <h4>Security context</h4>
-            <blockquote>{p.evidence}</blockquote>
+            <Evidence value={p.evidence} structured={structured} />
           </div>
         ) : null}
         {p.products.map((product, i) => (
           <section className="product-evidence" key={i}>
             <h4>{product.name.value}</h4>
-            <blockquote>{product.name.evidence}</blockquote>
+            <Evidence value={product.name.evidence} structured={structured} />
             <dl>
               <Facts
                 label="Affected versions"
                 facts={product.affected_versions}
+                structured={structured}
               />
-              <Facts label="Fixed versions" facts={product.fixed_versions} />
-              <Facts label="Prerequisites" facts={product.prerequisites} />
+              <Facts
+                label="Fixed versions"
+                facts={product.fixed_versions}
+                structured={structured}
+              />
+              <Facts
+                label="Prerequisites"
+                facts={product.prerequisites}
+                structured={structured}
+              />
             </dl>
           </section>
         ))}
         {p.related_cves.length ? (
           <dl>
-            <Facts label="Related CVEs" facts={p.related_cves} />
+            <Facts
+              label="Related CVEs"
+              facts={p.related_cves}
+              structured={structured}
+            />
           </dl>
         ) : null}
         {event.extraction_method !== "system" ? (
@@ -82,11 +124,13 @@ export function EventDetails({ event }: { event: FeedEvent }) {
             <h4>Publisher severity</h4>
             <p>
               {p.severity === "unknown"
-                ? "No explicit severity was extracted."
+                ? structured
+                  ? "No explicit severity was provided."
+                  : "No explicit severity was extracted."
                 : p.severity}
             </p>
             {p.severity_evidence ? (
-              <blockquote>{p.severity_evidence}</blockquote>
+              <Evidence value={p.severity_evidence} structured={structured} />
             ) : null}
           </div>
         ) : null}

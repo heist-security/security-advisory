@@ -1,6 +1,8 @@
 import { db } from "./db";
 import type { Extraction } from "./schema";
 import type { EventQuery } from "./filters";
+import { isStructured } from "./structured/config";
+import type { StructuredPayload } from "./structured/normalize";
 export type FeedEvent = {
   id: number;
   advisory_id: string;
@@ -14,6 +16,7 @@ export type FeedEvent = {
   cve_ids: string[];
   event_types: string[];
   payload: Extraction & {
+    structured?: StructuredPayload["structured"];
     correction_reason?: string;
     supersedes_event_id?: number;
   };
@@ -40,7 +43,17 @@ export async function events(options: Partial<EventQuery> = {}) {
     });
   const { data, error } = await query;
   if (error) throw error;
-  return data as FeedEvent[];
+  return (data as FeedEvent[]).map((row) => ({
+    ...row,
+    // Existing publication RPC labels all imports "llm". Interpret reviewed structured source
+    // provenance at the read boundary until that database metadata is extended separately.
+    extraction_method:
+      isStructured(row.source_id) &&
+      row.payload.structured &&
+      row.extraction_method !== "system"
+        ? "structured"
+        : row.extraction_method,
+  }));
 }
 export function xml(value: string) {
   return value
@@ -69,7 +82,9 @@ export function rss(
         "\n\n" +
         (row.extraction_method === "system"
           ? "Automated extraction correction."
-          : "Machine-extracted; verify the original source.") +
+          : row.extraction_method === "structured"
+            ? "Imported from structured advisory data; verify the original source."
+            : "Machine-extracted; verify the original source.") +
         " Revision " +
         row.revision +
         ".";

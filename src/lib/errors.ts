@@ -1,6 +1,16 @@
 // Persist only known categories. Never store provider responses, source text, keys or arbitrary error messages.
 export function failureReason(error: unknown) {
   const e = error as { status?: number; name?: string; message?: string };
+  if (/checkpoint outside|backfill required/.test(e?.message ?? ""))
+    return "structured_backfill_required";
+  if (/Source not selected/.test(e?.message ?? ""))
+    return "source_not_selected";
+  if (
+    /Structured|Invalid OSV|CVE upstream|identity mismatch/.test(
+      e?.message ?? "",
+    )
+  )
+    return "structured_validation";
   if (e?.status === 429) return "provider_rate_limit";
   if (e?.status === 401 || e?.status === 403) return "provider_authentication";
   if (e?.status === 400 || e?.status === 404) return "provider_configuration";

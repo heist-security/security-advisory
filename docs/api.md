@@ -89,3 +89,11 @@ Public event responses are cacheable for 60 seconds with a five-minute stale win
 The source catalog is paginated at /api/v1/sources?page=1, with 24 records per page and optional q, channel and category filters. It is the shipped catalog, not the live database enablement state or uptime. Source changes may be observed during pagination; this endpoint is not an immutable catalog snapshot API.
 
 Fields may be added in schema_version 1. Consumers should ignore unknown fields and handle unknown future event types conservatively.
+
+## Structured advisories and risk context
+
+Events from `core-osv`, `core-cve` and `core-kev` expose `extraction_method: "structured"` and `payload.structured` with upstream identity, aliases, native affected data and provenance. Their evidence fields are record identifiers/JSON pointers. Use native affected data for package/version matching; display technology tags alone do not establish exposure. Source records sharing a CVE remain separate attributable events.
+
+`GET /api/v1/risk?cve=CVE-2021-44228` returns KEV membership details and dated EPSS probability/percentile with explicit provider availability. Supply up to 40 comma-separated CVEs. Optional `nvd=1` adds NVD metrics/configurations for exactly one CVE. Null means no returned record or unavailable data, not zero risk. Results can be cached for 15 minutes; enrichment outages never block the event feed. See [semantics, checkpoints and limits](structured-sources.md).
+
+The source catalog defaults to core and opted-in vendor sources. `catalog=vendor` lists the historical vendor catalog for selection; it is not a live list of enabled database rows.

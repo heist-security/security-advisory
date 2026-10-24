@@ -69,7 +69,53 @@ const ruby: FeedEvent = {
     related_cves: [],
   },
 };
-const rows = [ruby, correction, patch];
+const structured: FeedEvent = {
+  ...patch,
+  id: 4,
+  advisory_id: "test-advisory-osv",
+  source_id: "core-osv",
+  source_url: "https://example.org/test-only/structured-advisory",
+  technologies: ["core-osv", "fixture-package"],
+  cve_ids: [],
+  event_types: ["advisory"],
+  // The existing RPC stores llm; the public read derives structured from provenance.
+  extraction_method: "llm",
+  payload: {
+    ...patch.payload,
+    kind: "advisory",
+    title: "Test fixture: Structured package advisory",
+    summary: "A fictional structured record used to verify source references.",
+    evidence: "TEST-OSV-1",
+    products: [
+      {
+        name: {
+          value: "fixture-package",
+          evidence: "/affected/0/package/name",
+        },
+        affected_versions: [
+          { value: "1.0.0", evidence: "/affected/0/versions" },
+        ],
+        fixed_versions: [],
+        prerequisites: [],
+      },
+    ],
+    related_cves: [],
+    structured: {
+      provider: "osv",
+      id: "TEST-OSV-1",
+      modified: "2026-10-24T07:00:00Z",
+      aliases: [],
+      affected: [
+        {
+          package: { name: "fixture-package", ecosystem: "npm" },
+          versions: ["1.0.0"],
+        },
+      ],
+      references: [],
+    },
+  },
+};
+const rows = [structured, ruby, correction, patch];
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:3038");
   if (url.pathname !== "/rest/v1/events") {

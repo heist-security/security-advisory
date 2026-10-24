@@ -4,11 +4,16 @@ const mocks = vi.hoisted(() => ({
   fetchResource: vi.fn(),
   documentText: vi.fn(),
   extract: vi.fn(),
+  processStructuredJobs: vi.fn(),
 }));
 vi.mock("../src/lib/db", () => ({ db: () => ({ rpc: mocks.rpc }) }));
 vi.mock("../src/lib/http", async (original) => ({
   ...(await original<object>()),
   fetchResource: mocks.fetchResource,
+}));
+vi.mock("../src/lib/structured/pipeline", async (original) => ({
+  ...(await original<object>()),
+  processStructuredJobs: mocks.processStructuredJobs,
 }));
 vi.mock("../src/lib/extract", () => ({ extract: mocks.extract }));
 vi.mock("../src/lib/feed", async (original) => ({
@@ -39,6 +44,7 @@ const source = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.processStructuredJobs.mockResolvedValue({ processed: 2, failed: 0 });
   vi.stubEnv("POLL_CONCURRENCY", "1");
   vi.stubEnv("POLL_BATCH_SIZE", "1");
   vi.stubEnv("COLLECT_CONCURRENCY", "1");
@@ -146,9 +152,14 @@ it("marks tag-only entries complete without invoking extraction", async () => {
   expect((await collect()).skipped).toBe(1);
   expect(mocks.extract).not.toHaveBeenCalled();
 });
-it("leaves the extraction queue untouched without configuration", async () => {
+it("publishes structured work without model credentials and leaves the paid queue untouched", async () => {
   vi.stubEnv("OPENAI_API_KEY", "");
   vi.stubEnv("OPENAI_MODEL", "");
-  await expect(processJobs()).rejects.toThrow("not configured");
+  await expect(processJobs()).resolves.toMatchObject({
+    processed: 2,
+    failed: 0,
+    vendor_disabled: 1,
+  });
+  expect(mocks.extract).not.toHaveBeenCalled();
   expect(mocks.rpc).not.toHaveBeenCalled();
 });

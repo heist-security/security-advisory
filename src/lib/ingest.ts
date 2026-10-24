@@ -13,6 +13,13 @@ import {
 } from "./feed";
 import { setting } from "./config";
 import { failureReason } from "./errors";
+import { isStructured } from "./structured/config";
+import {
+  stageStructured,
+  structuredDocument,
+  readStructuredDocument,
+  processStructuredJobs,
+} from "./structured/pipeline";
 export { articleText } from "./feed";
 export function digest(text: string) {
   return createHash("sha256").update(text).digest("hex");
@@ -21,6 +28,7 @@ type ClaimedSource = Source & {
   lease_token: string;
   etag: string | null;
   last_modified: string | null;
+  verification?: Record<string, unknown>;
 };
 type Client = ReturnType<typeof db>;
 
@@ -34,49 +42,57 @@ async function pollSource(
   let resource: Awaited<ReturnType<typeof fetchResource>> | undefined;
   try {
     sourceSchema.parse(source);
-    resource = await fetchResource(source.feed_url, source.allowed_origins, {
-      ...(source.adapter === "feed-content" ? source : {}),
-      max_bytes: source.max_feed_bytes,
-    });
-    if (resource.text !== null) {
-      const feed = await parseFeed(resource.text);
-      if (!feed.items.length) throw new Error("Feed has no entries");
-      if (feed.items.length > 20000)
-        throw new Error(
-          "Entry limit exceeded; source requires a paginated adapter",
-        );
-      // Enumerate the complete fetched feed, then collect documents from a durable queue.
-      // A crash halfway through staging is safe: validators are only committed after all batches.
-      const unique = new Map<
-        string,
-        { url: string; fingerprint: string; item: Item; feed_title: string }
-      >();
-      for (const item of feed.items) {
-        try {
-          const url = itemUrl(source, item);
-          const feed_title = feed.title ?? source.name;
-          if (!unique.has(url))
-            unique.set(url, {
-              url,
-              fingerprint: digest(JSON.stringify([item, feed_title])),
-              item,
-              feed_title,
-            });
-        } catch {
-          failures++;
+    if (isStructured(source.id)) {
+      staged = await stageStructured(
+        client,
+        { ...source, id: source.id },
+        deadline,
+      );
+    } else {
+      resource = await fetchResource(source.feed_url, source.allowed_origins, {
+        ...(source.adapter === "feed-content" ? source : {}),
+        max_bytes: source.max_feed_bytes,
+      });
+      if (resource.text !== null) {
+        const feed = await parseFeed(resource.text);
+        if (!feed.items.length) throw new Error("Feed has no entries");
+        if (feed.items.length > 20000)
+          throw new Error(
+            "Entry limit exceeded; source requires a paginated adapter",
+          );
+        // Enumerate the complete fetched feed, then collect documents from a durable queue.
+        // A crash halfway through staging is safe: validators are only committed after all batches.
+        const unique = new Map<
+          string,
+          { url: string; fingerprint: string; item: Item; feed_title: string }
+        >();
+        for (const item of feed.items) {
+          try {
+            const url = itemUrl(source, item);
+            const feed_title = feed.title ?? source.name;
+            if (!unique.has(url))
+              unique.set(url, {
+                url,
+                fingerprint: digest(JSON.stringify([item, feed_title])),
+                item,
+                feed_title,
+              });
+          } catch {
+            failures++;
+          }
         }
-      }
-      const entries = [...unique.values()];
-      for (let index = 0; index < entries.length; index += 500) {
-        if (Date.now() >= deadline)
-          throw new Error("Polling deadline exceeded");
-        const { error } = await client.rpc("stage_feed_entries", {
-          p_source: source.id,
-          p_token: source.lease_token,
-          p_entries: entries.slice(index, index + 500),
-        });
-        if (error) throw error;
-        staged += entries.slice(index, index + 500).length;
+        const entries = [...unique.values()];
+        for (let index = 0; index < entries.length; index += 500) {
+          if (Date.now() >= deadline)
+            throw new Error("Polling deadline exceeded");
+          const { error } = await client.rpc("stage_feed_entries", {
+            p_source: source.id,
+            p_token: source.lease_token,
+            p_entries: entries.slice(index, index + 500),
+          });
+          if (error) throw error;
+          staged += entries.slice(index, index + 500).length;
+        }
       }
     }
     const { error } = await client.rpc("complete_source", {
@@ -84,8 +100,8 @@ async function pollSource(
       token: source.lease_token,
       succeeded: failures === 0,
       message: failures ? "source_url_rejected" : null,
-      new_etag: failures ? null : resource.etag,
-      new_last_modified: failures ? null : resource.last_modified,
+      new_etag: failures ? null : (resource?.etag ?? null),
+      new_last_modified: failures ? null : (resource?.last_modified ?? null),
     });
     if (error) throw error;
   } catch (error) {
@@ -153,19 +169,28 @@ export async function collect() {
         try {
           let body = "";
           let skipped = false;
+          let structuredPublished: string | null | undefined;
           try {
-            body = (
-              await documentText(
-                sourceSchema.parse(source),
-                entry.item,
-                entry.feed_title,
-              )
-            ).body;
+            if (isStructured(source.id)) {
+              const document = await structuredDocument(source.id, entry.item);
+              body = document.body;
+              structuredPublished = document.published;
+            } else
+              body = (
+                await documentText(
+                  sourceSchema.parse(source),
+                  entry.item,
+                  entry.feed_title,
+                )
+              ).body;
           } catch (error) {
             if (error instanceof NoReleaseNotesError) skipped = true;
             else throw error;
           }
-          const date = entry.item.isoDate;
+          const date =
+            structuredPublished !== undefined
+              ? structuredPublished
+              : entry.item.isoDate;
           const published =
             date && Number.isFinite(Date.parse(date))
               ? new Date(date).toISOString()
@@ -198,10 +223,22 @@ export async function collect() {
 }
 
 export async function processJobs() {
-  if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_MODEL)
-    throw new Error("Extraction is not configured");
-  const client = db(),
-    start = Date.now();
+  const start = Date.now();
+  const client = db();
+  const structured = await processStructuredJobs(client);
+  // Structured publication needs no model credential or paid-attempt reservation.
+  // Vendor processing is explicitly opt-in and retains the database-enforced shared budget.
+  if (
+    !process.env.OPENAI_API_KEY ||
+    !process.env.OPENAI_MODEL ||
+    !process.env.VENDOR_SOURCE_IDS?.trim()
+  )
+    return { ...structured, vendor_disabled: 1 };
+  const vendorIds = new Set(
+    process.env.VENDOR_SOURCE_IDS.split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
+  );
   const maximum = setting("PROCESS_BATCH_SIZE", 24, 1, 100),
     concurrency = setting("PROCESS_CONCURRENCY", 4, 1, 12);
   const hourlyLimit = setting("EXTRACTION_HOURLY_LIMIT", 1440, 1, 10000);
@@ -210,7 +247,7 @@ export async function processJobs() {
     failed = 0;
   await Promise.all(
     Array.from({ length: concurrency }, async () => {
-      while (slots < maximum && Date.now() - start < 180000) {
+      while (slots < maximum && Date.now() - start < 240000) {
         slots++;
         const { data, error } = await client.rpc("claim_document", {
           hourly_limit: hourlyLimit,
@@ -219,12 +256,19 @@ export async function processJobs() {
         const job = data?.[0];
         if (!job) break;
         try {
-          const normalized = await extract(job.body);
+          const structuredJob = isStructured(job.source_id);
+          if (!structuredJob && !vendorIds.has(job.source_id))
+            throw new Error("Source not selected");
+          const normalized = structuredJob
+            ? readStructuredDocument(job).payload
+            : await extract(job.body);
           const result = await client.rpc("finish_document", {
             document_id: job.id,
             token: job.lease_token,
             result: normalized,
-            model_name: process.env.OPENAI_MODEL,
+            model_name: structuredJob
+              ? `structured:${job.source_id.slice(5)}:1`
+              : process.env.OPENAI_MODEL,
           });
           if (result.error) throw result.error;
           processed++;
@@ -242,5 +286,8 @@ export async function processJobs() {
       }
     }),
   );
-  return { processed, failed };
+  return {
+    processed: processed + structured.processed,
+    failed: failed + structured.failed,
+  };
 }

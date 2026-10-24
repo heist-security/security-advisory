@@ -1,4 +1,40 @@
 import { test, expect } from "@playwright/test";
+test("structured source filters show references rather than extracted quotations", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("combobox", { name: "Source", exact: true })
+    .selectOption("core-osv");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await expect(page.locator(".event-card")).toHaveCount(1);
+  const event = page.locator("#event-4");
+  await expect(event.locator(".event-foot")).toContainText(
+    "Structured advisory",
+  );
+  await event.getByText("Evidence and details", { exact: false }).click();
+  await expect(event.locator(".detail-disclaimer")).toContainText(
+    "Imported from structured advisory data",
+  );
+  await expect(
+    event.getByText("Source reference: /affected/0/versions", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    event.getByText("Not stated in this record").first(),
+  ).toBeVisible();
+  await expect(event.locator("blockquote")).toHaveCount(0);
+  const data = await (
+    await request.get("/api/v1/events?source=core-osv")
+  ).json();
+  expect(data.data[0].extraction_method).toBe("structured");
+  expect(data.data[0].payload.structured.affected[0].versions).toEqual([
+    "1.0.0",
+  ]);
+  expect(
+    await (await request.get("/feed.xml?source=core-osv")).text(),
+  ).toContain("Imported from structured advisory data");
+});
 test("visual reader displays the shared stream and expands source evidence", async ({
   page,
 }, info) => {
@@ -6,7 +42,7 @@ test("visual reader displays the shared stream and expands source evidence", asy
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Security feed",
   );
-  await expect(page.locator(".event-card")).toHaveCount(3);
+  await expect(page.locator(".event-card")).toHaveCount(4);
   await expect(
     page
       .getByRole("navigation", { name: "Feed formats" })
@@ -57,7 +93,7 @@ test("search and filters persist in the URL and subscription formats", async ({
   const data = await (await request.get("/api/v1/events?q=Ruby")).json();
   expect(data.data.map((event: { id: number }) => event.id)).toEqual([3]);
   await page.getByRole("link", { name: "Reset filters", exact: true }).click();
-  await expect(page.locator(".event-card")).toHaveCount(3);
+  await expect(page.locator(".event-card")).toHaveCount(4);
   await page
     .getByRole("combobox", { name: "Type", exact: true })
     .selectOption("patch");
@@ -79,10 +115,12 @@ test("search and filters persist in the URL and subscription formats", async ({
     "node-js",
   );
   await expect(page.locator(".event-card")).toHaveCount(2);
+  // Retained vendor history remains filterable even when its source is not selected for ingestion.
+  await page.locator(".event-source").first().click();
+  await expect(
+    page.getByRole("combobox", { name: "Source", exact: true }),
+  ).toHaveValue("nodejs");
   await page.getByLabel("Search", { exact: true }).fill("node");
-  await page
-    .getByRole("combobox", { name: "Source", exact: true })
-    .selectOption("nodejs");
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(2);
   const rss = await page
@@ -129,13 +167,13 @@ test("empty, invalid and unavailable states offer useful recovery", async ({
     fullPage: true,
   });
   await page.getByRole("link", { name: "Reset filters", exact: true }).click();
-  await expect(page.locator(".event-card")).toHaveCount(3);
+  await expect(page.locator(".event-card")).toHaveCount(4);
   await page.goto("/?before=1");
   await expect(page.getByRole("status")).toContainText("No earlier events.");
   await page
     .getByRole("link", { name: "Back to latest events", exact: true })
     .click();
-  await expect(page.locator(".event-card")).toHaveCount(3);
+  await expect(page.locator(".event-card")).toHaveCount(4);
   await page.goto("/?type=invalid");
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "Invalid event type",
@@ -157,7 +195,7 @@ test("the homepage is the reader and old feed URLs preserve filters", async ({
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Security feed",
   );
-  await expect(page.locator(".event-card")).toHaveCount(3);
+  await expect(page.locator(".event-card")).toHaveCount(4);
   await expect(page.getByRole("search")).toBeVisible();
   await expect(
     page

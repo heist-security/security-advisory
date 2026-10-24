@@ -3,7 +3,7 @@ test("unified feed filters update both subscription formats without layout overf
   page,
 }, info) => {
   await page.goto("/");
-  await expect(page.locator(".event-card")).toHaveCount(3);
+  await expect(page.locator(".event-card")).toHaveCount(4);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "Security feed",
   );
@@ -47,17 +47,32 @@ test("source pages are bounded and repeated query parameters never crash", async
   const response = await request.get("/sources?q=ruby&q=node");
   expect(response.status()).toBe(200);
   await page.goto("/sources");
-  await expect(page.locator(".source-row")).toHaveCount(24);
+  await expect(page.locator(".source-row")).toHaveCount(3);
+  await expect(
+    page.getByRole("heading", { name: "OSV", exact: true }),
+  ).toBeVisible();
   const first = page.locator(".source-row").first();
   await first.locator("summary").click();
   await expect(first.locator(".source-check")).toBeVisible();
+  await expect(first.locator(".source-check")).toContainText(
+    "Structured adapter",
+  );
+  await expect(first.locator(".source-check time")).toHaveCount(0);
+  await expect(
+    first.getByRole("link", { name: /Data documentation/ }),
+  ).toBeVisible();
   await first.locator("summary").click();
   await page.screenshot({
     path: "test-results/" + info.project.name + "-sources-first.png",
     fullPage: true,
   });
+  await page
+    .getByRole("link", { name: "Optional vendor catalog", exact: true })
+    .click();
+  await expect(page.locator(".source-row")).toHaveCount(24);
   await page.getByRole("link", { name: "Next", exact: true }).click();
   await expect(page).toHaveURL(/page=2/);
+  await expect(page).toHaveURL(/catalog=vendor/);
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(page.viewportSize()!.width);
@@ -77,7 +92,7 @@ test("public errors are bounded and protected operations fail closed", async ({
   for (const path of ["poll", "collect", "process", "health"])
     expect((await request.get("/api/cron/" + path)).status()).toBe(401);
   const catalog = await (await request.get("/api/v1/sources")).json();
-  expect(catalog.data).toHaveLength(24);
+  expect(catalog.data).toHaveLength(3);
   expect((await request.get("/")).headers()["x-content-type-options"]).toBe(
     "nosniff",
   );
