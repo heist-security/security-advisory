@@ -14,13 +14,13 @@ These settings require an administrator; committing the workflow does not create
 - [ ] In GitHub **Settings → Environments**, create `production`. Under deployment branches/tags, select **Selected branches and tags** and allow the **branch** `main` only. Do not add tags or pull-request refs. A required deployment reviewer is optional if reviewed merges should deploy automatically.
 - [ ] Add the following settings to that environment. Do not place production credentials in repository-wide secrets, source files, PR workflows or preview deployments.
 
-| Kind | Name | Value |
-| --- | --- | --- |
-| Secret | `SUPABASE_DB_URL` | PostgreSQL connection URL with a database migration owner's credentials and `sslmode=verify-full`. Percent-encode the password. Use the direct connection when reachable, or the IPv4 session pooler on port 5432; do not use the transaction pooler. |
-| Secret | `SUPABASE_DB_CA_CERT` | PEM root certificate downloaded from Supabase Database settings → SSL configuration. The workflow installs this temporarily and verifies the server hostname. |
-| Secret | `VERCEL_TOKEN` | Deployment-capable token scoped to the team hosting this project, with an expiry and rotation owner. |
-| Variable | `VERCEL_PROJECT_ID` | Existing project's `prj_...` ID from Vercel project settings. |
-| Variable | `VERCEL_TEAM_ID` | Hosting team's `team_...` ID from Vercel team settings. |
+| Kind     | Name                  | Value                                                                                                                                                                                                                                                 |
+| -------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Secret   | `SUPABASE_DB_URL`     | PostgreSQL connection URL with a database migration owner's credentials and `sslmode=verify-full`. Percent-encode the password. Use the direct connection when reachable, or the IPv4 session pooler on port 5432; do not use the transaction pooler. |
+| Secret   | `SUPABASE_DB_CA_CERT` | PEM root certificate downloaded from Supabase Database settings → SSL configuration. The workflow installs this temporarily and verifies the server hostname.                                                                                         |
+| Secret   | `VERCEL_TOKEN`        | Deployment-capable token scoped to the team hosting this project, with an expiry and rotation owner.                                                                                                                                                  |
+| Variable | `VERCEL_PROJECT_ID`   | Existing project's `prj_...` ID from Vercel project settings.                                                                                                                                                                                         |
+| Variable | `VERCEL_TEAM_ID`      | Hosting team's `team_...` ID from Vercel team settings.                                                                                                                                                                                               |
 
 `GITHUB_TOKEN` is provided automatically with read-only repository access. The migration connection is a PostgreSQL credential, not the Supabase service-role API key; no Supabase account access token is needed. Its role must own or be able to change the objects in these migrations, including grants and functions. Keep it exclusive to the release job.
 

@@ -15,20 +15,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Export formatted release changes
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from "node:fs";
-          import prettier from "prettier";
-          const paths = [".github/workflows/check.yml",".github/workflows/browser.yml",".github/workflows/production.yml","supabase/config.toml","vercel.json",".github/scripts/release.mjs","tests/deployment.test.mjs","docs/operations.md","README.md"];
-          for (const path of paths) {
-            const info = await prettier.getFileInfo(path);
-            if (!info.inferredParser) continue;
-            const content = await prettier.format(fs.readFileSync(path, "utf8"), { filepath: path });
-            fs.writeFileSync(path, content);
-            console.log("RELEASE_FORMAT " + JSON.stringify({ path, content: Buffer.from(content).toString("base64") }));
-          }
-          NODE
       - run: npm run format:check
       - run: npm run typecheck
       - name: Verify registry generation
