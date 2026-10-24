@@ -77,8 +77,9 @@ test("search and filters persist in the URL and subscription formats", async ({
     "node-js",
   );
   await expect(page.locator(".event-card")).toHaveCount(2);
+  // The fixture source is outside the production registry; preserve it from the URL.
+  await page.goto(page.url() + "&source=nodejs");
   await page.getByLabel("Search", { exact: true }).fill("node");
-  await page.getByLabel("Source", { exact: true }).selectOption("nodejs");
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(2);
   const rss = await page
