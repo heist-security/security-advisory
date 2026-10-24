@@ -98,16 +98,14 @@ describe("source and publication boundaries", () => {
     ).toBe("high");
   });
   it("checks the configured repository path after every redirect", async () => {
-    const fetch = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(null, {
-          status: 302,
-          headers: {
-            location: "https://github.com/other/project/releases/tag/v1",
-          },
-        }),
-      );
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: {
+          location: "https://github.com/other/project/releases/tag/v1",
+        },
+      }),
+    );
     vi.stubGlobal("fetch", fetch);
     await expect(
       documentText(

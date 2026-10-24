@@ -24,7 +24,7 @@ type ClaimedSource = Source & {
 };
 type Client = ReturnType<typeof db>;
 
-async function pollSource(client: Client, source: ClaimedSource) {
+async function pollSource(client: Client, source: ClaimedSource, deadline: number) {
   let staged = 0;
   let failures = 0;
   let resource: Awaited<ReturnType<typeof fetchResource>> | undefined;
@@ -64,6 +64,7 @@ async function pollSource(client: Client, source: ClaimedSource) {
       }
       const entries = [...unique.values()];
       for (let index = 0; index < entries.length; index += 500) {
+        if (Date.now() >= deadline) throw new Error("Polling deadline exceeded");
         const { error } = await client.rpc("stage_feed_entries", {
           p_source: source.id,
           p_token: source.lease_token,
@@ -117,7 +118,7 @@ export async function poll() {
         if (error) throw error;
         const source = data?.[0] as ClaimedSource | undefined;
         if (!source) break;
-        const result = await pollSource(client, source);
+        const result = await pollSource(client, source, start + 240000);
         totals.sources++;
         totals.entries_staged += result.staged;
         totals.failures += result.failures;

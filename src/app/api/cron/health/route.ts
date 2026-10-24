@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     if (error) throw error;
     const maxAge = setting("MAX_QUEUE_AGE_SECONDS", 3600, 60, 604800);
     const degraded =
+      data.sources_failing > 0 ||
       data.sources_overdue > 0 ||
       data.collection_failed > 0 ||
       data.extraction_failed > 0 ||

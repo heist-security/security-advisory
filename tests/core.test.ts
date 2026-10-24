@@ -86,14 +86,12 @@ describe("collector boundaries", () => {
       expect(() => allowedUrl(url, ["https://www.ruby-lang.org"])).toThrow();
   });
   it("rejects a redirect outside the source allowlist", async () => {
-    const mocked = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(null, {
-          status: 302,
-          headers: { location: "http://169.254.169.254/" },
-        }),
-      );
+    const mocked = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: "http://169.254.169.254/" },
+      }),
+    );
     vi.stubGlobal("fetch", mocked);
     await expect(
       fetchText("https://www.ruby-lang.org/a", ["https://www.ruby-lang.org"]),

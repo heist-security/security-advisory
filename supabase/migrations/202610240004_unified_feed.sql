@@ -26,7 +26,7 @@ create function public.stage_feed_entries(p_source text,p_token uuid,p_entries j
 returns integer language plpgsql set search_path=public as $$
 declare total integer;
 begin
-  perform 1 from sources where id=p_source and lease_token=p_token and leased_until>now() for update;
+  perform 1 from sources where id=p_source and lease_token=p_token and leased_until>now() for no key update;
   if not found then raise exception 'Source lease expired or replaced'; end if;
   if jsonb_array_length(p_entries)>500 then raise exception 'Entry batch too large'; end if;
   insert into feed_entries as existing(source_id,source_url,fingerprint,item,feed_title)
@@ -168,7 +168,7 @@ grant all on public.extraction_budget to service_role;
 drop function public.claim_document();
 create function public.claim_document(hourly_limit integer default 1440) returns setof public.documents
 language plpgsql set search_path=public as $$
-declare bucket timestamptz:=date_trunc('hour',now()); used integer; job documents;
+declare bucket timestamptz:=date_trunc('hour',now(),'UTC'); used integer; job documents;
 begin
   if hourly_limit<1 or hourly_limit>10000 then raise exception 'Invalid hourly extraction limit'; end if;
   perform pg_advisory_xact_lock(719432002);
@@ -202,7 +202,7 @@ create function public.feed_health() returns jsonb language sql set search_path=
  'extraction_pending',(select count(*) from documents where status in ('pending','processing')),
  'extraction_failed',(select count(*) from documents where status='failed'),
  'extraction_oldest_seconds',(select coalesce(extract(epoch from now()-min(observed_at)),0) from documents where status in ('pending','processing')),
- 'extraction_attempts_this_hour',(select coalesce(sum(attempts),0) from extraction_budget where hour=date_trunc('hour',now())),
+ 'extraction_attempts_this_hour',(select coalesce(sum(attempts),0) from extraction_budget where hour=date_trunc('hour',now(),'UTC')),
  'latest_event_at',(select max(published_at) from events)
  ); $$;
 revoke all on function public.stage_feed_entries(text,uuid,jsonb),public.claim_feed_entry(),

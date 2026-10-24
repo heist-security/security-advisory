@@ -3,6 +3,7 @@ test("unified feed filters update both subscription formats without layout overf
   page,
 }, info) => {
   await page.goto("/");
+    await expect(page.locator(".event-card")).toHaveCount(3);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "One place to listen.",
   );
@@ -62,4 +63,22 @@ test("public errors are bounded and protected operations fail closed", async ({
   expect((await request.get("/")).headers()["x-content-type-options"]).toBe(
     "nosniff",
   );
+});
+
+test("JSON and RSS keep corrections in filtered subscriptions and support archive cursors", async ({ request }) => {
+  const path = "/api/v1/events?technology=node-js&cve=CVE-2026-12345&type=patch";
+  const response = await request.get(path);
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+  expect(body.data.map((event: {id:number}) => event.id)).toEqual([2,1]);
+  expect(body.data[0].payload.kind).toBe("withdrawal");
+  const first = await (await request.get(path + "&after=0&limit=1")).json();
+  expect(first.data[0].id).toBe(1);
+  expect(first.next_after).toBe(1);
+  const next = await (await request.get(path + "&after=" + first.next_after)).json();
+  expect(next.data.map((event:{id:number}) => event.id)).toEqual([2]);
+  const rss = await request.get("/feed.xml?type=patch&technology=node-js&cve=CVE-2026-12345");
+  expect(rss.status()).toBe(200);
+  expect(await rss.text()).toContain("Previous extraction withdrawn");
+  expect(await rss.text()).not.toContain("Ruby advisory");
 });
