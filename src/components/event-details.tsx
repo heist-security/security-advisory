@@ -47,15 +47,33 @@ function Facts({
     </div>
   );
 }
-export function EventDetails({ event }: { event: FeedEvent }) {
+export function SourceDetails({
+  event,
+  primary = false,
+}: {
+  event: FeedEvent;
+  primary?: boolean;
+}) {
   const p = event.payload;
   const structured = event.extraction_method === "structured";
   return (
-    <details className="event-details">
-      <summary>
-        Evidence and details <span aria-hidden="true">+</span>
-      </summary>
-      <div className="event-details-body">
+    <section className="source-record" id={"source-" + event.advisory_id}>
+      <header className="source-record-heading">
+        <h2>
+          <a href={event.source_url}>{p.structured?.id ?? event.source_id}</a>
+        </h2>
+        <p>
+          {primary ? "Primary source · " : ""}Revision {event.revision}
+          {p.kind === "withdrawal" ? " · Withdrawn" : ""}
+        </p>
+        {!primary ? (
+          <>
+            <h3>{p.title}</h3>
+            <p className="source-description">{p.summary}</p>
+          </>
+        ) : null}
+      </header>
+      <div className="source-evidence">
         <p className="detail-disclaimer">
           {structured
             ? "Imported from structured advisory data. Source references identify upstream records or fields; verify affected versions and your deployed configuration."
@@ -69,14 +87,7 @@ export function EventDetails({ event }: { event: FeedEvent }) {
               publisher withdrew its announcement.
             </p>
             {p.supersedes_event_id ? (
-              <a
-                href={
-                  "/?before=" +
-                  (p.supersedes_event_id + 1) +
-                  "#event-" +
-                  p.supersedes_event_id
-                }
-              >
+              <a href={"/events/" + p.supersedes_event_id}>
                 View the preceding event
               </a>
             ) : null}
@@ -84,13 +95,13 @@ export function EventDetails({ event }: { event: FeedEvent }) {
         ) : null}
         {p.evidence ? (
           <div className="supporting-quote">
-            <h4>Security context</h4>
+            <h3>Security context</h3>
             <Evidence value={p.evidence} structured={structured} />
           </div>
         ) : null}
         {p.products.map((product, i) => (
           <section className="product-evidence" key={i}>
-            <h4>{product.name.value}</h4>
+            <h3>{product.name.value}</h3>
             <Evidence value={product.name.evidence} structured={structured} />
             <dl>
               <Facts
@@ -111,6 +122,15 @@ export function EventDetails({ event }: { event: FeedEvent }) {
             </dl>
           </section>
         ))}
+        {p.structured?.affected.length ? (
+          <section className="native-affected">
+            <h3>Structured affected-version data</h3>
+            <p>
+              Original package identities and version rules from this source.
+            </p>
+            <pre>{JSON.stringify(p.structured.affected, null, 2)}</pre>
+          </section>
+        ) : null}
         {p.related_cves.length ? (
           <dl>
             <Facts
@@ -122,7 +142,7 @@ export function EventDetails({ event }: { event: FeedEvent }) {
         ) : null}
         {event.extraction_method !== "system" ? (
           <div className="severity-evidence">
-            <h4>Publisher severity</h4>
+            <h3>Publisher severity</h3>
             <p>
               {p.severity === "unknown"
                 ? structured
@@ -137,7 +157,7 @@ export function EventDetails({ event }: { event: FeedEvent }) {
         ) : null}
         {event.priority?.linked_cves.length ? (
           <section className="linked-ratings">
-            <h4>Linked CVE context</h4>
+            <h3>Linked CVE context</h3>
             <p>
               These ratings describe the referenced vulnerabilities and
               products. They are not a severity rating for every application
@@ -190,6 +210,6 @@ export function EventDetails({ event }: { event: FeedEvent }) {
         </dl>
         <a href={event.source_url}>Read the original announcement</a>
       </div>
-    </details>
+    </section>
   );
 }

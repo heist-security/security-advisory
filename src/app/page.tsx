@@ -31,6 +31,7 @@ export default async function Feed({
     unavailable = !configured();
   try {
     query = parseEventQuery(pageParams(await searchParams), 20);
+    query.view ??= "grouped";
     if (query.after !== undefined)
       throw new Error("Use the JSON API for incremental cursors");
     query.limit = Math.min(query.limit, 50);
@@ -54,8 +55,13 @@ export default async function Feed({
       : [];
   const filters = filterQuery(query),
     suffix = filters.size ? "?" + filters : "";
+  const hasFilters = [...filters.keys()].some((key) => key !== "view");
   const groups = groupEvents(rows);
   const latest = feedLink(query);
+  const returnTo = feedLink(query, {
+    ...(query.before !== undefined ? { before: String(query.before) } : {}),
+    limit: String(query.limit),
+  });
   return (
     <main id="main" className="container browser-feed">
       <section className="browser-heading">
@@ -71,6 +77,12 @@ export default async function Feed({
         role="search"
         aria-label="Filter the feed"
       >
+        {query.view ? (
+          <input type="hidden" name="view" value={query.view} />
+        ) : null}
+        {query.group ? (
+          <input type="hidden" name="group" value={query.group} />
+        ) : null}
         <input
           className="feed-search"
           type="search"
@@ -106,7 +118,7 @@ export default async function Feed({
           <button type="submit" className="button">
             Filter
           </button>
-          {filters.size > 0 ? <a href="/">Reset filters</a> : null}
+          {hasFilters ? <a href="/">Reset filters</a> : null}
         </div>
       </form>
       <section className="feed-reader" aria-label="Security announcements">
@@ -129,7 +141,7 @@ export default async function Feed({
               <>
                 No earlier events. <a href={latest}>Back to latest events</a>
               </>
-            ) : filters.size ? (
+            ) : hasFilters ? (
               "No events match your filters."
             ) : (
               "No events yet."
@@ -156,7 +168,7 @@ export default async function Feed({
                     key={event.id}
                     event={event}
                     filters={query}
-                    expanded
+                    returnTo={returnTo}
                   />
                 ))}
               </section>

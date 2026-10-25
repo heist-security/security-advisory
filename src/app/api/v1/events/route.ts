@@ -22,7 +22,8 @@ export async function GET(request: Request) {
     const rows = await events(query);
     return Response.json(
       {
-        schema_version: "1",
+        schema_version: query.view === "grouped" ? "2" : "1",
+        view: query.view ?? "events",
         data: rows,
         next_after: rows.length
           ? Math.max(...rows.map((row) => row.id))

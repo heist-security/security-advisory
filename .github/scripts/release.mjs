@@ -123,6 +123,7 @@ export async function migrate(
     for (const [label, procedure] of [
       ["Priority", "backfill_event_priority"],
       ["Technology", "backfill_event_technologies"],
+      ["Advisory grouping", "backfill_advisory_groups"],
     ]) {
       let completed = false;
       const deadline = Date.now() + 15 * 60 * 1000;

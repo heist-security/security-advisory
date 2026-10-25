@@ -1,5 +1,6 @@
 import { severities, type Severity } from "./priority";
 import { technologyKey, technologyFamily } from "./technology";
+import { groupIdPattern } from "./item-links";
 export { technologyKey } from "./technology";
 export const eventTypes = [
   "advisory",
@@ -10,6 +11,8 @@ export const eventTypes = [
 ] as const;
 export type EventType = (typeof eventTypes)[number];
 export type Filters = {
+  view?: "events" | "grouped";
+  group?: string;
   q?: string;
   type?: EventType;
   technology?: string;
@@ -42,6 +45,8 @@ export function parseEventQuery(
   defaultLimit = 30,
 ): EventQuery {
   for (const key of [
+    "view",
+    "group",
     "q",
     "type",
     "kind",
@@ -58,6 +63,11 @@ export function parseEventQuery(
     if (params.getAll(key).length > 1)
       throw new Error("Repeated filter parameters are not supported");
   }
+  const view = params.get("view") || undefined;
+  if (view && view !== "events" && view !== "grouped")
+    throw new Error("Invalid view");
+  const group = params.get("group") || undefined;
+  if (group && !groupIdPattern.test(group)) throw new Error("Invalid group");
   const q = params.get("q")?.trim().replace(/\s+/g, " ") || undefined;
   const rawSeverity = params.get("severity");
   const selected = rawSeverity ? rawSeverity.split(",") : [];
@@ -114,6 +124,8 @@ export function parseEventQuery(
     throw new Error("Use after or before, not both");
   if (limit < 1 || limit > 100) throw new Error("Limit must be 1 to 100");
   return {
+    view: view as Filters["view"],
+    group,
     q,
     type: type as EventType | undefined,
     technology: technologies.length
@@ -132,6 +144,8 @@ export function parseEventQuery(
 export function filterQuery(filters: Filters) {
   const params = new URLSearchParams();
   for (const key of [
+    "view",
+    "group",
     "q",
     "type",
     "technology",

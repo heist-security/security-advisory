@@ -5,7 +5,7 @@ import { technologyOptions } from "../../src/lib/technology-options";
 import { technologyFamily } from "../../src/lib/technology";
 const patch: FeedEvent = {
   id: 1,
-  advisory_id: "test-advisory-node",
+  advisory_id: "00000000-0000-0000-0000-000000000001",
   revision: 1,
   source_id: "nodejs",
   source_url: "https://example.org/test-only/node-update",
@@ -93,7 +93,7 @@ const ruby: FeedEvent = {
     linked_cves: [],
   },
   id: 3,
-  advisory_id: "test-advisory-ruby",
+  advisory_id: "00000000-0000-0000-0000-000000000002",
   source_id: "ruby",
   source_url: "https://example.org/test-only/ruby-update",
   technologies: ["ruby"],
@@ -125,7 +125,7 @@ const structured: FeedEvent = {
     linked_cves: [],
   },
   id: 4,
-  advisory_id: "test-advisory-osv",
+  advisory_id: "00000000-0000-0000-0000-000000000003",
   source_id: "core-osv",
   source_url: "https://example.org/test-only/structured-advisory",
   technologies: ["core-osv", "fixture-package"],
@@ -170,16 +170,126 @@ const structured: FeedEvent = {
 };
 const routing = (row: FeedEvent) => ({
   ...row,
+  group_id: row.group_id ?? "advisory:" + row.advisory_id,
   severity_keys:
     row.id === 2 ? ["critical", "unknown"] : [row.priority!.severity],
   important: row.id === 2 || !!row.priority?.reasons.length,
   fix_available: row.id === 2 || !!row.priority?.fix_available,
 });
 const rows = [structured, ruby, correction, patch].map(routing);
+const exampleGroupId = "osv:GHSA-7x63-xv5r-3p2x";
+const exampleMembers: FeedEvent[] = ["GHSA-7x63-xv5r-3p2x", "GO-2026-5236"].map(
+  (id, i) => ({
+    ...structured,
+    id: 201 + i,
+    advisory_id: `00000000-0000-0000-0000-00000000020${i + 1}`,
+    group_id: exampleGroupId,
+    source_url: "https://osv.dev/vulnerability/" + id,
+    source_published_at: i ? "2026-06-25T00:00:00Z" : "2026-04-15T00:00:00Z",
+    payload: {
+      ...structured.payload,
+      title:
+        "OAuth2 Proxy authentication bypass" +
+        (i ? " in github.com/oauth2-proxy/oauth2-proxy" : ""),
+      summary:
+        "OAuth2 Proxy may trust a client-supplied X-Forwarded-Uri header. This example shows two source records grouped under one advisory.",
+      products: [
+        {
+          name: {
+            value: "github.com/oauth2-proxy/oauth2-proxy/v7",
+            evidence: "/affected/0/package/name",
+          },
+          affected_versions: [],
+          fixed_versions: [{ value: "7.15.2", evidence: "/affected/0/ranges" }],
+          prerequisites: [],
+        },
+      ],
+      structured: { ...structured.payload.structured!, id },
+    },
+  }),
+);
 // Isolated per test/project; never changes the normal four-row fixture.
 const liveStates = new Map<string, string>();
-createServer((req, res) => {
+createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:3038");
+  const grouped = url.pathname === "/rest/v1/rpc/query_advisory_groups";
+  let updates = false;
+  if (grouped) {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    const rpc = JSON.parse(body);
+    updates = rpc.updates;
+    if (rpc.filters.group === "osv:GHSA-2222-2222-2222") {
+      res.writeHead(200, { "Content-Type": "application/json" }).end(
+        JSON.stringify(
+          rpc.updates
+            ? [
+                {
+                  id: 199,
+                  group_id: rpc.filters.group,
+                  revision: 2,
+                  published_at: structured.published_at,
+                  primary: exampleMembers[0],
+                  changed: exampleMembers[0],
+                  members: exampleMembers,
+                  change: "membership",
+                  superseded_by: [exampleGroupId],
+                },
+              ]
+            : [],
+        ),
+      );
+      return;
+    }
+    if (
+      rpc.filters.q === "grouped-example" ||
+      rpc.filters.group === exampleGroupId
+    ) {
+      res.writeHead(200, { "Content-Type": "application/json" }).end(
+        JSON.stringify(
+          rpc.p_after !== null && rpc.p_after >= 200
+            ? []
+            : [
+                {
+                  id: 200,
+                  group_id: exampleGroupId,
+                  revision: 1,
+                  published_at: structured.published_at,
+                  primary: exampleMembers[0],
+                  changed: exampleMembers[0],
+                  members: exampleMembers,
+                  change: "published",
+                  superseded_by: [],
+                },
+              ],
+        ),
+      );
+      return;
+    }
+    url.pathname = "/rest/v1/events";
+    for (const [key, value] of Object.entries(rpc.filters)) {
+      if (key === "source") url.searchParams.set("source_id", "eq." + value);
+      if (key === "group") url.searchParams.set("group_id", "eq." + value);
+      if (key === "technology")
+        url.searchParams.set("technology_ids", "ov.{" + value + "}");
+      if (key === "type")
+        url.searchParams.set("event_types", "cs.{" + value + "}");
+      if (key === "cve") url.searchParams.set("cve_ids", "cs.{" + value + "}");
+      if (key === "severity")
+        url.searchParams.set(
+          "severity_keys",
+          "ov.{" + (value as string[]).join(",") + "}",
+        );
+      if (key === "q")
+        url.searchParams.set("search_document", "plfts(simple)." + value);
+      if (key === "important") url.searchParams.set("important", "eq.true");
+      if (key === "fix") url.searchParams.set("fix_available", "eq.true");
+    }
+    url.searchParams.set("limit", rpc.p_limit);
+    url.searchParams.set("order", rpc.p_after !== null ? "id.asc" : "id.desc");
+    if (rpc.p_after !== null) url.searchParams.set("id", "gt." + rpc.p_after);
+    if (rpc.p_before !== null) url.searchParams.set("id", "lt." + rpc.p_before);
+  }
   const liveSource = url.searchParams.get("source") ?? "";
   if (
     req.method === "POST" &&
@@ -213,6 +323,12 @@ createServer((req, res) => {
     res.writeHead(404).end();
     return;
   }
+  if (url.searchParams.get("id") === "eq.999998") {
+    res
+      .writeHead(503, { "Content-Type": "application/json" })
+      .end(JSON.stringify({ message: "Fixture unavailable" }));
+    return;
+  }
   const source = url.searchParams.get("source_id")?.slice(3) ?? "";
   const state = liveStates.get(source);
   if (source === "fixture-unavailable" || state === "unavailable") {
@@ -227,7 +343,24 @@ createServer((req, res) => {
     source_id: source,
     payload: { ...patch.payload, title: `Live fixture event ${id}` },
   }));
-  let data = (state ? liveRows.map(routing) : rows).filter((row) => {
+  const candidates =
+    url.searchParams.get("group_id") === "eq." + exampleGroupId ||
+    ["eq.201", "eq.202"].includes(url.searchParams.get("id") ?? "")
+      ? exampleMembers.map(routing)
+      : state
+        ? liveRows.map(routing)
+        : rows;
+  const current =
+    grouped && !updates
+      ? candidates.filter(
+          (row) =>
+            !candidates.some(
+              (other) =>
+                other.advisory_id === row.advisory_id && other.id > row.id,
+            ),
+        )
+      : candidates;
+  let data = current.filter((row) => {
     const selectedSeverity = url.searchParams
       .get("severity_keys")
       ?.slice(4, -1)
@@ -292,7 +425,14 @@ createServer((req, res) => {
     }
     const source = url.searchParams.get("source_id");
     if (source && row.source_id !== source.slice(3)) return false;
+    const group = url.searchParams.get("group_id");
+    if (
+      group &&
+      group.slice(3) !== (row.group_id ?? "advisory:" + row.advisory_id)
+    )
+      return false;
     const id = url.searchParams.get("id");
+    if (id?.startsWith("eq.") && row.id !== Number(id.slice(3))) return false;
     if (id?.startsWith("gt.") && row.id <= Number(id.slice(3))) return false;
     if (id?.startsWith("lt.") && row.id >= Number(id.slice(3))) return false;
     return true;
@@ -316,7 +456,19 @@ createServer((req, res) => {
             technologies: row.technologies,
             products: row.payload.products,
           }))
-        : selectedRows,
+        : grouped
+          ? selectedRows.map((row) => ({
+              id: row.id,
+              group_id: "advisory:" + row.advisory_id,
+              revision: row.revision,
+              published_at: row.published_at,
+              primary: row,
+              changed: row,
+              members: [row],
+              change: row.revision > 1 ? "updated" : "published",
+              superseded_by: [],
+            }))
+          : selectedRows,
     ),
   );
 }).listen(3038, "127.0.0.1");

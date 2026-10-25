@@ -1,11 +1,19 @@
 import { db } from "./db";
 import type { Extraction } from "./schema";
 import type { EventQuery } from "./filters";
-import { isStructured } from "./structured/config";
+import {
+  groupedEvents,
+  publicEvent,
+  type AdvisoryGroup,
+} from "./advisory-groups";
 import type { StructuredPayload } from "./structured/normalize";
 import { priorityLabels, type Priority } from "./priority";
 import { technologyFamily } from "./technology";
+import { itemPath } from "./item-links";
 export type FeedEvent = {
+  detail_url?: string;
+  group_id?: string | null;
+  group?: AdvisoryGroup;
   id: number;
   advisory_id: string;
   revision: number;
@@ -25,11 +33,15 @@ export type FeedEvent = {
     supersedes_event_id?: number;
   };
 };
-export async function events(options: Partial<EventQuery> = {}) {
+export async function events(
+  options: Partial<EventQuery> = {},
+  updates = false,
+) {
+  if (options.view === "grouped") return groupedEvents(options, updates);
   let query = db()
     .from("events")
     .select(
-      "id,advisory_id,revision,source_id,source_url,source_published_at,published_at,extraction_method,technologies,cve_ids,event_types,payload,priority,context_update",
+      "id,advisory_id,group_id,revision,source_id,source_url,source_published_at,published_at,extraction_method,technologies,cve_ids,event_types,payload,priority,context_update",
     )
     .order("id", { ascending: options.after !== undefined })
     .limit(options.limit ?? 30);
@@ -48,6 +60,7 @@ export async function events(options: Partial<EventQuery> = {}) {
   }
   if (options.cve) query = query.contains("cve_ids", [options.cve]);
   if (options.source) query = query.eq("source_id", options.source);
+  if (options.group) query = query.eq("group_id", options.group);
   if (options.severity?.length)
     query = query.overlaps("severity_keys", options.severity);
   if (options.important) query = query.eq("important", true);
@@ -59,17 +72,18 @@ export async function events(options: Partial<EventQuery> = {}) {
     });
   const { data, error } = await query;
   if (error) throw error;
-  return (data as FeedEvent[]).map((row) => ({
-    ...row,
-    // Existing publication RPC labels all imports "llm". Interpret reviewed structured source
-    // provenance at the read boundary until that database metadata is extended separately.
-    extraction_method:
-      isStructured(row.source_id) &&
-      row.payload.structured &&
-      row.extraction_method !== "system"
-        ? "structured"
-        : row.extraction_method,
-  }));
+  return (data as FeedEvent[]).map(publicEvent);
+}
+export async function eventById(id: number): Promise<FeedEvent | null> {
+  const { data, error } = await db()
+    .from("events")
+    .select(
+      "id,advisory_id,group_id,revision,source_id,source_url,source_published_at,published_at,extraction_method,technologies,cve_ids,event_types,payload,priority,context_update",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? publicEvent(data as FeedEvent) : null;
 }
 export function xml(value: string) {
   return value
@@ -93,8 +107,50 @@ export function rss(
 ) {
   const items = rows
     .map((row) => {
+      const title =
+        (row.group?.superseded_by.length
+          ? "Grouping updated: "
+          : row.group?.changed.payload.kind === "withdrawal"
+            ? "Source withdrawn: "
+            : "") + row.payload.title;
       const summary =
         row.payload.summary +
+        (row.group
+          ? "\n\nSources:\n" +
+            row.group.members
+              .map(
+                (member) =>
+                  (member.payload.structured?.id ?? member.source_id) +
+                  " — " +
+                  member.source_url +
+                  "\n" +
+                  (member.payload.kind === "withdrawal"
+                    ? "Withdrawn source record."
+                    : member.payload.products
+                        .map(
+                          (product) =>
+                            product.name.value +
+                            (product.fixed_versions.length
+                              ? ": fixed in " +
+                                product.fixed_versions
+                                  .map((v) => v.value)
+                                  .join(", ")
+                              : ": fix not stated in this record"),
+                        )
+                        .join("\n")),
+              )
+              .join("\n\n") +
+            (row.group.change !== "published"
+              ? "\n\nUpdated source: " +
+                row.group.changed.source_url +
+                "\n" +
+                row.group.changed.payload.summary
+              : "") +
+            (row.group.superseded_by.length
+              ? "\nGroup membership corrected. Replacement groups: " +
+                row.group.superseded_by.join(", ")
+              : "")
+          : "") +
         (row.priority
           ? "\n\n" + priorityLabels(row.priority).join(" · ")
           : "") +
@@ -128,10 +184,11 @@ export function rss(
       // RSS descriptions contain HTML. Escape once for HTML text and again for XML transport.
       return (
         "<item><title>" +
-        xml(row.payload.title) +
+        xml(title) +
         "</title><link>" +
-        xml(row.source_url) +
-        '</link><guid isPermaLink="false">heist-event:' +
+        xml(row.group ? base + itemPath(row) : row.source_url) +
+        '</link><guid isPermaLink="false">' +
+        (row.group ? "heist-group-update:" : "heist-event:") +
         row.id +
         "</guid><pubDate>" +
         new Date(row.published_at).toUTCString() +

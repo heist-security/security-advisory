@@ -27,9 +27,7 @@ beforeAll(async () => {
 }, 30000);
 afterAll(async () => sql.close());
 beforeEach(async () => {
-  await sql.exec(
-    "delete from events; delete from advisories; delete from documents; delete from extraction_budget;",
-  );
+  await sql.exec("truncate documents cascade; delete from extraction_budget;");
 });
 
 // Execute the application's conditional REST operations against a real PostgreSQL engine.

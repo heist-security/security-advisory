@@ -14,7 +14,8 @@ beforeEach(async (context) => {
     if (!(
       context.task.name.startsWith("backfills") &&
       (file.endsWith("008_event_priority.sql") ||
-        file.endsWith("009_priority_backfill.sql"))
+        file.endsWith("009_priority_backfill.sql") ||
+        file.endsWith("012_advisory_groups.sql"))
     ))
       await db.exec(readFileSync(new URL(file, folder), "utf8"));
 }, 30000);

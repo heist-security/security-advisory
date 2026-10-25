@@ -1,0 +1,335 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { PGlite } from "@electric-sql/pglite";
+import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
+import { normalizeRecord } from "../src/lib/structured/normalize";
+
+let db: PGlite;
+beforeAll(async () => {
+  db = new PGlite();
+  await db.exec(
+    "create role anon; create role authenticated; create role service_role bypassrls;",
+  );
+  const folder = new URL("../supabase/migrations/", import.meta.url);
+  for (const file of readdirSync(folder)
+    .filter((f) => f.endsWith(".sql"))
+    .sort())
+    await db.exec(readFileSync(new URL(file, folder), "utf8"));
+}, 30000);
+beforeEach(async () => {
+  await db.exec(
+    "truncate documents restart identity cascade; update advisory_group_backfill set last_id=0,completed_at=null;",
+  );
+});
+afterAll(async () => db?.close());
+
+const ghsa = "GHSA-7x63-xv5r-3p2x";
+const go = "GO-2026-5236";
+const key = "osv:" + ghsa;
+const affected = {
+  package: { ecosystem: "Go", name: "github.com/oauth2-proxy/oauth2-proxy/v7" },
+  ranges: [
+    { type: "SEMVER", events: [{ introduced: "7.5.0" }, { fixed: "7.15.2" }] },
+  ],
+};
+function record(id = ghsa) {
+  return normalizeRecord("core-osv", {
+    id,
+    modified: "2026-10-25T00:00:00Z",
+    published: "2026-04-15T00:00:00Z",
+    aliases: [ghsa, go, "CVE-2026-40575", "CVE-2026-76835"],
+    summary:
+      id === ghsa
+        ? "OAuth2 authentication bypass"
+        : "Go mirror of the OAuth2 authentication bypass",
+    details: "Source-specific details.",
+    affected: [
+      affected,
+      ...(id === go
+        ? [
+            {
+              package: { ecosystem: "Go", name: "legacy-package" },
+              versions: ["1.0.0"],
+            },
+          ]
+        : []),
+    ],
+    references: [
+      {
+        url:
+          "https://github.com/oauth2-proxy/oauth2-proxy/security/advisories/" +
+          ghsa,
+      },
+    ],
+    database_specific:
+      id === ghsa ? { github_reviewed: true, severity: "CRITICAL" } : {},
+  }).payload;
+}
+async function publish(
+  payload = record(),
+  source = "core-osv",
+  url = "https://osv.dev/vulnerability/" + payload.structured.id,
+) {
+  const job = (
+    await db.query<any>(
+      `insert into documents(source_id,source_url,content_hash,body,status,lease_token,leased_until)
+     values($1,$2,gen_random_uuid()::text,'Source body','processing',gen_random_uuid(),now()+interval '2 minutes') returning *`,
+      [source, url],
+    )
+  ).rows[0];
+  await db.query("select finish_document($1,$2,$3,'test')", [
+    job.id,
+    job.lease_token,
+    JSON.stringify(payload),
+  ]);
+}
+async function groups(
+  filters = {},
+  after: number | null = null,
+  before: number | null = null,
+  limit = 100,
+  updates = false,
+) {
+  return (
+    await db.query<any>("select query_advisory_groups($1,$2,$3,$4,$5) item", [
+      JSON.stringify(filters),
+      limit,
+      after,
+      before,
+      updates,
+    ])
+  ).rows.map((r) => r.item);
+}
+
+it("groups matching OSV copies, prefers the reviewed primary and retains every source's evidence", async () => {
+  await publish();
+  const first = (await groups())[0];
+  await publish(record(go));
+  const rows = await groups();
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({
+    id: first.id,
+    group_id: key,
+    primary: { payload: { structured: { id: ghsa } } },
+  });
+  expect(rows[0].members).toHaveLength(2);
+  expect(
+    rows[0].members.find((m: any) => m.payload.structured.id === go).payload
+      .products,
+  ).toHaveLength(2);
+  expect(rows[0].primary.payload.products).toHaveLength(1);
+  expect(await groups({}, first.id, null, 100, true)).toHaveLength(0);
+  expect((await db.query("select distinct group_id from events")).rows).toEqual(
+    [{ group_id: key }],
+  );
+});
+
+it("does not merge the later bypass, unrelated packages, title matches or CVE mentions", async () => {
+  await publish();
+  const later = record("GO-2026-9999");
+  later.structured.affected = [
+    {
+      ...affected,
+      ranges: [
+        {
+          type: "SEMVER",
+          events: [{ introduced: "7.15.2" }, { fixed: "7.15.5" }],
+        },
+      ],
+    },
+  ];
+  await publish(later);
+  const distro = record("BIT-oauth2-proxy-2026-40575");
+  distro.structured.affected = [
+    { ...affected, package: { ecosystem: "Bitnami", name: "oauth2-proxy" } },
+  ];
+  await publish(distro);
+  const mention = record("GO-2026-8888");
+  mention.structured.references = [
+    "https://github.com/oauth2-proxy/oauth2-proxy",
+  ];
+  await publish(mention);
+  expect(await groups()).toHaveLength(4);
+});
+
+it("filters matching members before group pagination, with all conditions on the same member", async () => {
+  await publish({ ...record(), title: "Reviewed exclusive finding" });
+  await publish(record(go));
+  const unrelated = record("TEST-123");
+  unrelated.structured.references = [];
+  await publish(unrelated);
+  expect((await groups({ technology: "legacy-package" }))[0].group_id).toBe(
+    key,
+  );
+  expect(
+    await groups({ q: "mirror", technology: "legacy-package" }),
+  ).toHaveLength(1);
+  expect(
+    await groups({ q: "reviewed exclusive", technology: "legacy-package" }),
+  ).toHaveLength(0);
+  const first = await groups({}, null, null, 1);
+  const second = await groups({}, null, first[0].id, 1);
+  expect(first[0].group_id).not.toBe(second[0].group_id);
+  expect(await groups({}, null, second[0].id, 1)).toHaveLength(0);
+});
+
+it("publishes changed secondary evidence, withdrawals and reversions with immutable update snapshots", async () => {
+  await publish();
+  await publish(record(go));
+  const first = (await groups())[0];
+  const changed = record(go);
+  changed.summary = "New mitigation instructions from Go.";
+  await publish(changed);
+  let updates = await groups({}, first.id, null, 100, true);
+  expect(updates).toHaveLength(1);
+  expect(updates[0].changed.payload.summary).toBe(changed.summary);
+  const updatedCursor = updates[0].id;
+  await publish({ ...changed, kind: "withdrawal" });
+  updates = await groups(
+    { technology: "legacy-package", severity: ["critical"] },
+    updatedCursor,
+    null,
+    100,
+    true,
+  );
+  expect(updates).toHaveLength(1);
+  expect(updates[0].changed.payload.kind).toBe("withdrawal");
+  expect(updates[0].primary.payload.structured.id).toBe(ghsa);
+  await publish(record(go));
+  expect(await groups({}, updates[0].id, null, 100, true)).toHaveLength(1);
+  expect(
+    (await groups({}, first.id, null, 1, true))[0].changed.payload.summary,
+  ).toBe(changed.summary);
+});
+
+it("keeps source attribution when the primary withdraws and retains the remaining source", async () => {
+  await publish();
+  await publish(record(go));
+  await publish({ ...record(), kind: "withdrawal" });
+  const rows = await groups();
+  expect(rows).toHaveLength(1);
+  expect(rows[0].primary.payload.structured.id).toBe(go);
+  expect(
+    rows[0].members.find((m: any) => m.payload.structured.id === ghsa).payload
+      .kind,
+  ).toBe("withdrawal");
+});
+
+it("coalesces linked context revisions and delivers a downgrade once to previous severity subscriptions", async () => {
+  await publish();
+  await publish(record(go));
+  const cursor = (await groups())[0].id;
+  await publish({ ...record(), severity: "low" });
+  const updates = await groups(
+    { severity: ["critical"] },
+    cursor,
+    null,
+    100,
+    true,
+  );
+  expect(updates).toHaveLength(1);
+  expect(
+    updates[0].members.every((m: any) => m.priority.severity === "low"),
+  ).toBe(true);
+  const next = updates[0].id;
+  const metadata = record();
+  metadata.severity = "low";
+  metadata.structured.modified = "2026-10-26T00:00:00Z";
+  await publish(metadata);
+  expect(await groups({}, next, null, 100, true)).toHaveLength(0);
+});
+
+it("records membership corrections when an anchor arrives late or ranges diverge", async () => {
+  await publish(record(go));
+  const first = (await groups())[0];
+  await publish();
+  expect(await groups()).toHaveLength(1);
+  const updates = await groups({}, first.id, null, 100, true);
+  expect(
+    updates.find((u: any) => u.group_id === first.group_id).superseded_by,
+  ).toEqual([key]);
+  const changed = record(go);
+  changed.structured.affected = [{ ...affected, versions: ["99.0.0"] }];
+  await publish(changed);
+  expect(await groups()).toHaveLength(2);
+});
+
+it("backfills only current source states in resumable batches without rewriting raw event IDs", async () => {
+  await db.exec("alter table events disable trigger publish_advisory_group");
+  await publish();
+  await publish({ ...record(), summary: "Latest source description" });
+  await publish(record(go));
+  const before = (
+    await db.query(
+      "select id,revision,published_at,payload from events order by id",
+    )
+  ).rows;
+  await db.exec("alter table events enable trigger publish_advisory_group");
+  for (let i = 0; i < 10; i++) {
+    const result = (
+      await db.query<any>("select * from backfill_advisory_groups(1)")
+    ).rows[0];
+    if (result.done) break;
+  }
+  expect(await groups()).toHaveLength(1);
+  expect(await groups({}, 0, null, 100, true)).toHaveLength(1);
+  expect((await groups())[0].members).toHaveLength(2);
+  expect(
+    (
+      await db.query(
+        "select id,revision,published_at,payload from events order by id",
+      )
+    ).rows,
+  ).toEqual(before);
+  expect(
+    (await db.query<any>("select processed from backfill_advisory_groups(1)"))
+      .rows[0].processed,
+  ).toBe(0);
+});
+
+it("keeps group tables and RPCs private to the backend", async () => {
+  for (const role of ["anon", "authenticated"]) {
+    await db.exec("set role " + role);
+    for (const sql of [
+      "select * from advisory_groups",
+      "select * from advisory_group_updates",
+      "select * from query_advisory_groups()",
+      "select * from backfill_advisory_groups()",
+    ])
+      await expect(db.query(sql)).rejects.toThrow("permission denied");
+    await db.exec("reset role");
+  }
+});
+
+it("requires bounded evidence and rejects conflicts between mirrors' additional packages", async () => {
+  const unknown = record();
+  unknown.structured.affected = [
+    {
+      package: affected.package,
+      ranges: [{ type: "SEMVER", events: [{ introduced: "0" }] }],
+    },
+  ];
+  const unknownMirror = {
+    ...record(go),
+    structured: {
+      ...record(go).structured,
+      affected: unknown.structured.affected,
+    },
+  };
+  await publish(unknown);
+  await publish(unknownMirror);
+  expect(await groups()).toHaveLength(2);
+  await publish(record());
+  const a = record(go);
+  a.structured.affected = [
+    affected,
+    { package: { ecosystem: "Go", name: "additional" }, versions: ["1.0.0"] },
+  ];
+  await publish(a);
+  const b = record("GO-2026-9998");
+  b.structured.affected = [
+    affected,
+    { package: { ecosystem: "Go", name: "additional" }, versions: ["2.0.0"] },
+  ];
+  await publish(b);
+  expect(await groups()).toHaveLength(3);
+});
