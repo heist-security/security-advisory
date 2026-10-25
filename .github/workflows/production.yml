@@ -60,12 +60,9 @@ jobs:
           expected=$(find supabase/migrations -name '*.sql' -type f | wc -l)
           test "$first" -eq "$expected"
           supabase db push --db-url 'postgresql://postgres:ci-only-password@localhost:5432/postgres?sslmode=disable' --yes
-          # Each invocation commits independently; checkpoints survive retries.
-          for batch in $(seq 1 30); do
-            done=$(psql -At -v ON_ERROR_STOP=1 -c 'select done from public.backfill_event_priority(100)')
-            if [ "$done" = t ]; then break; fi
-          done
-          test "$done" = t
+          # Run the real release script's psql connection/batching path against
+          # this disposable service; unit mocks alone missed the PGDATABASE bug.
+          BACKFILL_CLI_TEST=1 node --test tests/backfill-cli.test.mjs
           test "$(psql -At -c "select count(*) from events where priority='{}'::jsonb")" -eq 0
           test "$(psql -At -c 'select count(*) from events')" -eq 2000
           test "$(psql -At -c 'select processed from public.backfill_event_priority(100)')" -eq 0

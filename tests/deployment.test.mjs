@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import {
   configuration,
   migrate,
@@ -238,15 +238,24 @@ test("does not include provider error bodies or transport errors in failure mess
 });
 test("uses verified TLS, isolates CLI credentials, and removes the certificate", async () => {
   const env = environment();
-  let certificate;
+  let certificate, passfile;
   await migrate(configuration(env), env, (command, args, options) => {
     if (command === "psql") {
       assert.equal(options.env.VERCEL_TOKEN, undefined);
       assert.equal(options.env.GITHUB_TOKEN, undefined);
       assert.ok(!args.some((a) => a.includes("fixture-password")));
+      assert.equal(options.env.PGDATABASE, "postgres");
+      assert.equal(options.env.PGHOST, "db.example.com");
+      assert.equal(options.env.PGPORT, "5432");
+      assert.equal(options.env.PGUSER, "postgres");
+      assert.equal(options.env.PGSSLMODE, "verify-full");
+      assert.equal(options.env.PGSSLROOTCERT, certificate);
+      assert.equal(options.env.PGPASSWORD, undefined);
+      passfile = options.env.PGPASSFILE;
+      assert.equal(statSync(passfile).mode & 0o777, 0o600);
       assert.equal(
-        new URL(options.env.PGDATABASE).searchParams.get("sslmode"),
-        "verify-full",
+        readFileSync(passfile, "utf8"),
+        "db.example.com:5432:postgres:postgres:fixture-password\n",
       );
       return { status: 0, stdout: "0|0|t" };
     }
@@ -264,6 +273,39 @@ test("uses verified TLS, isolates CLI credentials, and removes the certificate",
     return { status: 0 };
   });
   assert.equal(existsSync(certificate), false);
+  assert.equal(existsSync(passfile), false);
+});
+test("decodes connection fields, escapes password-file delimiters, and cleans up after backfill failure", async () => {
+  const env = environment();
+  env.SUPABASE_DB_URL =
+    "postgresql://postgres.project:p%3Aa%5Css@db.example.com:6543/feed%20db?sslmode=verify-full";
+  let passfile;
+  await assert.rejects(
+    migrate(configuration(env), env, (command, _args, options) => {
+      if (command === "supabase") return { status: 0 };
+      assert.equal(options.env.PGPORT, "6543");
+      assert.equal(options.env.PGDATABASE, "feed db");
+      assert.equal(options.env.PGUSER, "postgres.project");
+      passfile = options.env.PGPASSFILE;
+      assert.equal(
+        readFileSync(passfile, "utf8"),
+        "db.example.com:6543:feed db:postgres.project:p\\:a\\\\ss\n",
+      );
+      return { status: 1, stderr: "private details" };
+    }),
+    /Priority backfill failed/,
+  );
+  assert.equal(existsSync(passfile), false);
+  assert.equal(
+    migrationFailure({ error: { code: "ENOENT" } }),
+    "database client not installed",
+  );
+  assert.equal(
+    migrationFailure({
+      stderr: "connection to server on socket private-location failed",
+    }),
+    "database connection failed",
+  );
 });
 test("suppresses migration diagnostics and removes the certificate on failure", async () => {
   const env = environment();

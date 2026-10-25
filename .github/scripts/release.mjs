@@ -68,6 +68,13 @@ export function migrationFailure(result) {
   const code = String(result.stderr ?? "").match(
     /(?:SQLSTATE[ :]*|ERROR:\s*)([0-9A-Z]{5})\b/,
   )?.[1];
+  if (result.error?.code === "ENOENT") return "database client not installed";
+  if (
+    /connection to server|could not translate host name/i.test(
+      String(result.stderr ?? ""),
+    )
+  )
+    return "database connection failed";
   return result.error?.code === "ETIMEDOUT"
     ? "client timeout"
     : (states[code] ?? "database command failed");
@@ -110,12 +117,16 @@ export async function migrate(
     }
     // Schema DDL has committed. Backfill separately so readers remain available
     // and interrupted releases resume from the last committed batch.
+    // libpq does not expand connection URIs supplied through PGDATABASE.
+    // Keep the password in a private file rather than process arguments/env.
+    const connection = psqlEnvironment(database, env, certificate, directory);
     const deadline = Date.now() + 15 * 60 * 1000;
     for (let attempt = 0; attempt < 5000 && Date.now() < deadline; attempt++) {
       const batch = execute(
         "psql",
         [
           "--no-psqlrc",
+          "--no-password",
           "--quiet",
           "--tuples-only",
           "--no-align",
@@ -125,13 +136,7 @@ export async function migrate(
           "set lock_timeout='5s'; set statement_timeout='30s'; select last_id,processed,done from public.backfill_event_priority(100);",
         ],
         {
-          env: {
-            PATH: env.PATH,
-            HOME: env.HOME,
-            PGDATABASE: database.toString(),
-            PGSSLMODE: "verify-full",
-            PGSSLROOTCERT: certificate,
-          },
+          env: connection,
           encoding: "utf8",
           stdio: ["ignore", "pipe", "pipe"],
           timeout: 45000,
@@ -160,6 +165,35 @@ export async function migrate(
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+}
+
+function psqlEnvironment(database, env, certificate, directory) {
+  const host = database.hostname.replace(/^\[|\]$/g, "");
+  const port = database.port || "5432";
+  const name = decodeURIComponent(database.pathname.slice(1)) || "postgres";
+  const user = decodeURIComponent(database.username);
+  const password = decodeURIComponent(database.password);
+  const fields = [host, port, name, user, password];
+  if (fields.some((value) => /[\r\n\0]/.test(value)))
+    throw new ReleaseError("Invalid database connection field.");
+  const passfile = join(directory, "pgpass");
+  writeFileSync(
+    passfile,
+    fields.map((value) => value.replace(/[\\:]/g, "\\$&")).join(":") + "\n",
+    { mode: 0o600 },
+  );
+  return {
+    PATH: env.PATH,
+    HOME: env.HOME,
+    PGHOST: host,
+    PGPORT: port,
+    PGDATABASE: name,
+    PGUSER: user,
+    PGPASSFILE: passfile,
+    PGCONNECT_TIMEOUT: "10",
+    PGSSLMODE: "verify-full",
+    PGSSLROOTCERT: certificate,
+  };
 }
 
 export async function release({
