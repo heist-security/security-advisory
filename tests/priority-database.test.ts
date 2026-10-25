@@ -1,6 +1,8 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { beforeEach, afterEach, it, expect } from "vitest";
+import { normalizeRecord } from "../src/lib/structured/normalize";
+import upstreamOsv from "./fixtures/osv-upstream.json";
 let db: PGlite;
 beforeEach(async (context) => {
   db = new PGlite();
@@ -15,7 +17,8 @@ beforeEach(async (context) => {
       context.task.name.startsWith("backfills") &&
       (file.endsWith("008_event_priority.sql") ||
         file.endsWith("009_priority_backfill.sql") ||
-        file.endsWith("012_advisory_groups.sql"))
+        file.endsWith("012_advisory_groups.sql") ||
+        file.endsWith("013_osv_upstream_priority.sql"))
     ))
       await db.exec(readFileSync(new URL(file, folder), "utf8"));
 }, 30000);
@@ -167,6 +170,45 @@ it("updates known-exploited context and removes rejected CVE ratings", async () 
   expect((await latest()).priority.severity).toBe("unknown");
   await publish("core-kev", { ...kev, kind: "withdrawal" });
   expect((await latest()).priority.known_exploited).toBe(false);
+});
+it("publishes upstream CVE subscriptions and ratings without merging or propagating downstream severity", async () => {
+  const normalized = normalizeRecord("core-osv", upstreamOsv);
+  const upstreamId = upstreamOsv.upstream[0];
+  await publish("core-osv", normalized.payload, "structured", normalized.url);
+  const first = await latest("core-osv");
+  expect(first.cve_ids).toEqual([upstreamId]);
+  expect(first.priority).toMatchObject({
+    severity: "medium",
+    publisher_severity: "medium",
+    fix_available: true,
+  });
+  expect(first.severity_keys).toEqual(["medium"]);
+  const upstream = {
+    ...cve("low"),
+    related_cves: [{ value: upstreamId, evidence: "/cveMetadata/cveId" }],
+    structured: { ...cve("low").structured, id: upstreamId },
+  };
+  await publish("core-cve", upstream);
+  const cveEvent = await latest("core-cve");
+  expect(cveEvent.priority.severity).toBe("low");
+  expect(cveEvent.priority.linked_cves).toEqual([]);
+  const linked = await latest("core-osv");
+  expect(linked.priority.linked_cves[0]).toMatchObject({
+    cve: upstreamId,
+    severity: "low",
+    relationship_evidence: "/upstream",
+  });
+  expect(linked.group_id).not.toBe(cveEvent.group_id);
+  const sibling = normalizeRecord("core-osv", {
+    ...upstreamOsv,
+    id: "CGA-sibling",
+    severity: [],
+  });
+  await publish("core-osv", sibling.payload, "structured", sibling.url);
+  const other = await latest("core-osv");
+  expect(other.priority.severity).toBe("low");
+  expect(other.group_id).not.toBe(linked.group_id);
+  expect(other.priority.linked_cves).toHaveLength(1);
 });
 it("only links legacy patches from verbatim opening fix headings and preserves links on context revisions", async () => {
   const { fixed_cves: _, ...legacy } = patch;

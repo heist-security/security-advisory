@@ -17,9 +17,11 @@
     "check:secrets": "node scripts/check-secrets.mjs",
     "eval:live": "node --env-file-if-exists=.env.local --import tsx scripts/evaluate.ts",
     "sources:configure": "node --env-file-if-exists=.env.local --import tsx scripts/configure-sources.ts",
+    "sources:recollect-osv": "node --env-file-if-exists=.env.local --import tsx scripts/recollect-osv.ts",
     "sources:verify-structured": "node --import tsx scripts/verify-structured.ts"
   },
   "dependencies": {
+    "@pandatix/js-cvss": "0.4.4",
     "@supabase/supabase-js": "^2.0.0",
     "cheerio": "^1.2.0",
     "next": "16.4.3",
