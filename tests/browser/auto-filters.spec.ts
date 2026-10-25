@@ -49,9 +49,8 @@ test("a selection includes pending search text and resets the feed cursor", asyn
   await page
     .getByRole("searchbox", { name: "Search feed", exact: true })
     .fill("fictional");
-  await page
-    .getByRole("combobox", { name: "Type", exact: true })
-    .selectOption("withdrawal");
+  await page.getByRole("button", { name: /^Type/ }).click();
+  await page.getByRole("checkbox", { name: "Withdrawal", exact: true }).check();
   await expect(page).toHaveURL(/type=withdrawal/);
   expect(new URL(page.url()).searchParams.get("source")).toBe("nodejs");
   expect(new URL(page.url()).searchParams.get("view")).toBe("events");
@@ -62,8 +61,8 @@ test("a selection includes pending search text and resets the feed cursor", asyn
   await expect(page.locator(".event-card")).toHaveCount(1);
   await expect(page.locator("#event-2")).toBeVisible();
   await expect(
-    page.getByRole("combobox", { name: "Type", exact: true }),
-  ).toHaveValue("withdrawal");
+    page.getByRole("checkbox", { name: "Withdrawal", exact: true }),
+  ).toBeChecked();
 });
 
 test("technology suggestions do not apply until selected, and deselecting clears filters", async ({
@@ -82,6 +81,7 @@ test("technology suggestions do not apply until selected, and deselecting clears
   await expect(page).toHaveURL("/?view=grouped");
   await expect(page.locator(".event-card")).toHaveCount(3);
   await page.getByLabel("Search technologies", { exact: true }).press("Escape");
+  await expect(page.getByRole("button", { name: /^Technology/ })).toBeFocused();
   await page.getByRole("button", { name: /^Severity/ }).click();
   const critical = page.getByRole("checkbox", {
     name: "Critical",
@@ -98,9 +98,6 @@ test("source filters apply automatically and keep the selected catalog", async (
   page,
 }) => {
   await page.goto("/sources?catalog=vendor&page=2");
-  await expect(
-    page.getByRole("button", { name: "Filter", exact: true }),
-  ).toHaveCount(0);
   await page
     .getByRole("combobox", { name: "Channel", exact: true })
     .selectOption("release-notes");
@@ -120,7 +117,7 @@ test("source filters apply automatically and keep the selected catalog", async (
   for (const value of await page.locator(".source-category").allTextContents())
     expect(value).toBe(category);
   await page
-    .getByRole("textbox", { name: "Search", exact: true })
+    .getByRole("searchbox", { name: "Search", exact: true })
     .fill("NoSuchSource");
   await expect(page).toHaveURL(/q=NoSuchSource/);
   await expect(

@@ -1,19 +1,13 @@
+import Link from "next/link";
 import type { FeedEvent } from "@/lib/events";
 import { technologyKey, type Filters } from "@/lib/filters";
-import { feedLink } from "@/lib/feed-view";
+import { feedLink, feedTimestamp } from "@/lib/feed-view";
 import { itemLink, summaryPreview } from "@/lib/item-links";
 import { registry, vendorRegistry } from "@/lib/registry";
 import { priorityLabels } from "@/lib/priority";
 import { Badge } from "./ui/badge";
 import { Card, CardDescription, CardFooter, CardHeader } from "./ui/card";
-import { cn } from "@/lib/utils";
-const kindStyles = {
-  patch: "border-blue-200 bg-blue-50 text-blue-800",
-  advisory: "border-violet-200 bg-violet-50 text-violet-800",
-  mitigation: "border-amber-200 bg-amber-50 text-amber-800",
-  withdrawal: "border-red-200 bg-red-50 text-red-800",
-  other: "border-border bg-muted text-muted-foreground",
-};
+import { EventKindBadge } from "./event-kind-badge";
 const sourceNames = new Map(
   [...vendorRegistry, ...registry].map((source) => [source.id, source.name]),
 );
@@ -42,12 +36,7 @@ export function EventCard({
       <Card className="gap-3 rounded-lg py-5 shadow-none">
         <CardHeader className="gap-2 px-5">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge
-              variant="outline"
-              className={cn("capitalize", kindStyles[event.payload.kind])}
-            >
-              {event.payload.kind}
-            </Badge>
+            <EventKindBadge kind={event.payload.kind} />
             {event.payload.kind !== "withdrawal"
               ? priorityLabels(event.priority).map((label) => (
                   <Badge variant="secondary" key={label}>
@@ -55,12 +44,12 @@ export function EventCard({
                   </Badge>
                 ))
               : null}
-            <a
+            <Link
               className="event-source hover:text-primary hover:underline"
               href={feedLink({ ...filters, source: event.source_id })}
             >
               {sourceNames.get(event.source_id) ?? event.source_id}
-            </a>
+            </Link>
             {event.group && event.group.members.length > 1 ? (
               <span className="group-sources">
                 {event.group.members.length} source records
@@ -71,11 +60,18 @@ export function EventCard({
             event.payload.kind !== "withdrawal" ? (
               <span>Source withdrawal</span>
             ) : null}
+            <time
+              dateTime={event.published_at}
+              title="Date added to the feed (UTC)"
+              className="w-full text-xs tabular-nums text-muted-foreground sm:ml-auto sm:w-auto"
+            >
+              {feedTimestamp(event.published_at)}
+            </time>
           </div>
           <h3 className="text-lg leading-snug font-medium tracking-tight">
-            <a href={href} className="hover:text-primary">
+            <Link href={href} className="hover:text-primary">
               {event.payload.title}
-            </a>
+            </Link>
           </h3>
           <CardDescription className="text-sm leading-relaxed">
             <p className="event-summary line-clamp-2">
@@ -92,14 +88,14 @@ export function EventCard({
                 key={i}
                 className="max-w-full min-w-0 rounded-md font-mono text-[11px] whitespace-normal"
               >
-                <a
+                <Link
                   href={feedLink({
                     ...filters,
                     technology: technologyKey(product.name.value),
                   })}
                 >
                   {product.name.value}
-                </a>
+                </Link>
               </Badge>
             ))}
             {cves.map((cve) => (
@@ -109,14 +105,14 @@ export function EventCard({
                 key={cve.value}
                 className="rounded-md font-mono text-[11px]"
               >
-                <a href={feedLink({ ...filters, cve: cve.value })}>
+                <Link href={feedLink({ ...filters, cve: cve.value })}>
                   {cve.value}
-                </a>
+                </Link>
               </Badge>
             ))}
             {remaining > 0 ? (
               <Badge asChild variant="secondary">
-                <a href={href}>+{remaining} more</a>
+                <Link href={href}>+{remaining} more</Link>
               </Badge>
             ) : null}
           </CardFooter>

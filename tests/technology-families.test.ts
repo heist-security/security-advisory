@@ -5,7 +5,6 @@ import {
   technologyMatches,
   technologySearch,
 } from "../src/lib/technology";
-import { technologyOptions } from "../src/lib/technology-options";
 
 it("groups known runtime versions and aliases but preserves distinct dependencies", () => {
   for (const value of [
@@ -37,33 +36,7 @@ it("groups known runtime versions and aliases but preserves distinct dependencie
     ).technology,
   ).toBe("node-js,ruby");
 });
-it("shows one stable label per family, including alias searches and historical keys", () => {
-  const rows = [
-    {
-      technologies: ["nodejs", "node-js-8", "node", "old-product", "core-osv"],
-      products: [
-        { name: { value: "Node.js 6" } },
-        { name: { value: "Node.js 22" } },
-        { name: { value: "node-gyp" } },
-      ],
-    },
-  ];
-  expect(technologyOptions(rows, "node")).toEqual([
-    { value: "node-gyp", label: "node-gyp" },
-    { value: "node-js", label: "Node.js" },
-  ]);
-  expect(technologyOptions(rows, "nodejs")).toEqual([
-    { value: "node-js", label: "Node.js" },
-  ]);
-  expect(technologyOptions(rows, "Node.js 22")).toEqual([
-    { value: "node-js", label: "Node.js" },
-  ]);
-  expect(technologyOptions(rows, "old")).toEqual([
-    { value: "old-product", label: "old-product" },
-  ]);
-  expect(technologyOptions(rows).some((o) => o.value === "core-osv")).toBe(
-    false,
-  );
+it("matches family aliases in technology searches", () => {
   expect(technologyMatches("python", "cpy")).toBe(true);
   expect(technologySearch("Node.js 22")).toBe(
     "(node:*) | (nodejs:*) | (node:* & js:*)",

@@ -1,3 +1,5 @@
+import type { FeedEvent } from "../src/lib/events";
+type LeasedJob = { id: number; lease_token: string };
 import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { beforeEach, afterEach, it, expect } from "vitest";
@@ -29,9 +31,9 @@ async function enqueue(hash: string) {
   );
 }
 async function claim() {
-  return (await db.query<any>("select * from claim_document()")).rows[0];
+  return (await db.query<LeasedJob>("select * from claim_document()")).rows[0];
 }
-async function finish(job: any, result: object) {
+async function finish(job: LeasedJob, result: object) {
   await db.query("select finish_document($1,$2,$3,'test')", [
     job.id,
     job.lease_token,
@@ -47,8 +49,11 @@ it("does not publish an older relevant document after a newer non-security decis
   await finish(old, payload);
   expect((await db.query("select * from events")).rows).toHaveLength(0);
   expect(
-    (await db.query<any>("select latest_document_id from advisories")).rows[0]
-      .latest_document_id,
+    (
+      await db.query<{ latest_document_id: number }>(
+        "select latest_document_id from advisories",
+      )
+    ).rows[0].latest_document_id,
   ).toBe(newer.id);
 });
 it("publishes one explicit system correction that remains in technology, type and CVE subscriptions", async () => {
@@ -59,7 +64,7 @@ it("publishes one explicit system correction that remains in technology, type an
   await enqueue("three");
   await finish(await claim(), { security_relevant: false });
   const rows = (
-    await db.query<any>(
+    await db.query<FeedEvent>(
       "select * from events where technologies @> array['widget'] and cve_ids @> array['CVE-2026-12345'] and event_types @> array['patch'] order by id",
     )
   ).rows;
@@ -73,7 +78,8 @@ it("fences collection work superseded by a newer feed snapshot", async () => {
   await db.exec(
     "update sources set enabled=false; update sources set enabled=true where id='ruby'",
   );
-  const source = (await db.query<any>("select * from claim_source()")).rows[0];
+  const source = (await db.query<LeasedJob>("select * from claim_source()"))
+    .rows[0];
   const stage = async (fingerprint: string) =>
     db.query("select stage_feed_entries('ruby',$1,$2)", [
       source.lease_token,
@@ -87,8 +93,9 @@ it("fences collection work superseded by a newer feed snapshot", async () => {
       ]),
     ]);
   await stage("a");
-  const old = (await db.query<any>("select * from claim_feed_entry()")).rows[0]
-    .entry;
+  const old = (
+    await db.query<{ entry: LeasedJob }>("select * from claim_feed_entry()")
+  ).rows[0].entry;
   await stage("b");
   await expect(
     db.query("select complete_feed_entry($1,$2,'Old text','old',null,false)", [
@@ -96,15 +103,17 @@ it("fences collection work superseded by a newer feed snapshot", async () => {
       old.lease_token,
     ]),
   ).rejects.toThrow("lease");
-  const newer = (await db.query<any>("select * from claim_feed_entry()"))
-    .rows[0].entry;
+  const newer = (
+    await db.query<{ entry: LeasedJob }>("select * from claim_feed_entry()")
+  ).rows[0].entry;
   await db.query(
     "select complete_feed_entry($1,$2,'New text','new',null,false)",
     [newer.id, newer.lease_token],
   );
-  expect((await db.query<any>("select body from documents")).rows[0].body).toBe(
-    "New text",
-  );
+  expect(
+    (await db.query<{ body: string }>("select body from documents")).rows[0]
+      .body,
+  ).toBe("New text");
 });
 it("limits extraction claims across workers in a shared hourly bucket", async () => {
   await enqueue("one");
@@ -135,7 +144,8 @@ it("corrects a publisher withdrawal that is later reclassified as non-security",
   await finish(await claim(), { ...payload, kind: "withdrawal" });
   await enqueue("irrelevant");
   await finish(await claim(), { security_relevant: false });
-  const rows = (await db.query<any>("select * from events order by id")).rows;
+  const rows = (await db.query<FeedEvent>("select * from events order by id"))
+    .rows;
   expect(rows).toHaveLength(2);
   expect(rows[1].extraction_method).toBe("system");
   expect(rows[1].payload.correction_reason).toBe("reclassified_non_security");
@@ -158,7 +168,7 @@ it("searches indexed public text and retained CVE keys across corrections", asyn
   });
   const matches = async (query: string) =>
     (
-      await db.query<any>(
+      await db.query<FeedEvent>(
         "select id,payload from events where search_document @@ plainto_tsquery('simple',$1) order by id",
         [query],
       )

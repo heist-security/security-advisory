@@ -38,9 +38,9 @@ export async function groupedEvents(
   options: Partial<EventQuery>,
   updates = false,
 ): Promise<FeedEvent[]> {
-  const { limit, after, before, view: _view, ...filters } = options;
+  const { limit, after, before, view: _view, type, ...filters } = options;
   const { data, error } = await db().rpc("query_advisory_groups", {
-    filters,
+    filters: { ...filters, ...(type?.length ? { type: type.join(",") } : {}) },
     p_limit: limit ?? 30,
     p_after: after ?? null,
     p_before: before ?? null,

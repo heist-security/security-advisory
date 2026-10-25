@@ -1,14 +1,19 @@
 "use client";
+import Link from "next/link";
 import { Search, X } from "lucide-react";
-import { eventTypes, filterQuery, type Filters } from "@/lib/filters";
-import type { Severity } from "@/lib/priority";
-import type { TechnologyOption } from "@/lib/technology-options";
-import { SeverityFilter } from "./severity-filter";
+import {
+  eventTypes,
+  filterQuery,
+  type EventType,
+  type Filters,
+} from "@/lib/filters";
+import { severities, severityLabel, type Severity } from "@/lib/priority";
+import type { TechnologyOption } from "@/lib/technology";
+import { MultiSelectFilter } from "./multi-select-filter";
 import { TechnologyFilter } from "./technology-filter";
 import { useAutoFilters } from "./use-auto-filters";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { NativeSelect, NativeSelectOption } from "./ui/native-select";
 
 export function FeedFilters({
   initialFilters,
@@ -55,21 +60,25 @@ export function FeedFilters({
           maxLength={120}
         />
       </div>
-      <NativeSelect
-        className="type-filter min-w-32"
+      <MultiSelectFilter
         name="type"
-        aria-label="Type"
-        value={filters.type ?? ""}
-        onChange={(event) => update({ type: event.target.value })}
-      >
-        <NativeSelectOption value="">All types</NativeSelectOption>
-        {eventTypes.map((type) => (
-          <NativeSelectOption key={type} value={type}>
-            {type[0].toUpperCase() + type.slice(1)}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-      <SeverityFilter
+        label="Type"
+        legend="Event type (matches any selected)"
+        options={eventTypes.map((value) => ({
+          value,
+          label: value[0].toUpperCase() + value.slice(1),
+        }))}
+        selected={(filters.type?.split(",") ?? []) as EventType[]}
+        onChange={(values) => update({ type: values.join(",") })}
+      />
+      <MultiSelectFilter
+        name="severity"
+        label="Severity"
+        legend="Severity (publisher or linked CVE)"
+        options={severities.map((value) => ({
+          value,
+          label: severityLabel(value),
+        }))}
         selected={(filters.severity?.split(",") ?? []) as Severity[]}
         onChange={(values) => update({ severity: values.join(",") })}
       />
@@ -82,10 +91,10 @@ export function FeedFilters({
         ([key, value]) => key !== "view" && value,
       ) ? (
         <Button asChild variant="ghost" size="sm">
-          <a href="/">
+          <Link href="/">
             <X aria-hidden="true" />
             Reset filters
-          </a>
+          </Link>
         </Button>
       ) : null}
     </form>

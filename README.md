@@ -1,117 +1,123 @@
 # Heist Feed
 
-**One open feed for security advisories, patches and mitigations.**
+Heist Feed is a self-hosted security advisory reader built with Next.js, TypeScript, and Supabase. It imports OSV, the official CVE List, and CISA KEV, then publishes advisories, patches, mitigations, and corrections through a web interface, RSS, and a JSON API.
 
-Heist Feed combines structured vulnerability advisories and exploitation updates in one RSS feed and one JSON API. Selected publisher announcements and release notes can supplement that coverage. Subscribe to everything, or filter the same stream by technology, event type, CVE or source.
+Structured ingestion runs without an LLM. Optional publisher feeds use model-assisted extraction with source quotations. Records retain their upstream identifiers, affected-version data, and revision history. Confirmed copies of an advisory are grouped in the reader; individual source events remain available through the API.
 
-Every event links to its source. Structured records preserve upstream identifiers and affected-version data; optional vendor extraction includes supporting quotations and can capture fixes without a new CVE.
+The project is in alpha. Coverage depends on the configured sources and ingestion checkpoints. Consult original advisories when assessing affected versions or remediation.
 
-**Status: alpha.** Structured OSV, official CVE List and CISA KEV records require no LLM calls. Production can select all 374 publisher feeds with `VENDOR_SOURCE_IDS=all`; see [publisher activation and remaining evaluation gates](docs/publisher-activation.md). EPSS and optional NVD data are available through the risk API. See [structured ingestion](docs/structured-sources.md) and the [publisher coverage audit](docs/source-coverage.md). Hosted validation, extraction evaluation and observation remain launch gates.
+## Requirements
 
-## Browse the visual feed
+- Node.js 22.13 or later and npm.
+- A Supabase project and the Supabase CLI for database setup.
+- OpenAI credentials only if you enable publisher extraction.
 
-The homepage `/` displays a compact list with filters. Each title opens a dedicated detail page. Existing `/feed` links redirect to the homepage with their filters intact. Search announcements, filter by type, technology, CVE or source, and open each item to inspect version details, source evidence and revision history. Structured imports identify source records and fields; vendor extractions include quotations. URLs preserve the current view, and its RSS/JSON links use the same filters. No account is required.
+## Local setup
 
-The reader groups confirmed copies of an advisory into one card, preserving all source evidence and revision history. Its JSON/RSS links use `view=grouped`; existing event subscriptions remain compatible. See [grouping and subscription semantics](docs/advisory-grouping.md). The production workflow applies migrations and finishes the grouping backfill before deploying this version.
+```sh
+npm ci
+cp .env.example .env.local
+```
 
-## One stream, optional filters
+For a new Supabase project, authenticate with the CLI, link the project, and apply the migrations:
 
-| Use                            | Endpoint                                  |
-| ------------------------------ | ----------------------------------------- |
-| Everything, latest 100 events  | /feed.xml                                 |
-| Visual feed                    | /                                         |
-| Keyword search                 | /?q=authentication                        |
-| Everything, JSON               | /api/v1/events                            |
-| Technology subscription        | /feed.xml?technology=node-js              |
-| CVE subscription               | /feed.xml?cve=CVE-2026-12345              |
-| Combined filters               | /api/v1/events?type=patch&technology=ruby |
-| Complete archive, oldest first | /api/v1/events?after=0&limit=100          |
-| Source catalog                 | /api/v1/sources?page=1                    |
+```sh
+supabase login
+supabase link --project-ref YOUR_PROJECT_REF
+supabase db push
+```
 
-There are no separate feeds per publisher. Source categories describe provenance; all published events enter the same stream. Use any combination of filters to narrow a subscription. Read [API semantics and examples](docs/api.md).
+Set these values in `.env.local`:
 
-Stable advisory IDs identify a source URL. Each published revision has a new event ID. Corrections retain earlier subscription keys so a consumer following a technology, CVE or event type receives later corrections too. A filtered response can therefore contain a withdrawal or updated classification.
+| Variable                    | Purpose                                                 |
+| --------------------------- | ------------------------------------------------------- |
+| `SUPABASE_URL`              | Supabase project URL                                    |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side database credential                         |
+| `CRON_SECRET`               | Bearer token for ingestion and health endpoints         |
+| `PUBLIC_BASE_URL`           | Public application URL; locally `http://localhost:3000` |
 
-## Run locally
+Generate a cron secret with `openssl rand -hex 32`. Keep the service-role key and cron secret on the server. The remaining settings and ingestion limits are listed in [.env.example](.env.example).
 
-Requires Node.js 22+ and a fresh Supabase project.
+Review the source configuration, then apply it:
 
-1. Run npm ci and copy .env.example to .env.local.
-2. Link the Supabase CLI project and run supabase db push. Existing installations apply only migrations they have not already run. Keep the CLI migration history intact; see the operations guide before automating an installation previously configured through the SQL editor.
-3. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. These are backend-only variables.
-4. Review `npm run sources:configure`, then run it with `--apply` to register the core sources using the existing schema. Set `VENDOR_SOURCE_IDS`, `OPENAI_API_KEY` and `OPENAI_MODEL` only for opted-in vendor extraction, with an agreed provider spending limit.
-5. Generate CRON_SECRET with openssl rand -hex 32.
-6. Set PUBLIC_BASE_URL=http://localhost:3000 and run npm run dev.
+```sh
+npm run sources:configure
+npm run sources:configure -- --apply
+npm run dev
+```
 
-The homepage and source catalog work without credentials. Data endpoints return 503 until the database is available. No sample events are presented as live data.
+Open <http://localhost:3000>. Without database credentials, the interface and source catalog are accessible, but data endpoints return `503`.
 
-Populate the shared feed by running the three protected stages, in order initially:
+The configuration command enables the three structured sources and any explicitly selected publisher feeds. It preserves existing checkpoints. For checkpoint selection, recovery, and existing installations, see [structured ingestion](docs/structured-sources.md) and [operations](docs/operations.md).
 
-    curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/poll
-    curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/collect
-    curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/process
+To populate the feed, export the same `CRON_SECRET` in your shell and call the stages in order:
 
-Export CRON_SECRET in your shell; reading .env.local does not export it there. Repeat collection and processing until the backlog is drained.
+```sh
+curl --fail -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/poll
+curl --fail -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/collect
+curl --fail -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/process
+```
 
-## How it works
+Repeat collection and processing while work remains queued. The protected `/api/cron/health` endpoint reports queue and source status.
 
-1. **Poll:** checkpoint structured change indexes and KEV snapshots into a durable queue. Selected vendor feeds use the existing RSS/Atom adapter.
-2. **Collect:** normalize structured records directly, preserving native affected data. Vendor entries collect linked articles or inline notes. Leases fence superseded workers.
-3. **Process and publish:** structured records publish deterministically without a model. Opted-in vendor documents use the evaluated extraction model and quote validation. Both paths use the same atomic publication transaction and event stream.
+### Optional publisher feeds
 
-Transport sizes, queue batches, concurrency, retries and extraction attempts are bounded. A database-backed hourly attempt budget applies across overlapping model workers. It is not a currency spending limit.
+Set `VENDOR_SOURCE_IDS` to a comma-separated list of registry IDs, or `all`, and configure `OPENAI_API_KEY` and `OPENAI_MODEL`. Run `sources:configure` again to reconcile the selection. An empty selection disables publisher extraction. Configure provider spending limits separately from the application's hourly attempt limit.
 
-An irrelevant newer document advances the publication watermark, preventing older work from publishing afterward. If a previously published extraction is reclassified as non-security, the feed emits an explicitly labeled system correction. This is not a claim that the publisher retracted the announcement.
+See [publisher activation](docs/publisher-activation.md) and [extraction evaluation](docs/evaluation.md) before enabling this path.
 
-## Deploy
+## Interface and API
 
-Import this repository into Vercel as a Next.js project and complete the [one-time production setup](docs/operations.md#one-time-setup-before-merging). After that, reviewed merges to main run validation, apply pending Supabase migrations, then deploy the checked commit to Vercel. Production Git auto-deployment is disabled so deployment cannot race migrations; preview branches keep their normal Vercel integration.
+| Endpoint                           | Description                        |
+| ---------------------------------- | ---------------------------------- |
+| `/`                                | Advisory reader and filters        |
+| `/sources`                         | Configured source catalog          |
+| `/docs`                            | API documentation                  |
+| `/feed.xml`                        | RSS of source events               |
+| `/api/v1/events`                   | JSON of source events              |
+| `/api/v1/events?view=grouped`      | Grouped advisories                 |
+| `/api/v1/events?after=0&limit=100` | Source event archive, oldest first |
+| `/api/v1/technologies`             | Technology suggestions             |
+| `/api/v1/sources`                  | Source catalog as JSON             |
+| `/api/v1/risk?cve=CVE-2021-44228`  | Exploitation and risk context      |
 
-The bundled workflow targets heist-security/security-advisory; forks must adapt the repository guards as described in the operations guide. The workflow needs environment-scoped database/Vercel credentials and project identifiers. Missing configuration stops the release. Application credentials stay in Vercel. The three per-minute schedules in vercel.json require a plan supporting that frequency; another scheduler can invoke the same endpoints.
+RSS and JSON support shared filters such as `technology=node-js`, `type=advisory,patch`, `severity=critical,high`, `cve`, and `source`. The reader's subscription links use `view=grouped`. Source events and grouped updates have separate cursors and RSS identifiers; start a fresh cursor when switching views.
 
-After database readiness, reconcile source configuration as described above before activating ingestion. Keep preview credentials separate. Configure edge rate controls, private vulnerability reporting and branch protection before launch. Use the protected /api/cron/health endpoint for queue and source monitoring.
+Corrections retain earlier subscription keys so existing subscribers receive withdrawals and classification changes. See [API semantics](docs/api.md) and [advisory grouping](docs/advisory-grouping.md) for response formats, pagination, and revision behavior.
 
-Follow the concrete [operations and launch checklist](docs/operations.md). Repository files do not provision hosting, database resources, DNS, firewall rules or GitHub settings.
+## Development
 
-## Validation
+```sh
+npm run check          # ESLint, Prettier, TypeScript, unit/database and release tests
+npm run build
+npx playwright install chromium
+npm run test:browser
+npm run check:secrets
+```
 
-    npm run format:check
-    npm run typecheck
-    npm test
-    node --test tests/deployment.test.mjs
-    npm run build
-    npx playwright install chromium
-    npm run test:browser
-    npm run check:secrets
-    npm audit
+Use `npm run lint:fix` for fixable lint errors and `npm run format` to format the project. CI checks both. Browser tests run against a local fixture server and the production build; they do not need Supabase or OpenAI credentials. Database tests use PGlite. The production workflow also exercises migrations and API queries against disposable PostgreSQL and PostgREST services.
 
-Tests cover full-feed enumeration, durable collection, stale-worker fencing, corrections, filtered subscription continuity, evidence validation, redirect boundaries, RSS escaping, authentication, database roles and public browser flows.
+The UI uses shadcn/ui components and Tailwind CSS throughout. Shared components live in `src/components/ui`, and theme tokens are defined in `src/app/globals.css`.
 
-A separate opt-in live-model evaluation is available:
+| Directory             | Contents                                            |
+| --------------------- | --------------------------------------------------- |
+| `src/app`             | Pages, public API routes, and protected cron routes |
+| `src/components`      | Reader components and shared UI primitives          |
+| `src/lib`             | Ingestion, validation, querying, and serialization  |
+| `sources`             | Publisher registry and verification data            |
+| `supabase/migrations` | Database schema and incremental migrations          |
+| `scripts`             | Source management and evaluation tools              |
+| `tests`               | Functional, database, and browser regression tests  |
+| `docs`                | API, deployment, and ingestion documentation        |
 
-    npm run eval:live -- --allow-paid
+## Deployment
 
-It spends provider credits. The bundled synthetic cases are smoke tests, not a production accuracy benchmark. Run a representative manually labeled corpus with --fixtures=path/to/cases.json --launch before enabling vendor model extraction for a hosted feed. See [evaluation guidance](docs/evaluation.md).
+The repository includes Vercel schedules and a GitHub Actions workflow that validates changes, applies Supabase migrations, completes backfills, and deploys the checked commit. The release job is restricted to the upstream repository. Forks must configure their own repository guard, credentials, and hosting settings.
 
-## Scope and limitations
+Follow the [operations guide](docs/operations.md) for setup and deployment. Keep preview credentials separate from production. If your hosting plan does not support the bundled cron frequency, use another scheduler to invoke the protected endpoints.
 
-- Retrieval checks do not establish model accuracy or complete security coverage.
-- Quotation matching does not prove product/version association. Unknown information should remain unknown.
-- Public feeds expose only a publisher's current feed window. Entries that disappear before polling cannot be recovered without a publisher-specific historical API. Feeds above the explicit transport/entry limits fail visibly; they are not silently truncated.
-- Changed article text may create a revision even when its security meaning is unchanged.
-- Source records remain distinct. Confirmed OSV mirrors share a display group; related CVEs alone are not deduplication keys.
-- Vendor display version strings preserve publisher wording. Structured affected data retains each upstream format and ecosystem semantics; consumers need format-aware matching.
-- Structured startup imports changes since an explicit checkpoint, not the full historical database. Expired upstream history and oversized data fail visibly.
-- Raw source text and queue data are private. Operators must set a retention policy and review upstream terms.
+## Contributing and security
 
-## Contribute and report issues
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and source contribution guidelines. Report vulnerabilities through the private channel described in [SECURITY.md](SECURITY.md).
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for source criteria and development checks, and [SECURITY.md](SECURITY.md) for private security reporting.
-
-Code: [MIT](LICENSE). Branding and upstream content: [NOTICE.md](NOTICE.md).
-
-## Structured sources
-
-Configure sources with `npm run sources:configure` (dry-run), then `--apply` after database setup. The publisher activation migration enables the reviewed catalog on merge; Production also sets `VENDOR_SOURCE_IDS=all` and the OpenAI settings. `VENDOR_SOURCE_IDS` is empty by default for local and Preview environments. Read [publisher activation](docs/publisher-activation.md) and [checkpoint recovery](docs/structured-sources.md).
-
-The public source catalog shows the three core inputs plus selected vendors. Use `/sources?catalog=vendor` or `/api/v1/sources?catalog=vendor` to browse the historical optional catalog. Use `/api/v1/risk?cve=CVE-2021-44228` for exploitation context, optionally adding `&nvd=1` for single-CVE NVD enrichment.
+The code is licensed under [MIT](LICENSE). Third-party notices, branding, and upstream data terms are described in [NOTICE.md](NOTICE.md).

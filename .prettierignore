@@ -6,3 +6,6 @@ supabase/migrations/
 docs/source-coverage.md
 test-results/
 playwright-report/
+.context/
+coverage/
+next-env.d.ts

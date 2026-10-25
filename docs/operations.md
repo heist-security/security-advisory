@@ -269,3 +269,7 @@ After the reviewed repair is merged, verify the Production run, nonempty RSS/JSO
 The combined #20/#19 release (run 40199583028) passed schema migration but stopped at the backfill client on 25 October at 13:55 UTC. The first runner supplied the entire connection URI in `PGDATABASE`; libpq treats this environment default as a database name, so it did not connect to the intended host. The follow-up passes host, port, database and user separately, keeps the decoded password in a temporary mode-0600 password file, and retains verified TLS. The password file and CA file are removed on success or failure. No database migrations or checkpoint changes are required for this connection fix.
 
 Migration CI now exercises the actual release script's `psql` connection and batching against its disposable populated PostgreSQL service, including the old connection failure and an idempotent retry. Only that local fixture disables TLS; production still requires `verify-full`. Public availability of the previous deployment does not establish completion of this release or its priority backfill.
+
+## Multiple event types
+
+Apply `202610250015_event_type_filters.sql` before deploying the type multi-select UI. It updates grouped feed queries to accept comma-separated type unions while preserving single-type subscriptions, cursor pagination, and correction routing. The production workflow applies it before deployment. No data backfill is needed.

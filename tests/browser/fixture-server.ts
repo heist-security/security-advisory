@@ -1,7 +1,6 @@
 // Deterministic PostgREST fixture for browser tests. Never used by the application.
 import { createServer } from "node:http";
 import type { FeedEvent } from "../../src/lib/events";
-import { technologyOptions } from "../../src/lib/technology-options";
 import { technologyFamily } from "../../src/lib/technology";
 const patch: FeedEvent = {
   id: 1,
@@ -125,6 +124,7 @@ const structured: FeedEvent = {
     linked_cves: [],
   },
   id: 4,
+  published_at: "2026-10-25T08:15:00Z",
   advisory_id: "00000000-0000-0000-0000-000000000003",
   source_id: "core-osv",
   source_url: "https://example.org/test-only/structured-advisory",
@@ -273,7 +273,7 @@ createServer(async (req, res) => {
       if (key === "technology")
         url.searchParams.set("technology_ids", "ov.{" + value + "}");
       if (key === "type")
-        url.searchParams.set("event_types", "cs.{" + value + "}");
+        url.searchParams.set("event_types", "ov.{" + value + "}");
       if (key === "cve") url.searchParams.set("cve_ids", "cs.{" + value + "}");
       if (key === "severity")
         url.searchParams.set(
@@ -306,9 +306,11 @@ createServer(async (req, res) => {
       .split("|")
       .map((x) => x.match(/[a-z0-9]+/g) ?? []);
     const selected = url.searchParams.get("id")?.slice(4, -1).split(",");
-    const options = technologyOptions(rows).filter(
-      (o) => !selected || selected.includes(o.value),
-    );
+    const options = [
+      { value: "fixture-package", label: "fixture-package" },
+      { value: "node-js", label: "Node.js" },
+      { value: "ruby", label: "Ruby" },
+    ].filter((o) => !selected || selected.includes(o.value));
     const catalog = options.filter((o) =>
       terms.some((words) =>
         words.every((w) => (o.value + " " + o.label).toLowerCase().includes(w)),
@@ -450,25 +452,19 @@ createServer(async (req, res) => {
   );
   res.end(
     JSON.stringify(
-      url.searchParams.get("select") ===
-        "technologies,products:payload->products"
+      grouped
         ? selectedRows.map((row) => ({
-            technologies: row.technologies,
-            products: row.payload.products,
+            id: row.id,
+            group_id: "advisory:" + row.advisory_id,
+            revision: row.revision,
+            published_at: row.published_at,
+            primary: row,
+            changed: row,
+            members: [row],
+            change: row.revision > 1 ? "updated" : "published",
+            superseded_by: [],
           }))
-        : grouped
-          ? selectedRows.map((row) => ({
-              id: row.id,
-              group_id: "advisory:" + row.advisory_id,
-              revision: row.revision,
-              published_at: row.published_at,
-              primary: row,
-              changed: row,
-              members: [row],
-              change: row.revision > 1 ? "updated" : "published",
-              superseded_by: [],
-            }))
-          : selectedRows,
+        : selectedRows,
     ),
   );
 }).listen(3038, "127.0.0.1");

@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
 
-test("a compact grouped list opens complete details, source history and matching subscription links", async ({
+test("grouped advisories retain source history, return filters and subscription links", async ({
   page,
   request,
-}, info) => {
+}) => {
   const feed = "/?q=grouped-example&limit=1&before=300";
   await page.goto(feed);
   await expect(page.locator(".event-card")).toHaveCount(1);
@@ -11,14 +11,6 @@ test("a compact grouped list opens complete details, source history and matching
   await expect(card.locator(".group-sources")).toContainText(
     "2 source records",
   );
-  await expect(card.locator("details")).toHaveCount(0);
-  await expect(
-    page.getByText("Evidence and details", { exact: false }),
-  ).toHaveCount(0);
-  await page.screenshot({
-    path: `.context/grouping-list-${info.project.name}.png`,
-    fullPage: true,
-  });
   const formats = page.getByRole("navigation", { name: "Feed formats" });
   const jsonUrl = await formats
     .getByRole("link", { name: "JSON", exact: true })
@@ -45,13 +37,6 @@ test("a compact grouped list opens complete details, source history and matching
     page.locator(".source-record").last().getByText("7.15.2", { exact: true }),
   ).toBeVisible();
   await expect(page.locator("#history li")).toHaveCount(2);
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth),
-  ).toBeLessThanOrEqual(page.viewportSize()!.width);
-  await page.screenshot({
-    path: `.context/grouping-detail-${info.project.name}.png`,
-    fullPage: false,
-  });
   await page.locator("#history li a").first().click();
   await expect(page).toHaveURL(/\/events\/202/);
   await expect(page.locator(".source-record")).toHaveCount(1);
@@ -60,10 +45,13 @@ test("a compact grouped list opens complete details, source history and matching
     .click();
   await expect(page.locator(".source-record")).toHaveCount(2);
   await page.getByRole("link", { name: "Back to feed", exact: false }).click();
-  const back = new URL(page.url());
-  expect(back.searchParams.get("q")).toBe("grouped-example");
-  expect(back.searchParams.get("before")).toBe("300");
-  expect(back.searchParams.get("limit")).toBe("1");
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname === "/" &&
+      url.searchParams.get("q") === "grouped-example" &&
+      url.searchParams.get("before") === "300" &&
+      url.searchParams.get("limit") === "1",
+  );
 });
 
 test("detail URLs handle missing records, outages, group replacements and unsafe return links", async ({

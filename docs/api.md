@@ -7,7 +7,7 @@ All publishers contribute to one event stream. The visual page at `/`, RSS and J
 | Parameter  | Meaning                                                     | Example        |
 | ---------- | ----------------------------------------------------------- | -------------- |
 | q          | Keyword search, up to 120 characters                        | authentication |
-| type       | Advisory classification; kind remains a compatible alias    | patch          |
+| type       | Comma-separated event types (OR); kind is an alias          | advisory,patch |
 | technology | Up to 10 catalog IDs or legacy routing keys (OR)            | node-js        |
 | cve        | CVE identifier, case-insensitive input                      | CVE-2026-12345 |
 | source     | Exact source ID from the catalog                            | ruby           |
@@ -17,6 +17,8 @@ All publishers contribute to one event stream. The visual page at `/`, RSS and J
 | limit      | Number of events, 1-100                                     | 100            |
 | after      | JSON only: ascending incremental cursor, exclusive          | 0              |
 | before     | JSON only: newest-first pagination, exclusive               | 123            |
+
+Select any combination of `advisory`, `patch`, `mitigation`, `withdrawal`, and `other` using `type=advisory,patch`. A record matches any selected type. Duplicate values are removed and subscriptions use a canonical order. Single-type URLs remain supported.
 
 Different filters combine with AND. Repeated API parameters, conflicting type/kind, invalid values and simultaneous after/before produce 400. Technology input is lowercased, runs of non-ASCII-alphanumeric characters become hyphens, and edge hyphens are trimmed. For example Node.js becomes node-js, C++ becomes c-plus-plus and C# becomes c-sharp. Keys derive from evidenced product names; this is not a curated alias/ontology service. Source IDs provide a stable alternative.
 

@@ -21,8 +21,7 @@ import {
   readStructuredDocument,
   processStructuredJobs,
 } from "./structured/pipeline";
-export { articleText } from "./feed";
-export function digest(text: string) {
+function digest(text: string) {
   return createHash("sha256").update(text).digest("hex");
 }
 type ClaimedSource = Source & {

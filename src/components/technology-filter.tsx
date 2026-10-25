@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ChevronDown, Plus, X } from "lucide-react";
 import {
   technologyFamily,
   technologyLabel,
   technologyMatches,
 } from "@/lib/technology";
-import type { TechnologyOption } from "@/lib/technology-options";
+import type { TechnologyOption } from "@/lib/technology";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
@@ -27,7 +27,9 @@ export function TechnologyFilter({
   const [optionsSearch, setOptionsSearch] = useState("");
   const [status, setStatus] = useState("");
   const [open, setOpen] = useState(false);
-  const labels = useRef(new Map(initialOptions.map((o) => [o.value, o.label])));
+  const [labels, setLabels] = useState(
+    () => new Map(initialOptions.map((o) => [o.value, o.label])),
+  );
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
@@ -41,7 +43,13 @@ export function TechnologyFilter({
         if (!response.ok) throw new Error();
         const result: { data: TechnologyOption[] } = await response.json();
         if (controller.signal.aborted) return;
-        for (const o of result.data) labels.current.set(o.value, o.label);
+        setLabels(
+          (previous) =>
+            new Map([
+              ...previous,
+              ...result.data.map((o) => [o.value, o.label] as const),
+            ]),
+        );
         setOptions(result.data);
         setOptionsSearch(search);
         setStatus(
@@ -73,7 +81,9 @@ export function TechnologyFilter({
     !matches.some((o) => o.value === key);
   const add = () => {
     if (custom && values.length < 10) {
-      labels.current.set(key, technologyLabel(key) ?? search.trim());
+      setLabels((previous) =>
+        new Map(previous).set(key, technologyLabel(key) ?? search.trim()),
+      );
       onChange([...values, key]);
       setSearch("");
     }
@@ -126,11 +136,11 @@ export function TechnologyFilter({
                 className="h-auto max-w-full whitespace-normal py-1 text-left [overflow-wrap:anywhere]"
                 aria-label={
                   "Remove " +
-                  (technologyLabel(value) ?? labels.current.get(value) ?? value)
+                  (technologyLabel(value) ?? labels.get(value) ?? value)
                 }
                 onClick={() => onChange(values.filter((v) => v !== value))}
               >
-                {technologyLabel(value) ?? labels.current.get(value) ?? value}{" "}
+                {technologyLabel(value) ?? labels.get(value) ?? value}{" "}
                 <X aria-hidden="true" />
               </Button>
             ))}

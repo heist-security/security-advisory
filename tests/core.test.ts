@@ -3,7 +3,7 @@ import { validateEvidence, type Extraction } from "../src/lib/schema";
 import { allowedUrl, fetchText } from "../src/lib/http";
 import { authorized } from "../src/lib/cron";
 import { rss, type FeedEvent } from "../src/lib/events";
-import { articleText } from "../src/lib/ingest";
+import { articleText } from "../src/lib/feed";
 
 const text =
   "Ruby security fixes. Fixed in 4.0.9. Applications accepting attacker-controlled regular expressions are affected.";

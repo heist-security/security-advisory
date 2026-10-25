@@ -1,18 +1,11 @@
 import type { FeedEvent } from "./events";
 import { filterQuery, type Filters } from "./filters";
-export const typeLabels = {
-  advisory: "Advisories",
-  patch: "Patches",
-  mitigation: "Mitigations",
-  withdrawal: "Withdrawals",
-  other: "Other",
-};
 export function feedLink(filters: Filters, extra: Record<string, string> = {}) {
   const params = filterQuery(filters);
   for (const [key, value] of Object.entries(extra)) params.set(key, value);
   return "/" + (params.size ? "?" + params : "");
 }
-export function eventDay(value: string) {
+function eventDay(value: string) {
   return new Date(value).toISOString().slice(0, 10);
 }
 export function dayLabel(value: string) {
@@ -22,6 +15,19 @@ export function dayLabel(value: string) {
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(value + "T12:00:00Z"));
+}
+export function feedTimestamp(value: string) {
+  return (
+    new Intl.DateTimeFormat("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: "UTC",
+    }).format(new Date(value)) + " UTC"
+  );
 }
 export function groupEvents(rows: FeedEvent[]) {
   const groups: { day: string; events: FeedEvent[] }[] = [];

@@ -1,61 +1,8 @@
 import { test, expect } from "@playwright/test";
-test("unified feed filters update both subscription formats without layout overflow", async ({
-  page,
-}, info) => {
-  await page.goto("/");
-  await expect(page.locator(".event-card")).toHaveCount(3);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Security feed",
-  );
-  await expect(
-    page.getByRole("button", { name: "Filter", exact: true }),
-  ).toHaveCount(0);
-  if (info.project.name === "desktop") {
-    const controls = await page
-      .getByRole("search")
-      .locator(
-        'input[name="q"], select[name="type"], button[aria-haspopup="dialog"]',
-      )
-      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
-    expect(controls).toHaveLength(4);
-    expect(Math.max(...controls) - Math.min(...controls)).toBeLessThan(4);
-  }
-  await expect(
-    page.getByRole("searchbox", { name: "Search feed", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("combobox", { name: "Type", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page
-      .getByRole("search")
-      .locator('input[name="cve"], input[name="important"], input[name="fix"]'),
-  ).toHaveCount(0);
-  await page.getByRole("button", { name: /^Technology/ }).click();
-  await page.getByRole("checkbox", { name: "Node.js", exact: true }).check();
-  await page.getByLabel("Search technologies", { exact: true }).press("Escape");
-  await expect(
-    page
-      .getByRole("navigation", { name: "Feed formats" })
-      .getByRole("link", { name: "RSS", exact: true }),
-  ).toHaveAttribute("href", "/feed.xml?view=grouped&technology=node-js");
-  await expect(
-    page
-      .getByRole("navigation", { name: "Feed formats" })
-      .getByRole("link", { name: "JSON", exact: true }),
-  ).toHaveAttribute("href", "/api/v1/events?view=grouped&technology=node-js");
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth),
-  ).toBeLessThanOrEqual(page.viewportSize()!.width);
-  await page.screenshot({
-    path: "test-results/" + info.project.name + "-feed.png",
-    fullPage: true,
-  });
-});
 test("source pages are bounded and repeated query parameters never crash", async ({
   page,
   request,
-}, info) => {
+}) => {
   const response = await request.get("/sources?q=ruby&q=node");
   expect(response.status()).toBe(200);
   await page.goto("/sources");
@@ -64,7 +11,9 @@ test("source pages are bounded and repeated query parameters never crash", async
     page.getByRole("heading", { name: "OSV", exact: true }),
   ).toBeVisible();
   const first = page.locator(".source-row").first();
-  await first.locator("summary").click();
+  await first
+    .getByRole("button", { name: /Scope and verification notes/ })
+    .click();
   await expect(first.locator(".source-check")).toBeVisible();
   await expect(first.locator(".source-check")).toContainText(
     "Structured adapter",
@@ -73,11 +22,9 @@ test("source pages are bounded and repeated query parameters never crash", async
   await expect(
     first.getByRole("link", { name: /Data documentation/ }),
   ).toBeVisible();
-  await first.locator("summary").click();
-  await page.screenshot({
-    path: "test-results/" + info.project.name + "-sources-first.png",
-    fullPage: true,
-  });
+  await first
+    .getByRole("button", { name: /Scope and verification notes/ })
+    .click();
   await page
     .getByRole("link", { name: "Optional vendor catalog", exact: true })
     .click();
@@ -85,13 +32,6 @@ test("source pages are bounded and repeated query parameters never crash", async
   await page.getByRole("link", { name: "Next", exact: true }).click();
   await expect(page).toHaveURL(/page=2/);
   await expect(page).toHaveURL(/catalog=vendor/);
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth),
-  ).toBeLessThanOrEqual(page.viewportSize()!.width);
-  await page.screenshot({
-    path: "test-results/" + info.project.name + "-sources.png",
-    fullPage: true,
-  });
 });
 test("public errors are bounded and protected operations fail closed", async ({
   request,

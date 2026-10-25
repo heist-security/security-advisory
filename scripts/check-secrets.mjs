@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 const patterns = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
   /gh[pousr]_[A-Za-z0-9_]{30,}/,
@@ -7,9 +7,13 @@ const patterns = [
   /sb_secret_[A-Za-z0-9_-]{20,}/,
   /AKIA[A-Z0-9]{16}/,
 ];
-const files = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
+const files = execFileSync(
+  "git",
+  ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+  { encoding: "utf8" },
+)
   .split("\0")
-  .filter(Boolean);
+  .filter((path) => path && existsSync(path));
 const matches = [];
 for (const path of files) {
   if (path === "scripts/check-secrets.mjs") continue;

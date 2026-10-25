@@ -74,7 +74,7 @@ it("exposes grouped snapshots with independent cursors and intact primary/member
   const fetch = database();
   const result = await jsonFeed(
     new Request(
-      "https://feed.example.test/api/v1/events?view=grouped&technology=Node.js&limit=2&before=9",
+      "https://feed.example.test/api/v1/events?view=grouped&technology=Node.js&type=patch,advisory&limit=2&before=9",
     ),
   );
   expect(result.status).toBe(200);
@@ -100,7 +100,7 @@ it("exposes grouped snapshots with independent cursors and intact primary/member
   const [url, options] = fetch.mock.calls[0];
   expect(url.toString()).toContain("/rpc/query_advisory_groups");
   expect(JSON.parse(options.body)).toEqual({
-    filters: { technology: "node-js" },
+    filters: { technology: "node-js", type: "advisory,patch" },
     p_limit: 2,
     p_after: null,
     p_before: 9,

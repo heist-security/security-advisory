@@ -21,6 +21,7 @@ export function returnToFeed(value: string | string[] | undefined) {
   if (
     typeof value !== "string" ||
     !value.startsWith("/") ||
+    // eslint-disable-next-line no-control-regex -- Reject controls before validating a local return URL.
     /[\x00-\x1f\\]/.test(value)
   )
     return "/";

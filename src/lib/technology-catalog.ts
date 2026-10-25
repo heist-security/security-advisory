@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { technologySearch } from "./technology";
-import type { TechnologyOption } from "./technology-options";
+import type { TechnologyOption } from "./technology";
 
 export async function catalogOptions(
   search = "",
