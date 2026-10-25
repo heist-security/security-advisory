@@ -49,7 +49,9 @@ export default async function Feed({
     }
   }
   const technologies =
-    !unavailable && !error ? await catalogOptions().catch(() => []) : [];
+    !unavailable && !error
+      ? await catalogOptions("", query.technology?.split(",")).catch(() => [])
+      : [];
   const filters = filterQuery(query),
     suffix = filters.size ? "?" + filters : "";
   const groups = groupEvents(rows);

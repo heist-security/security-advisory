@@ -65,6 +65,9 @@ it("catalogs arbitrary historical and future products, retaining correction rout
       processed: 2,
       done: false,
     });
+    await db.exec("begin");
+    await batch();
+    await db.exec("rollback");
     expect((await batch()).rows[0]).toMatchObject({ processed: 1, done: true });
     expect((await batch()).rows[0]).toMatchObject({ processed: 0, done: true });
     expect(

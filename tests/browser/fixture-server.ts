@@ -195,7 +195,10 @@ createServer((req, res) => {
       .replace(/^fts\(simple\)\./, "")
       .split("|")
       .map((x) => x.match(/[a-z0-9]+/g) ?? []);
-    const options = technologyOptions(rows);
+    const selected = url.searchParams.get("id")?.slice(4, -1).split(",");
+    const options = technologyOptions(rows).filter(
+      (o) => !selected || selected.includes(o.value),
+    );
     const catalog = options.filter((o) =>
       terms.some((words) =>
         words.every((w) => (o.value + " " + o.label).toLowerCase().includes(w)),

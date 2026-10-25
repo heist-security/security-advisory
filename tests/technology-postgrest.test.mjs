@@ -6,7 +6,7 @@ import { setTimeout } from "node:timers/promises";
 test("PostgREST filters indexed technology families before pagination", async () => {
   const query = new URLSearchParams({
     select: "id,technologies,technology_ids",
-    technology_ids: "ov.{node-js}",
+    or: "(technology_ids.ov.{node-js},technologies.ov.{node-js})",
     severity_keys: "ov.{high}",
     event_types: "cs.{advisory}",
     order: "id.asc",

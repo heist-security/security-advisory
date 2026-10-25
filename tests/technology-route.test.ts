@@ -50,3 +50,25 @@ it("uses the full catalog for initial suggestions and rejects invalid searches b
     ).toBe(400);
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+it("retains readable selected labels outside the first suggestion page", async () => {
+  vi.stubEnv("SUPABASE_URL", "https://database.example.test");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-placeholder");
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(String(input));
+    return Response.json(
+      url.searchParams.has("id")
+        ? [{ value: "pkg-test", label: "widget (npm)" }]
+        : [{ value: "ruby", label: "Ruby" }],
+    );
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const { catalogOptions } = await import("../src/lib/technology-catalog");
+  expect(await catalogOptions("", ["pkg-test", "ruby"])).toEqual([
+    { value: "ruby", label: "Ruby" },
+    { value: "pkg-test", label: "widget (npm)" },
+  ]);
+  expect(new URL(String(fetcher.mock.calls[1][0])).searchParams.get("id")).toBe(
+    "in.(pkg-test)",
+  );
+});
