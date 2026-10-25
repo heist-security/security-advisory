@@ -13,7 +13,8 @@ beforeEach(async (context) => {
     .sort())
     if (!(
       context.task.name.startsWith("backfills") &&
-      file.endsWith("008_event_priority.sql")
+      (file.endsWith("008_event_priority.sql") ||
+        file.endsWith("009_priority_backfill.sql"))
     ))
       await db.exec(readFileSync(new URL(file, folder), "utf8"));
 }, 30000);
@@ -206,6 +207,29 @@ it("backfills existing patch links and filters without emitting historical notif
       "utf8",
     ),
   );
+  await db.exec(
+    readFileSync(
+      new URL(
+        "../supabase/migrations/202610250009_priority_backfill.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await db.exec("begin; select * from backfill_event_priority(1); rollback;");
+  expect(
+    (await db.query("select last_id::int from priority_backfill")).rows,
+  ).toEqual([{ last_id: 0 }]);
+  expect(
+    (await db.query("select processed from backfill_event_priority(1)")).rows,
+  ).toEqual([{ processed: 1 }]);
+  expect((await latest("core-cve")).priority).toEqual({});
+  expect(
+    (await db.query("select processed from backfill_event_priority(1)")).rows,
+  ).toEqual([{ processed: 1 }]);
+  expect(
+    (await db.query("select done from backfill_event_priority(1)")).rows,
+  ).toEqual([{ done: true }]);
   expect((await db.query("select id from events order by id")).rows).toEqual(
     before,
   );

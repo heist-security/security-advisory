@@ -48,11 +48,27 @@ jobs:
           PGDATABASE: postgres
         run: |
           psql -v ON_ERROR_STOP=1 -c 'create role anon; create role authenticated; create role service_role bypassrls;'
+          # Reproduce a populated upgrade, not just an empty schema installation.
+          upgrade_fixture=$(mktemp -d)
+          mkdir -p "$upgrade_fixture/supabase/migrations"
+          cp supabase/config.toml "$upgrade_fixture/supabase/config.toml"
+          cp supabase/migrations/20261023*.sql supabase/migrations/20261024*.sql "$upgrade_fixture/supabase/migrations/"
+          (cd "$upgrade_fixture" && supabase db push --db-url 'postgresql://postgres:ci-only-password@localhost:5432/postgres?sslmode=disable' --yes)
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/priority-upgrade.sql
           supabase db push --db-url 'postgresql://postgres:ci-only-password@localhost:5432/postgres?sslmode=disable' --yes
           first=$(psql -At -c 'select count(*) from supabase_migrations.schema_migrations')
           expected=$(find supabase/migrations -name '*.sql' -type f | wc -l)
           test "$first" -eq "$expected"
           supabase db push --db-url 'postgresql://postgres:ci-only-password@localhost:5432/postgres?sslmode=disable' --yes
+          # Each invocation commits independently; checkpoints survive retries.
+          for batch in $(seq 1 30); do
+            done=$(psql -At -v ON_ERROR_STOP=1 -c 'select done from public.backfill_event_priority(100)')
+            if [ "$done" = t ]; then break; fi
+          done
+          test "$done" = t
+          test "$(psql -At -c "select count(*) from events where priority='{}'::jsonb")" -eq 0
+          test "$(psql -At -c 'select count(*) from events')" -eq 2000
+          test "$(psql -At -c 'select processed from public.backfill_event_priority(100)')" -eq 0
           second=$(psql -At -c 'select count(*) from supabase_migrations.schema_migrations')
           test "$first" -eq "$second"
   release:
@@ -63,7 +79,7 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: production
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

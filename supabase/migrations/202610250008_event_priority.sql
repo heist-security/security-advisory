@@ -1,5 +1,7 @@
 -- Persist evidence-backed priority before pagination; no public database grants.
 -- Context changes append revisions, preserving the commit-ordered event cursor.
+set local lock_timeout='5s';
+set local statement_timeout='30s';
 select pg_advisory_xact_lock(719432001);
 alter table public.events alter column document_id drop not null;
 alter table public.events add column priority jsonb not null default '{}',
@@ -101,15 +103,9 @@ begin
     'fix_available',coalesce(fixes,false),'known_exploited',exploited,'reasons',to_jsonb(reasons));
 end; $$;
 
--- Initial snapshot only: no paid re-extraction and no historical notification flood.
-update public.events e set priority=event_priority(e);
-update public.events e set severity_keys=array[e.priority->>'severity'],
-  important=jsonb_array_length(e.priority->'reasons')>0,fix_available=(e.priority->>'fix_available')::boolean;
--- Preserve correction delivery in subscriptions, just like type/CVE routing keys.
-update public.events e set
-  severity_keys=(select array_agg(distinct s) from events h cross join lateral unnest(h.severity_keys) s where h.advisory_id=e.advisory_id and h.id<=e.id),
-  important=exists(select 1 from events h where h.advisory_id=e.advisory_id and h.id<=e.id and h.important),
-  fix_available=exists(select 1 from events h where h.advisory_id=e.advisory_id and h.id<=e.id and h.fix_available);
+-- Historical rows are initialized in short, resumable transactions by migration
+-- 009's backfill function after this schema transaction commits. Do not perform
+-- a full-table backfill while ALTER TABLE's ACCESS EXCLUSIVE lock is held.
 
 create function public.prepare_event_priority() returns trigger
 language plpgsql set search_path=public as $$
@@ -134,7 +130,7 @@ begin
   -- Include removals via retained CVE routing keys, but use only current payload links.
   for target in
     select e.* from events e where e.cve_ids && new.cve_ids and e.advisory_id<>new.advisory_id
-      and e.payload->>'kind'<>'withdrawal'
+      and e.payload->>'kind'<>'withdrawal' and e.priority<>'{}'::jsonb
       and not exists(select 1 from events later where later.advisory_id=e.advisory_id and later.id>e.id)
     order by e.id
   loop
