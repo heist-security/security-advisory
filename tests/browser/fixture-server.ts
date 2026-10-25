@@ -101,7 +101,14 @@ const ruby: FeedEvent = {
     ...patch.payload,
     kind: "advisory",
     title: "Test fixture: Ruby advisory",
-    products: [],
+    products: [
+      {
+        name: { value: "Ruby", evidence: "Ruby advisory" },
+        affected_versions: [],
+        fixed_versions: [],
+        prerequisites: [],
+      },
+    ],
     related_cves: [],
   },
 };
