@@ -1,9 +1,13 @@
 "use client";
-import { useState } from "react";
 import { severities, severityLabel, type Severity } from "@/lib/priority";
 
-export function SeverityFilter({ selected = [] }: { selected?: Severity[] }) {
-  const [values, setValues] = useState(selected);
+export function SeverityFilter({
+  selected: values,
+  onChange,
+}: {
+  selected: Severity[];
+  onChange: (values: Severity[]) => void;
+}) {
   return (
     <details className="severity-filter choice-filter">
       <summary>Severity{values.length ? ` (${values.length})` : ""}</summary>
@@ -21,9 +25,9 @@ export function SeverityFilter({ selected = [] }: { selected?: Severity[] }) {
               type="checkbox"
               checked={values.includes(s)}
               onChange={(event) =>
-                setValues((current) =>
+                onChange(
                   severities.filter((v) =>
-                    v === s ? event.target.checked : current.includes(v),
+                    v === s ? event.target.checked : values.includes(v),
                   ),
                 )
               }

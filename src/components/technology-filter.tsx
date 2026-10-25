@@ -8,15 +8,14 @@ import {
 import type { TechnologyOption } from "@/lib/technology-options";
 
 export function TechnologyFilter({
-  selected = [],
+  selected: values,
   initialOptions,
+  onChange,
 }: {
-  selected?: string[];
+  selected: string[];
   initialOptions: TechnologyOption[];
+  onChange: (values: string[]) => void;
 }) {
-  const [values, setValues] = useState([
-    ...new Set(selected.map(technologyFamily)),
-  ]);
   const [search, setSearch] = useState("");
   const [options, setOptions] = useState(initialOptions);
   const [optionsSearch, setOptionsSearch] = useState("");
@@ -79,7 +78,7 @@ export function TechnologyFilter({
   const add = () => {
     if (custom && values.length < 10) {
       labels.current.set(key, technologyLabel(key) ?? search.trim());
-      setValues([...values, key]);
+      onChange([...values, key]);
       setSearch("");
     }
   };
@@ -135,13 +134,13 @@ export function TechnologyFilter({
                   "Remove " +
                   (technologyLabel(value) ?? labels.current.get(value) ?? value)
                 }
-                onClick={() => setValues(values.filter((v) => v !== value))}
+                onClick={() => onChange(values.filter((v) => v !== value))}
               >
                 {technologyLabel(value) ?? labels.current.get(value) ?? value}{" "}
                 <span aria-hidden="true">×</span>
               </button>
             ))}
-            <button type="button" onClick={() => setValues([])}>
+            <button type="button" onClick={() => onChange([])}>
               Clear all
             </button>
           </div>
@@ -158,7 +157,7 @@ export function TechnologyFilter({
                 checked={values.includes(o.value)}
                 disabled={values.length >= 10 && !values.includes(o.value)}
                 onChange={(event) =>
-                  setValues(
+                  onChange(
                     event.target.checked
                       ? [...values, o.value]
                       : values.filter((v) => v !== o.value),

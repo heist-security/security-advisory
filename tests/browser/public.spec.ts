@@ -7,14 +7,15 @@ test("unified feed filters update both subscription formats without layout overf
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "Security feed",
   );
+  await expect(
+    page.getByRole("button", { name: "Filter", exact: true }),
+  ).toHaveCount(0);
   if (info.project.name === "desktop") {
     const controls = await page
       .getByRole("search")
-      .locator(
-        'input[name="q"], select[name="type"], summary, .filter-actions button',
-      )
+      .locator('input[name="q"], select[name="type"], summary')
       .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
-    expect(controls).toHaveLength(5);
+    expect(controls).toHaveLength(4);
     expect(Math.max(...controls) - Math.min(...controls)).toBeLessThan(4);
   }
   await expect(
@@ -31,7 +32,6 @@ test("unified feed filters update both subscription formats without layout overf
   await page.locator(".technology-filter summary").click();
   await page.getByRole("checkbox", { name: "Node.js", exact: true }).check();
   await page.getByLabel("Search technologies", { exact: true }).press("Escape");
-  await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(
     page
       .getByRole("navigation", { name: "Feed formats" })
