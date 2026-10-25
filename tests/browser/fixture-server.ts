@@ -116,19 +116,39 @@ const structured: FeedEvent = {
   },
 };
 const rows = [structured, ruby, correction, patch];
+// Isolated per test/project; never changes the normal four-row fixture.
+const liveStates = new Map<string, string>();
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:3038");
+  const liveSource = url.searchParams.get("source") ?? "";
+  if (
+    req.method === "POST" &&
+    url.pathname === "/__test/live" &&
+    /^fixture-live-[a-z-]+$/.test(liveSource)
+  ) {
+    liveStates.set(liveSource, url.searchParams.get("state") ?? "initial");
+    res.writeHead(204).end();
+    return;
+  }
   if (url.pathname !== "/rest/v1/events") {
     res.writeHead(404).end();
     return;
   }
-  if (url.searchParams.get("source_id") === "eq.fixture-unavailable") {
+  const source = url.searchParams.get("source_id")?.slice(3) ?? "";
+  const state = liveStates.get(source);
+  if (source === "fixture-unavailable" || state === "unavailable") {
     res
       .writeHead(503, { "Content-Type": "application/json" })
       .end(JSON.stringify({ message: "Fixture unavailable" }));
     return;
   }
-  let data = rows.filter((row) => {
+  const liveRows = [101, ...(state === "published" ? [102] : [])].map((id) => ({
+    ...patch,
+    id,
+    source_id: source,
+    payload: { ...patch.payload, title: `Live fixture event ${id}` },
+  }));
+  let data = (state ? liveRows : rows).filter((row) => {
     const search = url.searchParams.get("search_document");
     if (search) {
       // Only a request-boundary stub. Actual PostgreSQL search semantics are tested in PGlite.

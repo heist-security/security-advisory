@@ -1,5 +1,35 @@
 # Operations and launch checks
 
+## Feed freshness follow-up — 25 October 2026
+
+Monitoring confirmed publisher publications, including the Ruby/GitLab regexp
+announcement ([event 19319](https://feed.heist.security/api/v1/events?after=19318&limit=1)),
+but also found inconsistent public reads. At 06:03 UTC, RSS and the default JSON
+query returned event 21918 (05:53 UTC), while a different valid page size returned
+event 22549 (06:03 UTC). Earlier, an unchanged incremental cursor returned an empty
+page while newer records existed. These are read freshness failures, not evidence
+that ingestion stopped.
+
+The remediation removes the persistent event-result cache, makes HTML/RSS/JSON
+event reads dynamic, disables caching on database fetches, and sends `no-store`
+for event API/RSS responses (including empty cursor pages). This trades cache hits
+for one bounded database read per feed request; monitor database latency and
+request volume after deployment. Existing query limits and the public rate limit
+remain the load controls. Source catalog and risk-response cache policies are
+unchanged.
+
+The production-build regression fixture checks identical URLs before and after
+publication, including an initially empty cursor, plus database outage and
+recovery. After merge and deployment, repeat these checks on the exact deployed
+commit: poll the same cursor across a new publication, confirm RSS/JSON/HTML
+advance, and check response cache headers. A local test is not live deployment
+verification.
+
+The public records are marked `llm`; independent OpenAI token-usage/completion
+verification remains pending because authenticated runtime access was unavailable
+during monitoring. Extraction evaluation, complete coverage, backfill completion,
+and continuous 24-hour observation are not established by these checks.
+
 ## Publisher activation follow-up — 24 October 2026
 
 The operator requested a PR to activate all 374 reviewed publisher feeds and create a restricted OpenAI key. See [publisher activation](publisher-activation.md) for the production configuration, 60-attempt/hour limit, shared-project funding boundary, merge-time migration and remaining evaluation gates. This supersedes earlier instructions to leave the vendor selection empty for this deployment. Live activation is not claimed until this PR is merged and its exact release is verified.
