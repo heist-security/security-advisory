@@ -333,3 +333,110 @@ it("requires bounded evidence and rejects conflicts between mirrors' additional 
   await publish(b);
   expect(await groups()).toHaveLength(3);
 });
+
+it("bounds page reads on a populated feed, including cached plans and selective searches", async () => {
+  await db.exec(
+    readFileSync(
+      new URL("./fixtures/group-query.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  // Buffer accesses measure database work without flaky wall-clock thresholds.
+  // The old query touched over 18,000 buffers for a single 21-item page.
+  await db.exec("set plan_cache_mode=force_generic_plan");
+  try {
+    const cases = [
+      {
+        filters: {},
+        after: null,
+        before: null,
+        updates: false,
+        first: 6000,
+        count: 21,
+      },
+      {
+        filters: {},
+        after: null,
+        before: 3000,
+        updates: false,
+        first: 2999,
+        count: 21,
+      },
+      {
+        filters: {},
+        after: 0,
+        before: null,
+        updates: false,
+        first: 1,
+        count: 21,
+      },
+      {
+        filters: {},
+        after: null,
+        before: null,
+        updates: true,
+        first: 6000,
+        count: 21,
+      },
+      {
+        filters: {},
+        after: 0,
+        before: null,
+        updates: true,
+        first: 1,
+        count: 21,
+      },
+      {
+        filters: { cve: "CVE-2026-10001" },
+        after: null,
+        before: null,
+        updates: false,
+        first: 1,
+        count: 1,
+      },
+      {
+        filters: { q: "no-such-query-fixture" },
+        after: null,
+        before: null,
+        updates: false,
+        first: undefined,
+        count: 0,
+      },
+      {
+        filters: { q: "fixture", source: "core-cve" },
+        after: null,
+        before: null,
+        updates: false,
+        first: 6000,
+        count: 21,
+      },
+    ];
+    for (const entry of cases) {
+      const rows = await groups(
+        entry.filters,
+        entry.after,
+        entry.before,
+        21,
+        entry.updates,
+      );
+      expect(rows).toHaveLength(entry.count);
+      expect(rows[0]?.id).toBe(entry.first);
+      const result = await db.query<any>(
+        "explain (analyze,buffers,format json) select * from query_advisory_groups($1,21,$2,$3,$4)",
+        [
+          JSON.stringify(entry.filters),
+          entry.after,
+          entry.before,
+          entry.updates,
+        ],
+      );
+      const plan = result.rows[0]["QUERY PLAN"][0].Plan;
+      expect(plan["Actual Rows"]).toBe(entry.count);
+      expect(
+        plan["Shared Hit Blocks"] + plan["Shared Read Blocks"],
+      ).toBeLessThan(2000);
+    }
+  } finally {
+    await db.exec("reset plan_cache_mode");
+  }
+}, 15000);

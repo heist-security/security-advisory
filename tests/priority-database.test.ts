@@ -18,7 +18,8 @@ beforeEach(async (context) => {
       (file.endsWith("008_event_priority.sql") ||
         file.endsWith("009_priority_backfill.sql") ||
         file.endsWith("012_advisory_groups.sql") ||
-        file.endsWith("013_osv_upstream_priority.sql"))
+        file.endsWith("013_osv_upstream_priority.sql") ||
+        file.endsWith("014_grouped_feed_query.sql"))
     ))
       await db.exec(readFileSync(new URL(file, folder), "utf8"));
 }, 30000);
