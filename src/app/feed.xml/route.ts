@@ -1,8 +1,8 @@
-import { cachedEvents } from "@/lib/cached-events";
-import { rss } from "@/lib/events";
+import { events, rss } from "@/lib/events";
 import { baseUrl } from "@/lib/db";
 import { parseEventQuery, filterQuery } from "@/lib/filters";
-import { cacheHeaders, unavailable } from "@/lib/http";
+import { eventHeaders, unavailable } from "@/lib/http";
+export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   let query;
   try {
@@ -20,9 +20,9 @@ export async function GET(request: Request) {
     const params = filterQuery(query);
     if (query.limit !== 100) params.set("limit", String(query.limit));
     const self = baseUrl() + "/feed.xml" + (params.size ? "?" + params : "");
-    return new Response(rss(await cachedEvents(query), baseUrl(), self), {
+    return new Response(rss(await events(query), baseUrl(), self), {
       headers: {
-        ...cacheHeaders,
+        ...eventHeaders,
         "Content-Type": "application/rss+xml; charset=utf-8",
         "X-Content-Type-Options": "nosniff",
       },

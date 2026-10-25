@@ -1,6 +1,7 @@
-import { cachedEvents } from "@/lib/cached-events";
+import { events } from "@/lib/events";
 import { parseEventQuery } from "@/lib/filters";
-import { cacheHeaders, unavailable } from "@/lib/http";
+import { eventHeaders, unavailable } from "@/lib/http";
+export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   let query;
   try {
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     );
   }
   try {
-    const rows = await cachedEvents(query);
+    const rows = await events(query);
     return Response.json(
       {
         schema_version: "1",
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
           ? Math.min(...rows.map((row) => row.id))
           : (query.before ?? null),
       },
-      { headers: cacheHeaders },
+      { headers: eventHeaders },
     );
   } catch {
     return unavailable();

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { cachedEvents } from "@/lib/cached-events";
+import { events } from "@/lib/events";
 import { configured } from "@/lib/db";
 import type { FeedEvent } from "@/lib/events";
 import {
@@ -13,6 +13,7 @@ import {
 import { feedLink, groupEvents, dayLabel, typeLabels } from "@/lib/feed-view";
 import { registry } from "@/lib/registry";
 import { EventCard } from "@/components/event-card";
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Security feed",
   description:
@@ -39,7 +40,7 @@ export default async function Feed({
     hasMore = false;
   if (!unavailable && !error) {
     try {
-      const result = await cachedEvents({ ...query, limit: query.limit + 1 });
+      const result = await events({ ...query, limit: query.limit + 1 });
       hasMore = result.length > query.limit;
       rows = result.slice(0, query.limit);
     } catch {

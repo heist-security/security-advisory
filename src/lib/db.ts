@@ -15,6 +15,8 @@ export function db() {
         fetch: (input, init) =>
           fetch(input, {
             ...init,
+            // Database state must not enter Next's persistent fetch cache.
+            cache: "no-store",
             signal: init?.signal
               ? AbortSignal.any([init.signal, AbortSignal.timeout(10000)])
               : AbortSignal.timeout(10000),
