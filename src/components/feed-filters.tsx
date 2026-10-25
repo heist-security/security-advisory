@@ -1,10 +1,14 @@
 "use client";
+import { Search, X } from "lucide-react";
 import { eventTypes, filterQuery, type Filters } from "@/lib/filters";
 import type { Severity } from "@/lib/priority";
 import type { TechnologyOption } from "@/lib/technology-options";
 import { SeverityFilter } from "./severity-filter";
 import { TechnologyFilter } from "./technology-filter";
 import { useAutoFilters } from "./use-auto-filters";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
 
 export function FeedFilters({
   initialFilters,
@@ -19,7 +23,7 @@ export function FeedFilters({
   );
   return (
     <form
-      className="filters feed-filters"
+      className="feed-filters flex flex-wrap items-center gap-2 pb-6"
       action="/"
       role="search"
       aria-label="Filter the feed"
@@ -35,30 +39,36 @@ export function FeedFilters({
       {filters.group ? (
         <input type="hidden" name="group" value={filters.group} />
       ) : null}
-      <input
-        className="feed-search"
-        type="search"
-        name="q"
-        aria-label="Search feed"
-        placeholder="Search advisories, CVEs, products…"
-        value={filters.q ?? ""}
-        onChange={(event) => update({ q: event.target.value }, 300)}
-        maxLength={120}
-      />
-      <select
-        className="type-filter"
+      <div className="relative min-w-0 basis-full md:flex-1">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+        />
+        <Input
+          className="feed-search pl-9"
+          type="search"
+          name="q"
+          aria-label="Search feed"
+          placeholder="Search advisories, CVEs, products…"
+          value={filters.q ?? ""}
+          onChange={(event) => update({ q: event.target.value }, 300)}
+          maxLength={120}
+        />
+      </div>
+      <NativeSelect
+        className="type-filter min-w-32"
         name="type"
         aria-label="Type"
         value={filters.type ?? ""}
         onChange={(event) => update({ type: event.target.value })}
       >
-        <option value="">All types</option>
+        <NativeSelectOption value="">All types</NativeSelectOption>
         {eventTypes.map((type) => (
-          <option key={type} value={type}>
+          <NativeSelectOption key={type} value={type}>
             {type[0].toUpperCase() + type.slice(1)}
-          </option>
+          </NativeSelectOption>
         ))}
-      </select>
+      </NativeSelect>
       <SeverityFilter
         selected={(filters.severity?.split(",") ?? []) as Severity[]}
         onChange={(values) => update({ severity: values.join(",") })}
@@ -71,9 +81,12 @@ export function FeedFilters({
       {Object.entries(filters).some(
         ([key, value]) => key !== "view" && value,
       ) ? (
-        <div className="filter-actions">
-          <a href="/">Reset filters</a>
-        </div>
+        <Button asChild variant="ghost" size="sm">
+          <a href="/">
+            <X aria-hidden="true" />
+            Reset filters
+          </a>
+        </Button>
       ) : null}
     </form>
   );

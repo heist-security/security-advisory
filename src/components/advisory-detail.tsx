@@ -11,7 +11,7 @@ export function DetailUnavailable({
   returnTo: string;
 }) {
   return (
-    <main id="main" className="container advisory-detail">
+    <main id="main" className="site-container advisory-detail">
       <a className="detail-back" href={returnTo}>
         Back to feed
       </a>
@@ -56,7 +56,7 @@ export function AdvisoryDetail({
     return itemPath(event) + (params.size ? "?" + params : "") + "#history";
   };
   return (
-    <main id="main" className="container advisory-detail">
+    <main id="main" className="site-container advisory-detail">
       <nav className="detail-navigation" aria-label="Advisory navigation">
         <a className="detail-back" href={returnTo}>
           ← Back to feed

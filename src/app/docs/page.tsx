@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { title: "API documentation" };
 export default function Docs() {
   return (
-    <main id="main" className="container">
+    <main id="main" className="site-container">
       <article className="prose">
         <h1>API documentation</h1>
         <p>

@@ -17,6 +17,13 @@ Before a pull request:
 
 Browser tests require Chromium: npx playwright install chromium.
 
+The feed UI uses [shadcn/ui](https://ui.shadcn.com/docs) with Tailwind CSS v4.
+Reusable components live in `src/components/ui`; add more with
+`npx shadcn@latest add <component>`. Keep shared colors and typography in
+`src/app/globals.css` and use the `cn` helper in `src/lib/utils.ts` when composing
+classes. `src/app/site.css` retains the styles for the shared shell and other pages
+in the components layer so Tailwind utilities can override them.
+
 Keep changes focused. Add regression coverage for ingestion, publication, filter and access-control changes. Never commit credentials, .env files or real customer data.
 
 ## Source contributions
