@@ -350,7 +350,7 @@ h1 {
   letter-spacing: 0;
 }
 .catalog-filters {
-  grid-template-columns: 1.5fr 1fr 1fr auto;
+  grid-template-columns: 1.5fr 1fr 1fr;
   padding: 0;
 }
 .catalog-count {
@@ -733,9 +733,6 @@ pre {
   .feed-filters label:first-child,
   .catalog-filters label:first-child {
     grid-column: 1 / -1;
-  }
-  .catalog-filters .button {
-    width: fit-content;
   }
   .catalog-columns {
     display: none;

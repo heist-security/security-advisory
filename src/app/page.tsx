@@ -6,15 +6,13 @@ import {
   filterQuery,
   pageParams,
   parseEventQuery,
-  eventTypes,
   type EventQuery,
   type SearchParams,
 } from "@/lib/filters";
 import { feedLink, groupEvents, dayLabel } from "@/lib/feed-view";
-import { TechnologyFilter } from "@/components/technology-filter";
+import { FeedFilters } from "@/components/feed-filters";
 import { catalogOptions } from "@/lib/technology-catalog";
 import { EventCard } from "@/components/event-card";
-import { SeverityFilter } from "@/components/severity-filter";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Security feed",
@@ -26,11 +24,12 @@ export default async function Feed({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  const params = pageParams(await searchParams);
   let query: EventQuery = { limit: 20 },
     error = "",
     unavailable = !configured();
   try {
-    query = parseEventQuery(pageParams(await searchParams), 20);
+    query = parseEventQuery(params, 20);
     if (query.after !== undefined)
       throw new Error("Use the JSON API for incremental cursors");
     query.limit = Math.min(query.limit, 50);
@@ -65,50 +64,10 @@ export default async function Feed({
           <a href={"/api/v1/events" + suffix}>JSON</a>
         </nav>
       </section>
-      <form
-        className="filters feed-filters"
-        action="/"
-        role="search"
-        aria-label="Filter the feed"
-      >
-        <input
-          className="feed-search"
-          type="search"
-          name="q"
-          aria-label="Search feed"
-          placeholder="Search advisories, CVEs, products…"
-          defaultValue={query.q ?? ""}
-          maxLength={120}
-        />
-        <select
-          className="type-filter"
-          name="type"
-          aria-label="Type"
-          defaultValue={query.type ?? ""}
-        >
-          <option value="">All types</option>
-          {eventTypes.map((type) => (
-            <option key={type} value={type}>
-              {type[0].toUpperCase() + type.slice(1)}
-            </option>
-          ))}
-        </select>
-        <SeverityFilter
-          key={query.severity?.join(",") ?? "all"}
-          selected={query.severity}
-        />
-        <TechnologyFilter
-          key={query.technology ?? "all"}
-          selected={query.technology?.split(",")}
-          initialOptions={technologies}
-        />
-        <div className="filter-actions">
-          <button type="submit" className="button">
-            Filter
-          </button>
-          {filters.size > 0 ? <a href="/">Reset filters</a> : null}
-        </div>
-      </form>
+      <FeedFilters
+        initialFilters={{ ...query, q: params.get("q") ?? "" }}
+        technologies={technologies}
+      />
       <section className="feed-reader" aria-label="Security announcements">
         {query.before !== undefined && rows.length > 0 ? (
           <a href={latest} className="latest-link">
