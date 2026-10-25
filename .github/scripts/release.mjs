@@ -56,7 +56,28 @@ export function configuration(env) {
   return database;
 }
 
-export function migrate(database, env, execute = spawnSync) {
+export function migrationFailure(result) {
+  const states = {
+    57014: "query timeout or cancellation",
+    "55P03": "database lock timeout",
+    "40P01": "database deadlock",
+    42501: "database permission denied",
+    42701: "column already exists",
+    "42P01": "required table missing",
+  };
+  const code = String(result.stderr ?? "").match(
+    /(?:SQLSTATE[ :]*|ERROR:\s*)([0-9A-Z]{5})\b/,
+  )?.[1];
+  return result.error?.code === "ETIMEDOUT"
+    ? "client timeout"
+    : (states[code] ?? "database command failed");
+}
+export async function migrate(
+  database,
+  env,
+  execute = spawnSync,
+  pause = setTimeout,
+) {
   const directory = mkdtempSync(join(tmpdir(), "heist-migration-"));
   try {
     const certificate = join(directory, "root.crt");
@@ -82,9 +103,60 @@ export function migrate(database, env, execute = spawnSync) {
     // SQL/driver diagnostics may contain data or transformed credentials.
     if (result.error || result.status !== 0) {
       throw new ReleaseError(
-        "Migration failed; deployment stopped. Inspect the database and migration history privately.",
+        "Migration failed (" +
+          migrationFailure(result) +
+          "); deployment stopped. Inspect the database and migration history privately.",
       );
     }
+    // Schema DDL has committed. Backfill separately so readers remain available
+    // and interrupted releases resume from the last committed batch.
+    const deadline = Date.now() + 15 * 60 * 1000;
+    for (let attempt = 0; attempt < 5000 && Date.now() < deadline; attempt++) {
+      const batch = execute(
+        "psql",
+        [
+          "--no-psqlrc",
+          "--quiet",
+          "--tuples-only",
+          "--no-align",
+          "--set=ON_ERROR_STOP=1",
+          "--set=VERBOSITY=sqlstate",
+          "--command",
+          "set lock_timeout='5s'; set statement_timeout='30s'; select last_id,processed,done from public.backfill_event_priority(100);",
+        ],
+        {
+          env: {
+            PATH: env.PATH,
+            HOME: env.HOME,
+            PGDATABASE: database.toString(),
+            PGSSLMODE: "verify-full",
+            PGSSLROOTCERT: certificate,
+          },
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          timeout: 45000,
+          maxBuffer: 65536,
+        },
+      );
+      if (batch.error || batch.status !== 0)
+        throw new ReleaseError(
+          "Priority backfill failed (" +
+            migrationFailure(batch) +
+            "); deployment stopped. Completed batches are retained for retry.",
+        );
+      const progress = String(batch.stdout ?? "")
+        .trim()
+        .match(/^(\d+)\|(\d+)\|([tf])$/);
+      if (!progress)
+        throw new ReleaseError(
+          "Invalid backfill response; deployment stopped.",
+        );
+      if (progress[3] === "t") return;
+      await pause(100);
+    }
+    throw new ReleaseError(
+      "Priority backfill timed out; deployment stopped. Retry resumes completed batches.",
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

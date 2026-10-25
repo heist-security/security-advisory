@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import {
   configuration,
   migrate,
+  migrationFailure,
   release,
 } from "../.github/scripts/release.mjs";
 
@@ -235,10 +236,20 @@ test("does not include provider error bodies or transport errors in failure mess
     assert.ok(!f.calls.includes("migrate"));
   }
 });
-test("uses verified TLS, isolates CLI credentials, and removes the certificate", () => {
+test("uses verified TLS, isolates CLI credentials, and removes the certificate", async () => {
   const env = environment();
   let certificate;
-  migrate(configuration(env), env, (command, args, options) => {
+  await migrate(configuration(env), env, (command, args, options) => {
+    if (command === "psql") {
+      assert.equal(options.env.VERCEL_TOKEN, undefined);
+      assert.equal(options.env.GITHUB_TOKEN, undefined);
+      assert.ok(!args.some((a) => a.includes("fixture-password")));
+      assert.equal(
+        new URL(options.env.PGDATABASE).searchParams.get("sslmode"),
+        "verify-full",
+      );
+      return { status: 0, stdout: "0|0|t" };
+    }
     assert.equal(command, "supabase");
     assert.deepEqual(args.slice(0, 3), ["db", "push", "--db-url"]);
     const url = new URL(args[3]);
@@ -254,10 +265,10 @@ test("uses verified TLS, isolates CLI credentials, and removes the certificate",
   });
   assert.equal(existsSync(certificate), false);
 });
-test("suppresses migration diagnostics and removes the certificate on failure", () => {
+test("suppresses migration diagnostics and removes the certificate on failure", async () => {
   const env = environment();
   let certificate;
-  assert.throws(
+  await assert.rejects(
     () =>
       migrate(configuration(env), env, (_command, args) => {
         certificate = new URL(args[3]).searchParams.get("sslrootcert");
@@ -268,4 +279,48 @@ test("suppresses migration diagnostics and removes the certificate on failure", 
       !error.message.includes("fixture-password"),
   );
   assert.equal(existsSync(certificate), false);
+});
+
+test("backfill batches finish before deployment and retain safe failure categories", async () => {
+  const env = environment();
+  let calls = 0;
+  await migrate(
+    configuration(env),
+    env,
+    (cmd) => {
+      if (cmd === "supabase") return { status: 0 };
+      calls++;
+      return { status: 0, stdout: calls === 1 ? "100|100|f" : "101|1|t" };
+    },
+    async () => {},
+  );
+  assert.equal(calls, 2);
+  await assert.rejects(
+    migrate(configuration(env), env, (cmd) =>
+      cmd === "supabase"
+        ? { status: 0 }
+        : { status: 1, stderr: "ERROR: 57014 secret data" },
+    ),
+    /query timeout or cancellation/,
+  );
+  assert.equal(
+    migrationFailure({ stderr: "ERROR: private database text and password" }),
+    "database command failed",
+  );
+  assert.equal(
+    migrationFailure({ stderr: "error (SQLSTATE 55P03) private data" }),
+    "database lock timeout",
+  );
+  assert.equal(
+    migrationFailure({ error: { code: "ETIMEDOUT" } }),
+    "client timeout",
+  );
+  await assert.rejects(
+    migrate(configuration(env), env, (cmd) =>
+      cmd === "supabase"
+        ? { status: 0 }
+        : { status: 0, stdout: "secret-invalid-response" },
+    ),
+    /Invalid backfill response/,
+  );
 });
