@@ -336,7 +336,7 @@ test("backfill batches finish before deployment and retain safe failure categori
     },
     async () => {},
   );
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   await assert.rejects(
     migrate(configuration(env), env, (cmd) =>
       cmd === "supabase"
@@ -365,4 +365,22 @@ test("backfill batches finish before deployment and retain safe failure categori
     ),
     /Invalid backfill response/,
   );
+});
+
+test("both backfills must complete; a technology failure blocks release", async () => {
+  const env = environment();
+  const procedures = [];
+  await assert.rejects(
+    migrate(configuration(env), env, (cmd, args) => {
+      if (cmd === "supabase") return { status: 0 };
+      const sql = args.at(-1);
+      procedures.push(sql);
+      return sql.includes("backfill_event_priority")
+        ? { status: 0, stdout: "100|0|t" }
+        : { status: 1, stderr: "ERROR: 57014 private data" };
+    }),
+    /Technology backfill failed \(query timeout or cancellation\)/,
+  );
+  assert.equal(procedures.length, 2);
+  assert.match(procedures[1], /backfill_event_technologies/);
 });

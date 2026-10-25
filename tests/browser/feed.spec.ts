@@ -79,6 +79,12 @@ test("technology multi-selection persists and matches any selected product", asy
   await page.goto("/");
   await page.locator(".technology-filter summary").click();
   await page.getByLabel("Search technologies", { exact: true }).fill("Node");
+  await expect(
+    page.getByRole("checkbox", { name: "Node.js", exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("checkbox", { name: /Node.js \d|^nodejs$/ }),
+  ).toHaveCount(0);
   await page.getByRole("checkbox", { name: "Node.js", exact: true }).check();
   await page.getByLabel("Search technologies", { exact: true }).fill("Ruby");
   await page.getByRole("checkbox", { name: "Ruby", exact: true }).check();
@@ -112,6 +118,56 @@ test("technology multi-selection persists and matches any selected product", asy
   await expect(page.locator("#event-3")).toBeVisible();
   await page.getByRole("link", { name: "Reset filters", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(4);
+});
+test("search and type remain combined with canonical technology and severity subscriptions", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("searchbox", { name: "Search feed", exact: true })
+    .fill("fictional");
+  await page
+    .getByRole("combobox", { name: "Type", exact: true })
+    .selectOption("patch");
+  await page.locator(".severity-filter summary").click();
+  await page.getByRole("checkbox", { name: "Critical", exact: true }).check();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.locator(".severity-filter summary").click();
+  await page.locator(".technology-filter summary").click();
+  await page.getByRole("checkbox", { name: "Node.js", exact: true }).check();
+  await page
+    .getByRole("searchbox", { name: "Search technologies", exact: true })
+    .press("Escape");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await expect(page.locator(".event-card")).toHaveCount(2);
+  const suffix = "?q=fictional&type=patch&technology=node-js&severity=critical";
+  await expect(
+    page
+      .getByRole("navigation", { name: "Feed formats" })
+      .getByRole("link", { name: "RSS", exact: true }),
+  ).toHaveAttribute("href", "/feed.xml" + suffix);
+  const json = await (await request.get("/api/v1/events" + suffix)).json();
+  expect(json.data.map((e: { id: number }) => e.id)).toEqual([2, 1]);
+  await page.reload();
+  await expect(
+    page.getByRole("searchbox", { name: "Search feed", exact: true }),
+  ).toHaveValue("fictional");
+  await expect(
+    page.getByRole("combobox", { name: "Type", exact: true }),
+  ).toHaveValue("patch");
+  await page
+    .getByRole("combobox", { name: "Type", exact: true })
+    .selectOption("withdrawal");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await expect(page.locator(".event-card")).toHaveCount(1);
+  await expect(page.locator("#event-2")).toBeVisible();
+  const legacy = await (
+    await request.get("/api/v1/events?technology=Node.js%208&type=patch")
+  ).json();
+  expect(legacy.data.map((e: { id: number }) => e.id)).toEqual([2, 1]);
 });
 test("technology picker supports custom entries, clearing and failed suggestions", async ({
   page,
@@ -258,4 +314,35 @@ test("severity filters share RSS/JSON and keep correction delivery", async ({
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(page.viewportSize()!.width);
+});
+
+test("catalog results for a previously unseen product become stable subscriptions", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/technologies?*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [{ value: "example-engine", label: "Example Engine" }],
+      }),
+    }),
+  );
+  await page.goto("/");
+  await page.locator(".technology-filter summary").click();
+  await page
+    .getByRole("searchbox", { name: "Search technologies", exact: true })
+    .fill("Example Engine v7.2");
+  await page
+    .getByRole("checkbox", { name: "Example Engine", exact: true })
+    .check();
+  await page
+    .getByRole("searchbox", { name: "Search technologies", exact: true })
+    .press("Escape");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await expect(page).toHaveURL(/technology=example-engine/);
+  await expect(
+    page
+      .getByRole("navigation", { name: "Feed formats" })
+      .getByRole("link", { name: "RSS", exact: true }),
+  ).toHaveAttribute("href", "/feed.xml?technology=example-engine");
 });

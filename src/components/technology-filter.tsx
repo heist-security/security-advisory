@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { technologyKey } from "@/lib/filters";
+import {
+  technologyFamily,
+  technologyLabel,
+  technologyMatches,
+} from "@/lib/technology";
 import type { TechnologyOption } from "@/lib/technology-options";
 
 export function TechnologyFilter({
@@ -10,9 +14,12 @@ export function TechnologyFilter({
   selected?: string[];
   initialOptions: TechnologyOption[];
 }) {
-  const [values, setValues] = useState(selected);
+  const [values, setValues] = useState([
+    ...new Set(selected.map(technologyFamily)),
+  ]);
   const [search, setSearch] = useState("");
   const [options, setOptions] = useState(initialOptions);
+  const [optionsSearch, setOptionsSearch] = useState("");
   const [status, setStatus] = useState("");
   const [open, setOpen] = useState(false);
   const details = useRef<HTMLDetailsElement>(null);
@@ -41,6 +48,7 @@ export function TechnologyFilter({
         if (controller.signal.aborted) return;
         for (const o of result.data) labels.current.set(o.value, o.label);
         setOptions(result.data);
+        setOptionsSearch(search);
         setStatus(
           result.data.length
             ? ""
@@ -58,8 +66,11 @@ export function TechnologyFilter({
       controller.abort();
     };
   }, [search, open]);
-  const key = technologyKey(search);
-  const matches = options.filter((o) => !key || o.value.includes(key));
+  const key = technologyFamily(search);
+  const matches =
+    optionsSearch === search
+      ? options
+      : options.filter((o) => technologyMatches(o.value, search));
   const custom =
     key &&
     key.length <= 100 &&
@@ -67,7 +78,7 @@ export function TechnologyFilter({
     !matches.some((o) => o.value === key);
   const add = () => {
     if (custom && values.length < 10) {
-      labels.current.set(key, search.trim());
+      labels.current.set(key, technologyLabel(key) ?? search.trim());
       setValues([...values, key]);
       setSearch("");
     }
@@ -120,10 +131,13 @@ export function TechnologyFilter({
               <button
                 key={value}
                 type="button"
-                aria-label={"Remove " + (labels.current.get(value) ?? value)}
+                aria-label={
+                  "Remove " +
+                  (technologyLabel(value) ?? labels.current.get(value) ?? value)
+                }
                 onClick={() => setValues(values.filter((v) => v !== value))}
               >
-                {labels.current.get(value) ?? value}{" "}
+                {technologyLabel(value) ?? labels.current.get(value) ?? value}{" "}
                 <span aria-hidden="true">×</span>
               </button>
             ))}

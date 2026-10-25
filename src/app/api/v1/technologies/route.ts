@@ -1,6 +1,5 @@
-import { db } from "@/lib/db";
+import { catalogOptions } from "@/lib/technology-catalog";
 import { technologyKey } from "@/lib/filters";
-import { technologyOptions } from "@/lib/technology-options";
 import { eventHeaders, unavailable } from "@/lib/http";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
@@ -16,28 +15,8 @@ export async function GET(request: Request) {
       { status: 400, headers: eventHeaders },
     );
   try {
-    let query = db()
-      .from("events")
-      .select("technologies,payload")
-      .order("id", { ascending: false })
-      .limit(100);
-    // Search indexed public event text, then return only matching routing keys.
-    // The bounded suggestion list is not an exhaustive technology catalog.
-    if (q)
-      query = query.textSearch(
-        "search_document",
-        technologyKey(q)
-          .split("-")
-          .map((word) => word + ":*")
-          .join(" & "),
-        { config: "simple" },
-      );
-    const { data, error } = await query;
-    if (error) throw error;
-    return Response.json(
-      { data: technologyOptions(data ?? [], q) },
-      { headers: eventHeaders },
-    );
+    const data = await catalogOptions(q);
+    return Response.json({ data: data ?? [] }, { headers: eventHeaders });
   } catch {
     return unavailable();
   }

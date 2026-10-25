@@ -6,12 +6,13 @@ import {
   filterQuery,
   pageParams,
   parseEventQuery,
+  eventTypes,
   type EventQuery,
   type SearchParams,
 } from "@/lib/filters";
 import { feedLink, groupEvents, dayLabel } from "@/lib/feed-view";
 import { TechnologyFilter } from "@/components/technology-filter";
-import { technologyOptions } from "@/lib/technology-options";
+import { catalogOptions } from "@/lib/technology-catalog";
 import { EventCard } from "@/components/event-card";
 import { SeverityFilter } from "@/components/severity-filter";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,10 @@ export default async function Feed({
       unavailable = true;
     }
   }
+  const technologies =
+    !unavailable && !error
+      ? await catalogOptions("", query.technology?.split(",")).catch(() => [])
+      : [];
   const filters = filterQuery(query),
     suffix = filters.size ? "?" + filters : "";
   const groups = groupEvents(rows);
@@ -66,6 +71,28 @@ export default async function Feed({
         role="search"
         aria-label="Filter the feed"
       >
+        <input
+          className="feed-search"
+          type="search"
+          name="q"
+          aria-label="Search feed"
+          placeholder="Search advisories, CVEs, products…"
+          defaultValue={query.q ?? ""}
+          maxLength={120}
+        />
+        <select
+          className="type-filter"
+          name="type"
+          aria-label="Type"
+          defaultValue={query.type ?? ""}
+        >
+          <option value="">All types</option>
+          {eventTypes.map((type) => (
+            <option key={type} value={type}>
+              {type[0].toUpperCase() + type.slice(1)}
+            </option>
+          ))}
+        </select>
         <SeverityFilter
           key={query.severity?.join(",") ?? "all"}
           selected={query.severity}
@@ -73,7 +100,7 @@ export default async function Feed({
         <TechnologyFilter
           key={query.technology ?? "all"}
           selected={query.technology?.split(",")}
-          initialOptions={technologyOptions(rows)}
+          initialOptions={technologies}
         />
         <div className="filter-actions">
           <button type="submit" className="button">

@@ -4,19 +4,19 @@ All publishers contribute to one event stream. The visual page at `/`, RSS and J
 
 ## Filters
 
-| Parameter  | Meaning                                                       | Example        |
-| ---------- | ------------------------------------------------------------- | -------------- |
-| q          | Keyword search, up to 120 characters                          | authentication |
-| type       | Advisory classification; kind remains a compatible alias      | patch          |
-| technology | Up to 10 comma-separated product-name keys or source IDs (OR) | node-js        |
-| cve        | CVE identifier, case-insensitive input                        | CVE-2026-12345 |
-| source     | Exact source ID from the catalog                              | ruby           |
-| severity   | One or more publisher/linked severity ratings                 | critical,high  |
-| important  | High/Critical OR known exploited OR unrated security fix      | 1              |
-| fix        | Documented fixed versions (including structured advisories)   | 1              |
-| limit      | Number of events, 1-100                                       | 100            |
-| after      | JSON only: ascending incremental cursor, exclusive            | 0              |
-| before     | JSON only: newest-first pagination, exclusive                 | 123            |
+| Parameter  | Meaning                                                     | Example        |
+| ---------- | ----------------------------------------------------------- | -------------- |
+| q          | Keyword search, up to 120 characters                        | authentication |
+| type       | Advisory classification; kind remains a compatible alias    | patch          |
+| technology | Up to 10 catalog IDs or legacy routing keys (OR)            | node-js        |
+| cve        | CVE identifier, case-insensitive input                      | CVE-2026-12345 |
+| source     | Exact source ID from the catalog                            | ruby           |
+| severity   | One or more publisher/linked severity ratings               | critical,high  |
+| important  | High/Critical OR known exploited OR unrated security fix    | 1              |
+| fix        | Documented fixed versions (including structured advisories) | 1              |
+| limit      | Number of events, 1-100                                     | 100            |
+| after      | JSON only: ascending incremental cursor, exclusive          | 0              |
+| before     | JSON only: newest-first pagination, exclusive               | 123            |
 
 Different filters combine with AND. Repeated API parameters, conflicting type/kind, invalid values and simultaneous after/before produce 400. Technology input is lowercased, runs of non-ASCII-alphanumeric characters become hyphens, and edge hyphens are trimmed. For example Node.js becomes node-js, C++ becomes c-plus-plus and C# becomes c-sharp. Keys derive from evidenced product names; this is not a curated alias/ontology service. Source IDs provide a stable alternative.
 
@@ -119,8 +119,18 @@ Severity, important and fix routing retain prior subscription matches so downgra
 
 ### Technology multi-select
 
-`technology=node-js,ruby` matches any selected technology. It combines with severity and other filters using AND, before pagination. Single-technology URLs continue to work. Values are normalized, deduplicated and sorted; each must be at most 100 characters. Repeated `technology` parameters are rejected.
+`technology=node-js,ruby` matches any selected technology family. It combines with search, type, severity and other filters using AND, before pagination. Known aliases and numeric versions normalize to the same family: `node`, `nodejs`, `Node.js 8` and `Node.js 22` become `node-js`; `CPython` and `python3` become `python`. Legacy alias/version URLs therefore include all matching family records. Distinct packages such as `node-gyp`, `Node-RED`, `python-pillow` and `react-dom` remain separate. Unknown technologies retain their normalized exact key. Values are deduplicated and sorted; each must be at most 100 characters. Repeated `technology` parameters are rejected.
 
-The visual feed exposes severity and technology controls. Advanced URL/API filters remain supported. Applying the simplified form replaces any advanced filters in the current URL.
+The visual feed exposes Search, Type, Severity and a searchable technology multi-select. RSS, JSON and pagination retain those selections. Advanced URL/API filters remain supported; submitting the visual form replaces advanced filters not represented by its controls.
 
-`GET /api/v1/technologies?q=node` returns up to 50 `{value,label}` suggestions from at most 100 recent matching public events. Search uses the existing text-search index across the archive; suggestions are bounded, not an exhaustive catalog. The picker also accepts an explicit product name when suggestions are missing or unavailable. No raw documents or credentials are exposed.
+`GET /api/v1/technologies?q=node` returns up to 50 `{value,label}` choices. Use the returned stable `value` as the technology filter. The picker also accepts explicit legacy product keys when suggestions are unavailable. No raw documents or credentials are exposed.
+
+### Technology catalog and stable subscriptions
+
+Technology suggestions now query `technology_catalog`, a database catalog of all observed products, rather than sampling 100 recent events. The endpoint returns up to 50 alphabetically ordered matches from an indexed full-catalog search. Event volume and recency do not determine whether a technology can be found. Source IDs are not suggestions unless an actual product has that name.
+
+Publisher product names use generic, conservative version separation before identity normalization: `Example Engine 1.2`, `Example Engine v3.4`, and future versions share `example-engine`. This works for previously unseen products without adding them to the reviewed semantic-alias list. Embedded numbers such as `log4j2`, `HTTP/2`, and `OAuth2` remain intact. Semantic synonyms cannot safely be guessed: reviewed aliases still handle names such as Node.js/nodejs; unrecognized synonyms remain separate until a rule is reviewed.
+
+OSV package identities use the exact ecosystem and package name, including namespace and numeric suffixes. These have stable opaque `pkg-…` IDs and labels such as `widget-2 (npm)`; similarly named packages in different ecosystems remain separate. Use the returned option `value` in subscriptions, not a slug made from its label. Original affected/fixed versions and evidence are unchanged. Older routing-key subscriptions remain accepted alongside canonical IDs.
+
+Migration 011 creates the catalog and indexed `events.technology_ids`; a publication trigger maintains them for future events. The release runner completes a separate, resumable 100-row historical metadata backfill after schema commit and before deployment. It retains previous product identities on correction events, creates no new events, and makes no model calls. Retry resumes from the committed checkpoint. Catalog reads and maintenance are service-role only. New semantic-alias rules require a versioned migration/reindex of affected metadata; do not edit applied migration snapshots.

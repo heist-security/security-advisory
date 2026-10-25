@@ -12,8 +12,12 @@ export default function Docs() {
         </p>
         <h2>Browse visually</h2>
         <p>
-          <a href="/">Open the feed</a> to filter by severity and one or more
-          technologies, and expand source evidence and version details.
+          <a href="/">Open the feed</a> to search announcements and filter by
+          type, severity and one or more technologies. Technology search covers
+          the full observed product catalog. Release versions share a product
+          choice; packages retain their ecosystem and namespace. Expand each
+          announcement for its original product names, source evidence and
+          affected versions.
         </p>
         <h2>Subscribe</h2>
         <pre>
@@ -63,11 +67,11 @@ export default function Docs() {
           </tbody>
         </table>
         <p>
-          Filters combine with AND. Source and technology keys are available in
-          event responses. Corrections retain earlier subscription keys, so an
-          update can reach you even if its latest classification changes.
-          Keyword searches match the current event text and retained routing
-          keys; previous free-text wording is not retained.
+          Filters combine with AND. Source and legacy technology keys are
+          available in event responses. Corrections retain earlier subscription
+          keys, so an update can reach you even if its latest classification
+          changes. Keyword searches match the current event text and retained
+          routing keys; previous free-text wording is not retained.
         </p>
         <h2 id="priority">Severity and important updates</h2>
         <p>

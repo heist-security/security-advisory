@@ -4,6 +4,7 @@ import type { EventQuery } from "./filters";
 import { isStructured } from "./structured/config";
 import type { StructuredPayload } from "./structured/normalize";
 import { priorityLabels, type Priority } from "./priority";
+import { technologyFamily } from "./technology";
 export type FeedEvent = {
   id: number;
   advisory_id: string;
@@ -35,8 +36,16 @@ export async function events(options: Partial<EventQuery> = {}) {
   if (options.after !== undefined) query = query.gt("id", options.after);
   if (options.before !== undefined) query = query.lt("id", options.before);
   if (options.type) query = query.contains("event_types", [options.type]);
-  if (options.technology)
-    query = query.overlaps("technologies", options.technology.split(","));
+  if (options.technology) {
+    const ids = [
+      ...new Set(options.technology.split(",").map(technologyFamily)),
+    ];
+    // Canonical IDs for new subscriptions; original routing keys keep existing
+    // package/source subscriptions and historical corrections working.
+    query = query.or(
+      `technology_ids.ov.{${ids.join(",")}},technologies.ov.{${ids.join(",")}}`,
+    );
+  }
   if (options.cve) query = query.contains("cve_ids", [options.cve]);
   if (options.source) query = query.eq("source_id", options.source);
   if (options.severity?.length)
