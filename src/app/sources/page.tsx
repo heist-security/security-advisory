@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SourceFilters } from "@/components/source-filters";
 import { sourcePage } from "@/lib/registry";
 import { pageParams, type SearchParams } from "@/lib/filters";
 export const metadata: Metadata = { title: "Sources" };
@@ -31,41 +32,15 @@ export default async function Sources({
           {result.catalog_channel_counts["release-notes"]} release-note streams
         </p>
       </header>
-      <form className="filters catalog-filters" action="/sources">
-        {params.get("catalog") === "vendor" ? (
-          <input type="hidden" name="catalog" value="vendor" />
-        ) : null}
-        <label>
-          Search
-          <input
-            name="q"
-            placeholder="Search sources…"
-            defaultValue={result.q}
-            maxLength={100}
-          />
-        </label>
-        <label>
-          Channel
-          <select name="channel" defaultValue={result.channel}>
-            <option value="">All channels</option>
-            <option value="security-advisories">Advisories</option>
-            <option value="mixed-announcements">Mixed announcements</option>
-            <option value="release-notes">Release notes</option>
-          </select>
-        </label>
-        <label>
-          Category
-          <select name="category" defaultValue={result.category}>
-            <option value="">All categories</option>
-            {result.catalog_categories.map((category) => (
-              <option key={category}>{category}</option>
-            ))}
-          </select>
-        </label>
-        <button className="button" type="submit">
-          Filter
-        </button>
-      </form>
+      <SourceFilters
+        initialFilters={{
+          q: (params.get("q") ?? "").slice(0, 100),
+          channel: result.channel,
+          category: result.category,
+          catalog: params.get("catalog") === "vendor" ? "vendor" : "",
+        }}
+        categories={result.catalog_categories}
+      />
       <div className="catalog-count">
         <p>
           {result.total} matching sources · Page {result.page} of {result.pages}
