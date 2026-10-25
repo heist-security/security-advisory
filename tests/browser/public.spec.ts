@@ -8,42 +8,35 @@ test("unified feed filters update both subscription formats without layout overf
     "Security feed",
   );
   if (info.project.name === "desktop") {
-    // The primary controls share one row; priority options sit below them.
     const controls = await page
       .getByRole("search")
-      .locator(
-        ":scope > label input, :scope > label select, .filter-actions button",
-      )
-      .evaluateAll((elements) =>
-        elements.map((element) => {
-          const { top, bottom } = element.getBoundingClientRect();
-          return { top, bottom };
-        }),
-      );
-    expect(controls).toHaveLength(6);
-    const tops = controls.map((control) => control.top);
-    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(1);
-    const priority = await page.locator(".priority-filters").boundingBox();
-    expect(priority!.y).toBeGreaterThanOrEqual(
-      Math.max(...controls.map((control) => control.bottom)),
-    );
+      .locator("summary, .filter-actions button")
+      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
+    expect(controls).toHaveLength(3);
+    expect(Math.max(...controls) - Math.min(...controls)).toBeLessThan(2);
   }
-  await page.getByLabel("Technology", { exact: true }).fill("Node.js");
-  await page.getByLabel("CVE", { exact: true }).fill("CVE-2026-12345");
+  await expect(page.getByRole("search").locator("select")).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("search")
+      .locator(
+        'input[name="q"], input[name="cve"], input[name="important"], input[name="fix"]',
+      ),
+  ).toHaveCount(0);
+  await page.locator(".technology-filter summary").click();
+  await page.getByRole("checkbox", { name: "Node.js", exact: true }).check();
+  await page.getByLabel("Search technologies", { exact: true }).press("Escape");
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(
     page
       .getByRole("navigation", { name: "Feed formats" })
       .getByRole("link", { name: "RSS", exact: true }),
-  ).toHaveAttribute("href", "/feed.xml?technology=node-js&cve=CVE-2026-12345");
+  ).toHaveAttribute("href", "/feed.xml?technology=node-js");
   await expect(
     page
       .getByRole("navigation", { name: "Feed formats" })
       .getByRole("link", { name: "JSON", exact: true }),
-  ).toHaveAttribute(
-    "href",
-    "/api/v1/events?technology=node-js&cve=CVE-2026-12345",
-  );
+  ).toHaveAttribute("href", "/api/v1/events?technology=node-js");
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(page.viewportSize()!.width);
@@ -113,8 +106,7 @@ test("public errors are bounded and protected operations fail closed", async ({
 test("JSON and RSS keep corrections in filtered subscriptions and support archive cursors", async ({
   request,
 }) => {
-  const path =
-    "/api/v1/events?technology=node-js&cve=CVE-2026-12345&type=patch";
+  const path = "/api/v1/events?technology=node-js&type=patch";
   const response = await request.get(path);
   expect(response.status()).toBe(200);
   const body = await response.json();
@@ -127,9 +119,7 @@ test("JSON and RSS keep corrections in filtered subscriptions and support archiv
     await request.get(path + "&after=" + first.next_after)
   ).json();
   expect(next.data.map((event: { id: number }) => event.id)).toEqual([2]);
-  const rss = await request.get(
-    "/feed.xml?type=patch&technology=node-js&cve=CVE-2026-12345",
-  );
+  const rss = await request.get("/feed.xml?type=patch&technology=node-js");
   expect(rss.status()).toBe(200);
   expect(await rss.text()).toContain("Previous extraction withdrawn");
   expect(await rss.text()).not.toContain("Ruby advisory");

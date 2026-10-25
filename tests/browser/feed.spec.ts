@@ -3,11 +3,7 @@ test("structured source filters show references rather than extracted quotations
   page,
   request,
 }) => {
-  await page.goto("/");
-  await page
-    .getByRole("combobox", { name: "Source", exact: true })
-    .selectOption("core-osv");
-  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await page.goto("/?source=core-osv");
   await expect(page.locator(".event-card")).toHaveCount(1);
   const event = page.locator("#event-4");
   await expect(event.locator(".event-foot")).toContainText(
@@ -76,64 +72,77 @@ test("visual reader displays the shared stream and expands source evidence", asy
     fullPage: true,
   });
 });
-test("search and filters persist in the URL and subscription formats", async ({
+test("technology multi-selection persists and matches any selected product", async ({
   page,
   request,
 }) => {
   await page.goto("/");
-  await page.getByLabel("Search", { exact: true }).fill("Ruby");
+  await page.locator(".technology-filter summary").click();
+  await page.getByLabel("Search technologies", { exact: true }).fill("Node");
+  await page.getByRole("checkbox", { name: "Node.js", exact: true }).check();
+  await page.getByLabel("Search technologies", { exact: true }).fill("Ruby");
+  await page.getByRole("checkbox", { name: "Ruby", exact: true }).check();
+  await page.getByLabel("Search technologies", { exact: true }).press("Escape");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await expect(page.locator(".event-card")).toHaveCount(3);
+  const rss = page
+    .getByRole("navigation", { name: "Feed formats" })
+    .getByRole("link", { name: "RSS", exact: true });
+  await expect(rss).toHaveAttribute(
+    "href",
+    "/feed.xml?technology=node-js%2Cruby",
+  );
+  const json = await (
+    await request.get("/api/v1/events?technology=node-js,ruby")
+  ).json();
+  expect(json.data.map((e: { id: number }) => e.id)).toEqual([3, 2, 1]);
+  const xml = await (
+    await request.get("/feed.xml?technology=node-js,ruby")
+  ).text();
+  for (const id of [1, 2, 3]) expect(xml).toContain("heist-event:" + id);
+  expect(xml).not.toContain("heist-event:4");
+  await page.reload();
+  await page.locator(".technology-filter summary").click();
+  await page
+    .getByRole("button", { name: "Remove Node.js", exact: true })
+    .click();
+  await page.getByLabel("Search technologies", { exact: true }).press("Escape");
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(1);
-  await expect(page.locator(".event-card h3")).toContainText("Ruby advisory");
-  await expect(
-    page
-      .getByRole("navigation", { name: "Feed formats" })
-      .getByRole("link", { name: "RSS", exact: true }),
-  ).toHaveAttribute("href", "/feed.xml?q=Ruby");
-  const data = await (await request.get("/api/v1/events?q=Ruby")).json();
-  expect(data.data.map((event: { id: number }) => event.id)).toEqual([3]);
+  await expect(page.locator("#event-3")).toBeVisible();
   await page.getByRole("link", { name: "Reset filters", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(4);
-  await page
-    .getByRole("combobox", { name: "Type", exact: true })
-    .selectOption("patch");
-  await page.getByLabel("Technology", { exact: true }).fill("Node.js");
-  await page.getByLabel("CVE", { exact: true }).fill("CVE-2026-12345");
-  await page.getByRole("button", { name: "Filter", exact: true }).click();
-  await expect(page.locator(".event-card")).toHaveCount(2);
-  await expect(page.locator("#event-2")).toBeVisible();
-  await expect(
-    page
-      .getByRole("navigation", { name: "Feed formats" })
-      .getByRole("link", { name: "RSS", exact: true }),
-  ).toHaveAttribute(
-    "href",
-    "/feed.xml?type=patch&technology=node-js&cve=CVE-2026-12345",
+});
+test("technology picker supports custom entries, clearing and failed suggestions", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/technologies?*", (route) =>
+    route.fulfill({ status: 503, body: "Unavailable" }),
   );
-  await page.reload();
-  await expect(page.getByLabel("Technology", { exact: true })).toHaveValue(
-    "node-js",
-  );
-  await expect(page.locator(".event-card")).toHaveCount(2);
-  // Retained vendor history remains filterable even when its source is not selected for ingestion.
-  await page.locator(".event-source").first().click();
+  await page.goto("/");
+  await page.locator(".technology-filter summary").click();
+  const search = page.getByLabel("Search technologies", { exact: true });
+  await search.fill("C++");
   await expect(
-    page.getByRole("combobox", { name: "Source", exact: true }),
-  ).toHaveValue("nodejs");
-  await page.getByLabel("Search", { exact: true }).fill("node");
+    page.getByRole("status").filter({ hasText: "Suggestions unavailable" }),
+  ).toBeVisible();
+  await search.press("Enter");
+  await expect(
+    page.getByRole("button", { name: "Remove C++", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Clear all", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Remove C++", exact: true }),
+  ).toHaveCount(0);
+  await search.fill("C#");
+  await search.press("Enter");
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await search.press("Escape");
+  await expect(page.locator(".technology-filter summary")).toBeFocused();
   await page.getByRole("button", { name: "Filter", exact: true }).click();
-  await expect(page.locator(".event-card")).toHaveCount(2);
-  const rss = await page
-    .getByRole("navigation", { name: "Feed formats" })
-    .getByRole("link", { name: "RSS", exact: true })
-    .getAttribute("href");
-  expect(Object.fromEntries(new URL(rss!, page.url()).searchParams)).toEqual({
-    q: "node",
-    type: "patch",
-    technology: "node-js",
-    cve: "CVE-2026-12345",
-    source: "nodejs",
-  });
+  await expect(page).toHaveURL(/technology=c-sharp/);
 });
 test("cursor navigation retains filters and does not offer an empty extra page", async ({
   page,
@@ -208,7 +217,7 @@ test("the homepage is the reader and old feed URLs preserve filters", async ({
   await expect(page.locator(".event-card")).toHaveCount(1);
 });
 
-test("severity and important filters share RSS/JSON and keep correction delivery", async ({
+test("severity filters share RSS/JSON and keep correction delivery", async ({
   page,
   request,
 }) => {
@@ -217,12 +226,6 @@ test("severity and important filters share RSS/JSON and keep correction delivery
   await page.getByRole("checkbox", { name: "Critical", exact: true }).check();
   await page.getByRole("checkbox", { name: "High", exact: true }).check();
   await page.locator(".severity-filter summary").click();
-  await page
-    .getByRole("checkbox", { name: "Important updates", exact: true })
-    .check();
-  await page
-    .getByRole("checkbox", { name: "Fix available", exact: true })
-    .check();
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(page.locator(".event-card")).toHaveCount(2);
   await expect(page.locator("#event-1")).toContainText("Linked Critical CVE");

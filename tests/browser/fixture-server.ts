@@ -101,7 +101,14 @@ const ruby: FeedEvent = {
     ...patch.payload,
     kind: "advisory",
     title: "Test fixture: Ruby advisory",
-    products: [],
+    products: [
+      {
+        name: { value: "Ruby", evidence: "Ruby advisory" },
+        affected_versions: [],
+        fixed_versions: [],
+        prerequisites: [],
+      },
+    ],
     related_cves: [],
   },
 };
@@ -236,7 +243,15 @@ createServer((req, res) => {
     }
     for (const key of ["technologies", "cve_ids", "event_types"] as const) {
       const value = url.searchParams.get(key);
-      if (value && !row[key].includes(value.slice(4, -1))) return false;
+      if (value) {
+        const keys = value.slice(4, -1).split(",");
+        if (
+          value.startsWith("ov.")
+            ? !keys.some((k) => row[key].includes(k))
+            : !keys.every((k) => row[key].includes(k))
+        )
+          return false;
+      }
     }
     const source = url.searchParams.get("source_id");
     if (source && row.source_id !== source.slice(3)) return false;

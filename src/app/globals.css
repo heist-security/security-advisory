@@ -161,9 +161,10 @@ h1 {
   color: var(--foreground);
 }
 .feed-filters {
-  grid-template-columns:
-    minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)) minmax(0, 1.25fr)
-    auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
   padding: 0 0 20px;
 }
 .filter-actions {
@@ -793,46 +794,96 @@ pre {
   }
 }
 
-.priority-filters {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 20px;
+.choice-filter {
+  position: relative;
   font-size: 12px;
 }
-.priority-filters label {
-  flex-direction: row;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.choice-filter summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: white;
 }
-.priority-filters input[type="checkbox"] {
+.choice-filter[open] summary {
+  border-color: var(--blue-hover);
+}
+.choice-filter fieldset,
+.technology-menu {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 3;
+  width: 280px;
+  max-width: calc(100vw - 32px);
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  margin: 6px 0 0;
+  box-shadow: 0 6px 20px #00000010;
+}
+.choice-filter legend {
+  font-size: 11px;
+}
+.choice-filter label {
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 0;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.choice-filter input[type="checkbox"] {
   width: 14px;
   height: 14px;
   margin: 0;
+  flex-shrink: 0;
 }
-.severity-filter {
-  position: relative;
-}
-.severity-filter summary {
-  cursor: pointer;
-}
-.severity-filter fieldset {
-  position: absolute;
-  z-index: 2;
-  min-width: 225px;
-  background: var(--bg, white);
-  border: 1px solid var(--border);
-  padding: 12px;
+.technology-options {
+  max-height: 220px;
+  overflow-y: auto;
   margin-top: 8px;
 }
-.severity-filter legend {
+.selected-technologies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 10px;
+}
+.selected-technologies button,
+.add-technology {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 7px;
   font-size: 11px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
-.severity-filter label {
-  padding: 5px 0;
+.add-technology {
+  margin-top: 8px;
 }
+.technology-status {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 10px 0 0;
+}
+@media (max-width: 760px) {
+  .feed-filters {
+    position: relative;
+  }
+  .technology-filter {
+    position: static;
+  }
+  .technology-menu {
+    left: 0;
+    right: auto;
+    width: min(300px, 100%);
+    top: calc(100% - 14px);
+  }
+}
+
 .priority-label {
   font-size: 11px;
   font-weight: 600;

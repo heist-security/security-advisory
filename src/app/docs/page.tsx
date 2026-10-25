@@ -12,8 +12,8 @@ export default function Docs() {
         </p>
         <h2>Browse visually</h2>
         <p>
-          <a href="/">Open the feed</a> to search the archive, filter by your
-          stack, and expand source evidence and version details.
+          <a href="/">Open the feed</a> to filter by severity and one or more
+          technologies, and expand source evidence and version details.
         </p>
         <h2>Subscribe</h2>
         <pre>
@@ -43,7 +43,10 @@ export default function Docs() {
             </tr>
             <tr>
               <td>technology</td>
-              <td>Normalized product name, e.g. node-js, or a source ID</td>
+              <td>
+                Up to 10 comma-separated product keys or source IDs, e.g.
+                node-js,ruby (matches any)
+              </td>
             </tr>
             <tr>
               <td>cve</td>

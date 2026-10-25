@@ -3,9 +3,63 @@ import { parseEventQuery, filterQuery } from "../src/lib/filters";
 import { events, rss, type FeedEvent } from "../src/lib/events";
 import { validateEvidence, type Extraction } from "../src/lib/schema";
 import type { Priority } from "../src/lib/priority";
+import { technologyOptions } from "../src/lib/technology-options";
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+});
+it("normalizes technology unions while preserving single-technology URLs", () => {
+  const query = parseEventQuery(
+    new URLSearchParams({ technology: "Ruby,Node.js,Ruby,C++,C#" }),
+  );
+  expect(query.technology).toBe("c-plus-plus,c-sharp,node-js,ruby");
+  expect(parseEventQuery(filterQuery(query)).technology).toBe(query.technology);
+  for (const technology of [
+    "ruby,",
+    "!!!",
+    Array(11).fill("ruby").join(","),
+    "x".repeat(101),
+  ])
+    expect(() =>
+      parseEventQuery(new URLSearchParams({ technology })),
+    ).toThrow();
+  expect(() =>
+    parseEventQuery(new URLSearchParams("technology=ruby&technology=node-js")),
+  ).toThrow();
+});
+it("filters technology unions in the database before pagination", async () => {
+  vi.stubEnv("SUPABASE_URL", "https://database.example.test");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-placeholder");
+  const fetcher = vi.fn(async (_input: RequestInfo | URL) => Response.json([]));
+  vi.stubGlobal("fetch", fetcher);
+  await events({
+    technology: "node-js,ruby",
+    severity: ["critical"],
+    after: 5,
+    limit: 1,
+  });
+  expect(
+    Object.fromEntries(new URL(String(fetcher.mock.calls[0][0])).searchParams),
+  ).toMatchObject({
+    technologies: "ov.{node-js,ruby}",
+    severity_keys: "ov.{critical}",
+    id: "gt.5",
+    limit: "1",
+  });
+});
+it("suggests deduplicated public technology keys with product labels and retained correction keys", () => {
+  const rows = [
+    {
+      technologies: ["node-js", "old-product"],
+      payload: { products: [{ name: { value: "Node.js" } }] },
+    },
+  ];
+  expect(technologyOptions([...rows, ...rows], "node")).toEqual([
+    { value: "node-js", label: "Node.js" },
+  ]);
+  expect(technologyOptions(rows, "old")).toEqual([
+    { value: "old-product", label: "old-product" },
+  ]);
 });
 it("canonicalizes multiple severities and rejects ambiguous subscription parameters", () => {
   const q = parseEventQuery(
