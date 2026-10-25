@@ -1,8 +1,8 @@
 import type { FeedEvent } from "@/lib/events";
 import { technologyKey, type Filters } from "@/lib/filters";
 import { feedLink } from "@/lib/feed-view";
+import { itemLink, summaryPreview } from "@/lib/item-links";
 import { registry, vendorRegistry } from "@/lib/registry";
-import { EventDetails } from "./event-details";
 import { priorityLabels } from "@/lib/priority";
 const sourceNames = new Map(
   [...vendorRegistry, ...registry].map((source) => [source.id, source.name]),
@@ -10,12 +10,20 @@ const sourceNames = new Map(
 export function EventCard({
   event,
   filters = {},
-  expanded = false,
+  returnTo = "/",
 }: {
   event: FeedEvent;
   filters?: Filters;
-  expanded?: boolean;
+  returnTo?: string;
 }) {
+  const href = itemLink(event, returnTo);
+  const products = event.payload.products.slice(0, 3);
+  const cves = event.payload.related_cves.slice(0, 2);
+  const remaining =
+    event.payload.products.length +
+    event.payload.related_cves.length -
+    products.length -
+    cves.length;
   return (
     <article className="event-card" id={"event-" + event.id}>
       <div className="event-meta">
@@ -35,70 +43,40 @@ export function EventCard({
         >
           {sourceNames.get(event.source_id) ?? event.source_id}
         </a>
-        <time dateTime={event.published_at}>
-          {new Date(event.published_at).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            timeZone: "UTC",
-          })}
-        </time>
+        {event.group && event.group.members.length > 1 ? (
+          <span className="group-sources">
+            {event.group.members.length} source records
+          </span>
+        ) : null}
+        {event.context_update ? <span>Risk context updated</span> : null}
+        {event.group?.changed.payload.kind === "withdrawal" &&
+        event.payload.kind !== "withdrawal" ? (
+          <span>Source withdrawal</span>
+        ) : null}
       </div>
       <h3>
-        <a href={event.source_url}>{event.payload.title}</a>
+        <a href={href}>{event.payload.title}</a>
       </h3>
-      <p>{event.payload.summary}</p>
-      {event.context_update ? (
-        <p className="context-update">
-          CVE context updated · The publisher announcement is unchanged.
-        </p>
-      ) : null}
-      {event.source_published_at ? (
-        <p className="publisher-date">
-          Announced{" "}
-          <time dateTime={event.source_published_at}>
-            {new Date(event.source_published_at).toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-              timeZone: "UTC",
-            })}
-          </time>
-        </p>
-      ) : null}
+      <p className="event-summary">{summaryPreview(event.payload.summary)}</p>
       <div className="tags">
-        {event.payload.products.map((p, i) => (
+        {products.map((product, i) => (
           <a
             key={i}
             href={feedLink({
               ...filters,
-              technology: technologyKey(p.name.value),
+              technology: technologyKey(product.name.value),
             })}
           >
-            {p.name.value}
-            {p.fixed_versions.length
-              ? " · Fixed in " + p.fixed_versions.map((v) => v.value).join(", ")
-              : ""}
+            {product.name.value}
           </a>
         ))}
-        {event.payload.related_cves.map((c) => (
-          <a key={c.value} href={feedLink({ ...filters, cve: c.value })}>
-            {c.value}
+        {cves.map((cve) => (
+          <a key={cve.value} href={feedLink({ ...filters, cve: cve.value })}>
+            {cve.value}
           </a>
         ))}
+        {remaining > 0 ? <a href={href}>+{remaining} more</a> : null}
       </div>
-      <div className="event-foot">
-        <span>
-          {event.extraction_method === "system"
-            ? "Automated correction"
-            : event.extraction_method === "structured"
-              ? "Structured advisory"
-              : "Machine-extracted"}{" "}
-          · Revision {event.revision}
-        </span>
-        <a href={event.source_url}>Original source</a>
-      </div>
-      {expanded ? <EventDetails event={event} /> : null}
     </article>
   );
 }

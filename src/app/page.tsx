@@ -30,6 +30,7 @@ export default async function Feed({
     unavailable = !configured();
   try {
     query = parseEventQuery(params, 20);
+    query.view ??= "grouped";
     if (query.after !== undefined)
       throw new Error("Use the JSON API for incremental cursors");
     query.limit = Math.min(query.limit, 50);
@@ -53,8 +54,13 @@ export default async function Feed({
       : [];
   const filters = filterQuery(query),
     suffix = filters.size ? "?" + filters : "";
+  const hasFilters = [...filters.keys()].some((key) => key !== "view");
   const groups = groupEvents(rows);
   const latest = feedLink(query);
+  const returnTo = feedLink(query, {
+    ...(query.before !== undefined ? { before: String(query.before) } : {}),
+    limit: String(query.limit),
+  });
   return (
     <main id="main" className="container browser-feed">
       <section className="browser-heading">
@@ -88,7 +94,7 @@ export default async function Feed({
               <>
                 No earlier events. <a href={latest}>Back to latest events</a>
               </>
-            ) : filters.size ? (
+            ) : hasFilters ? (
               "No events match your filters."
             ) : (
               "No events yet."
@@ -115,7 +121,7 @@ export default async function Feed({
                     key={event.id}
                     event={event}
                     filters={query}
-                    expanded
+                    returnTo={returnTo}
                   />
                 ))}
               </section>

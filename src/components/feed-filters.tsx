@@ -29,6 +29,12 @@ export function FeedFilters({
         update({});
       }}
     >
+      {filters.view ? (
+        <input type="hidden" name="view" value={filters.view} />
+      ) : null}
+      {filters.group ? (
+        <input type="hidden" name="group" value={filters.group} />
+      ) : null}
       <input
         className="feed-search"
         type="search"
@@ -62,7 +68,9 @@ export function FeedFilters({
         initialOptions={technologies}
         onChange={(values) => update({ technology: values.join(",") })}
       />
-      {Object.values(filters).some(Boolean) ? (
+      {Object.entries(filters).some(
+        ([key, value]) => key !== "view" && value,
+      ) ? (
         <div className="filter-actions">
           <a href="/">Reset filters</a>
         </div>

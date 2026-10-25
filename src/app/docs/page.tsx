@@ -15,16 +15,30 @@ export default function Docs() {
           <a href="/">Open the feed</a> to search announcements and filter by
           type, severity and one or more technologies. Technology search covers
           the full observed product catalog. Release versions share a product
-          choice; packages retain their ecosystem and namespace. Expand each
-          announcement for its original product names, source evidence and
-          affected versions.
+          choice; packages retain their ecosystem and namespace. Open each
+          announcement for its source records, affected versions, evidence and
+          revision history.
         </p>
         <h2>Subscribe</h2>
+        <p>
+          The visual feed combines confirmed copies of the same advisory. Use
+          view=grouped for the same groups in JSON and RSS. Each group preserves
+          its source records and their individual fixes and ratings.
+        </p>
         <pre>
           {
-            "/feed.xml\n/feed.xml?technology=node-js\n/feed.xml?type=patch&technology=ruby\n/feed.xml?cve=CVE-2026-12345"
+            "/feed.xml?view=grouped\n/feed.xml?view=grouped&technology=node-js\n/api/v1/events?view=grouped\n/api/v1/events?view=grouped&after=0"
           }
         </pre>
+        <p>
+          Grouped JSON returns current groups by default; after=0 starts its
+          update history. RSS publishes meaningful group updates, including
+          source withdrawals. Matching copies add attribution without repeating
+          the announcement. JSON includes the original events in group.members.
+          Grouped responses use schema_version 2 and separate cursor and RSS
+          GUID namespaces. Existing subscriptions without view=grouped keep
+          their original behavior; start a fresh cursor when switching views.
+        </p>
         <h2>Filter the shared stream</h2>
         <table>
           <thead>

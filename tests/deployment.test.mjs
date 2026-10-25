@@ -336,7 +336,7 @@ test("backfill batches finish before deployment and retain safe failure categori
     },
     async () => {},
   );
-  assert.equal(calls, 3);
+  assert.equal(calls, 4);
   await assert.rejects(
     migrate(configuration(env), env, (cmd) =>
       cmd === "supabase"
@@ -383,4 +383,17 @@ test("both backfills must complete; a technology failure blocks release", async 
   );
   assert.equal(procedures.length, 2);
   assert.match(procedures[1], /backfill_event_technologies/);
+});
+
+test("an advisory grouping backfill failure prevents deployment", async () => {
+  const env = environment();
+  await assert.rejects(
+    migrate(configuration(env), env, (cmd, args) => {
+      if (cmd === "supabase") return { status: 0 };
+      return args.at(-1).includes("backfill_advisory_groups")
+        ? { status: 1, stderr: "ERROR: 57014 private data" }
+        : { status: 0, stdout: "100|0|t" };
+    }),
+    /Advisory grouping backfill failed \(query timeout or cancellation\)/,
+  );
 });

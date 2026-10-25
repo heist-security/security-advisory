@@ -27,19 +27,22 @@ test("feed search applies after typing stops and clearing restores the feed", as
   await expect(page.locator("#event-3")).toBeVisible();
   await search.fill("");
   await page.clock.runFor(300);
-  await expect(page).toHaveURL("/");
-  await expect(page.locator(".event-card")).toHaveCount(4);
+  await expect(page).toHaveURL("/?view=grouped");
+  await expect(page.locator(".event-card")).toHaveCount(3);
   await expect(
     page
       .getByRole("navigation", { name: "Feed formats" })
       .getByRole("link", { name: "RSS", exact: true }),
-  ).toHaveAttribute("href", "/feed.xml");
+  ).toHaveAttribute("href", "/feed.xml?view=grouped");
 });
 
 test("a selection includes pending search text and resets the feed cursor", async ({
   page,
 }) => {
-  await page.goto("/?source=nodejs&limit=1&before=2");
+  const group = "advisory:00000000-0000-0000-0000-000000000001";
+  await page.goto(
+    `/?view=events&group=${encodeURIComponent(group)}&source=nodejs&limit=1&before=2`,
+  );
   await expect(page.locator("#event-1")).toBeVisible();
   await page.clock.install();
   await page.clock.pauseAt(new Date());
@@ -51,6 +54,8 @@ test("a selection includes pending search text and resets the feed cursor", asyn
     .selectOption("withdrawal");
   await expect(page).toHaveURL(/type=withdrawal/);
   expect(new URL(page.url()).searchParams.get("source")).toBe("nodejs");
+  expect(new URL(page.url()).searchParams.get("view")).toBe("events");
+  expect(new URL(page.url()).searchParams.get("group")).toBe(group);
   expect(new URL(page.url()).searchParams.get("q")).toBe("fictional");
   expect(new URL(page.url()).searchParams.has("before")).toBe(false);
   await page.clock.runFor(300);
@@ -74,8 +79,8 @@ test("technology suggestions do not apply until selected, and deselecting clears
   await expect(page).toHaveURL(/technology=ruby/);
   await expect(page.locator("#event-3")).toBeVisible();
   await ruby.uncheck();
-  await expect(page).toHaveURL("/");
-  await expect(page.locator(".event-card")).toHaveCount(4);
+  await expect(page).toHaveURL("/?view=grouped");
+  await expect(page.locator(".event-card")).toHaveCount(3);
   await page.getByLabel("Search technologies", { exact: true }).press("Escape");
   await page.locator(".severity-filter summary").click();
   const critical = page.getByRole("checkbox", {
@@ -85,8 +90,8 @@ test("technology suggestions do not apply until selected, and deselecting clears
   await critical.check();
   await expect(page).toHaveURL(/severity=critical/);
   await critical.uncheck();
-  await expect(page).toHaveURL("/");
-  await expect(page.locator(".event-card")).toHaveCount(4);
+  await expect(page).toHaveURL("/?view=grouped");
+  await expect(page.locator(".event-card")).toHaveCount(3);
 });
 
 test("source filters apply automatically and keep the selected catalog", async ({

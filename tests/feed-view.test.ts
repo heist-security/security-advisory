@@ -2,6 +2,31 @@ import { expect, it } from "vitest";
 import { parseEventQuery, filterQuery } from "../src/lib/filters";
 import { feedLink, groupEvents } from "../src/lib/feed-view";
 import type { FeedEvent } from "../src/lib/events";
+import { groupRouteId, returnToFeed } from "../src/lib/item-links";
+
+it("resolves escaped group routes and restricts return links to the local feed", () => {
+  const id = "osv:GHSA-7x63-xv5r-3p2x";
+  expect(groupRouteId(id)).toBe(id);
+  expect(groupRouteId(encodeURIComponent(id))).toBe(id);
+  for (const value of [
+    "%",
+    "osv:unknown",
+    "%2Fother",
+    encodeURIComponent(encodeURIComponent(id)),
+  ])
+    expect(groupRouteId(value)).toBeNull();
+  expect(returnToFeed("/?q=oauth&before=100&limit=1")).toBe(
+    "/?q=oauth&before=100&limit=1",
+  );
+  for (const value of [
+    "https://evil.example",
+    "//evil.example",
+    "/\\evil.example",
+    "/events/1",
+    "/\n/evil.example",
+  ])
+    expect(returnToFeed(value)).toBe("/");
+});
 it("normalizes bounded search and shares it between browser and subscriptions", () => {
   const query = parseEventQuery(
     new URLSearchParams("q=++certificate+++validation++&type=patch"),

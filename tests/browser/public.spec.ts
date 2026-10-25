@@ -3,7 +3,7 @@ test("unified feed filters update both subscription formats without layout overf
   page,
 }, info) => {
   await page.goto("/");
-  await expect(page.locator(".event-card")).toHaveCount(4);
+  await expect(page.locator(".event-card")).toHaveCount(3);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "Security feed",
   );
@@ -36,12 +36,12 @@ test("unified feed filters update both subscription formats without layout overf
     page
       .getByRole("navigation", { name: "Feed formats" })
       .getByRole("link", { name: "RSS", exact: true }),
-  ).toHaveAttribute("href", "/feed.xml?technology=node-js");
+  ).toHaveAttribute("href", "/feed.xml?view=grouped&technology=node-js");
   await expect(
     page
       .getByRole("navigation", { name: "Feed formats" })
       .getByRole("link", { name: "JSON", exact: true }),
-  ).toHaveAttribute("href", "/api/v1/events?technology=node-js");
+  ).toHaveAttribute("href", "/api/v1/events?view=grouped&technology=node-js");
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(page.viewportSize()!.width);

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     const params = filterQuery(query);
     if (query.limit !== 100) params.set("limit", String(query.limit));
     const self = baseUrl() + "/feed.xml" + (params.size ? "?" + params : "");
-    return new Response(rss(await events(query), baseUrl(), self), {
+    return new Response(rss(await events(query, true), baseUrl(), self), {
       headers: {
         ...eventHeaders,
         "Content-Type": "application/rss+xml; charset=utf-8",

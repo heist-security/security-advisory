@@ -22,13 +22,15 @@ Different filters combine with AND. Repeated API parameters, conflicting type/ki
 
 ## Visual browsing and keyword search
 
-`/` provides a newest-first timeline, expandable evidence, active-filter links and cursor navigation. Dates use UTC and reflect when events were added to Heist Feed. It defaults to 20 events per page and caps visual pages at 50; RSS/JSON keep their existing limits. Existing `/feed` URLs redirect to `/` and preserve query parameters. The visual page uses `before` for older results; use JSON for `after` cursors.
+`/` provides a compact newest-first list, active-filter links and cursor navigation. Item titles open detail pages containing source evidence, affected versions and revision history. Dates use UTC and reflect when events were added to Heist Feed. It defaults to 20 events per page and caps visual pages at 50; RSS/JSON keep their existing limits. Existing `/feed` URLs redirect to `/` and preserve query parameters. The visual page uses `before` for older results; use JSON for `after` cursors.
 
 `q` searches words in published event text, product/version evidence, source IDs and historical subscription keys. All supplied words must match; punctuation is handled by PostgreSQL's simple text-search dictionary. It searches the event archive, not just the currently displayed page, and does not search private raw documents. Use the structured technology/CVE filters for precise subscriptions. A correction retains historical routing keys but not all previous free-text wording, so a title-specific keyword search may omit a later correction.
 
 Examples: `/?q=authentication`, `/feed.xml?q=authentication&type=patch`, `/api/v1/events?q=authentication&after=0`.
 
 ## Incremental consumption
+
+The website's JSON/RSS links use `view=grouped`. This opt-in view returns one current card per group, or immutable group updates when using JSON `after` or RSS. It has its own cursor/GUID namespace and exposes original source events in `group.members`. Existing URLs retain raw event semantics. Read [grouping, source evidence and subscription compatibility](advisory-grouping.md) before switching an existing consumer.
 
 Start at /api/v1/events?after=0&limit=100. Persist next_after only after processing the returned batch. Repeat with the same filters. Empty batches preserve the cursor. IDs can have gaps. Changing filters requires a new cursor to backfill the new subscription.
 

@@ -10,9 +10,9 @@ Every event links to its source. Structured records preserve upstream identifier
 
 ## Browse the visual feed
 
-The homepage `/` displays the events and filters directly. Existing `/feed` links redirect to the homepage with their filters intact. Search announcements, filter by type, technology, CVE or source, and expand each event to inspect version details and source evidence. Structured imports identify source records and fields; vendor extractions include quotations. URLs preserve the current view, and its RSS/JSON links use the same filters. No account is required.
+The homepage `/` displays a compact list with filters. Each title opens a dedicated detail page. Existing `/feed` links redirect to the homepage with their filters intact. Search announcements, filter by type, technology, CVE or source, and open each item to inspect version details, source evidence and revision history. Structured imports identify source records and fields; vendor extractions include quotations. URLs preserve the current view, and its RSS/JSON links use the same filters. No account is required.
 
-Search requires migration `202610240005_feed_search.sql`; the production workflow applies it before deploying this version.
+The reader groups confirmed copies of an advisory into one card, preserving all source evidence and revision history. Its JSON/RSS links use `view=grouped`; existing event subscriptions remain compatible. See [grouping and subscription semantics](docs/advisory-grouping.md). The production workflow applies migrations and finishes the grouping backfill before deploying this version.
 
 ## One stream, optional filters
 
@@ -99,7 +99,7 @@ It spends provider credits. The bundled synthetic cases are smoke tests, not a p
 - Quotation matching does not prove product/version association. Unknown information should remain unknown.
 - Public feeds expose only a publisher's current feed window. Entries that disappear before polling cannot be recovered without a publisher-specific historical API. Feeds above the explicit transport/entry limits fail visibly; they are not silently truncated.
 - Changed article text may create a revision even when its security meaning is unchanged.
-- Distinct sources remain distinct advisories; related CVEs are links, not deduplication keys.
+- Source records remain distinct. Confirmed OSV mirrors share a display group; related CVEs alone are not deduplication keys.
 - Vendor display version strings preserve publisher wording. Structured affected data retains each upstream format and ecosystem semantics; consumers need format-aware matching.
 - Structured startup imports changes since an explicit checkpoint, not the full historical database. Expired upstream history and oversized data fail visibly.
 - Raw source text and queue data are private. Operators must set a retention policy and review upstream terms.
