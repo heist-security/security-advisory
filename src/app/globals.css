@@ -792,3 +792,56 @@ pre {
     background-image: none;
   }
 }
+
+.priority-filters {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  font-size: 12px;
+}
+.priority-filters label {
+  flex-direction: row;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.priority-filters input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+.severity-filter {
+  position: relative;
+}
+.severity-filter summary {
+  cursor: pointer;
+}
+.severity-filter fieldset {
+  position: absolute;
+  z-index: 2;
+  min-width: 225px;
+  background: var(--bg, white);
+  border: 1px solid var(--border);
+  padding: 12px;
+  margin-top: 8px;
+}
+.severity-filter legend {
+  font-size: 11px;
+}
+.severity-filter label {
+  padding: 5px 0;
+}
+.priority-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+.event-card .publisher-date,
+.event-card .context-update {
+  font-size: 12px;
+  color: var(--muted);
+}
+.linked-ratings > div {
+  margin: 12px 0;
+}

@@ -207,3 +207,52 @@ test("the homepage is the reader and old feed URLs preserve filters", async ({
   await expect(page.locator("#event-1")).toBeVisible();
   await expect(page.locator(".event-card")).toHaveCount(1);
 });
+
+test("severity and important filters share RSS/JSON and keep correction delivery", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await page.locator(".severity-filter summary").click();
+  await page.getByRole("checkbox", { name: "Critical", exact: true }).check();
+  await page.getByRole("checkbox", { name: "High", exact: true }).check();
+  await page.locator(".severity-filter summary").click();
+  await page
+    .getByRole("checkbox", { name: "Important updates", exact: true })
+    .check();
+  await page
+    .getByRole("checkbox", { name: "Fix available", exact: true })
+    .check();
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await expect(page.locator(".event-card")).toHaveCount(2);
+  await expect(page.locator("#event-1")).toContainText("Linked Critical CVE");
+  await page
+    .locator("#event-1")
+    .getByText("Evidence and details", { exact: false })
+    .click();
+  await expect(page.locator("#event-1 .linked-ratings")).toContainText(
+    "GitLab",
+  );
+  const href = await page
+    .getByRole("navigation", { name: "Feed formats" })
+    .getByRole("link", { name: "RSS", exact: true })
+    .getAttribute("href");
+  expect(new URL(href!, page.url()).searchParams.get("severity")).toBe(
+    "critical,high",
+  );
+  const json = await (
+    await request.get(href!.replace("/feed.xml", "/api/v1/events"))
+  ).json();
+  expect(json.data.map((e: { id: number }) => e.id)).toEqual([2, 1]);
+  const xml = await (await request.get(href!)).text();
+  expect(xml).toContain("Linked Critical CVE");
+  expect(xml).toContain("heist-event:2");
+  await page.reload();
+  await page.locator(".severity-filter summary").click();
+  await expect(
+    page.getByRole("checkbox", { name: "Critical", exact: true }),
+  ).toBeChecked();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(page.viewportSize()!.width);
+});

@@ -4,16 +4,19 @@ All publishers contribute to one event stream. The visual page at `/`, RSS and J
 
 ## Filters
 
-| Parameter  | Meaning                                                  | Example        |
-| ---------- | -------------------------------------------------------- | -------------- |
-| q          | Keyword search, up to 120 characters                     | authentication |
-| type       | Advisory classification; kind remains a compatible alias | patch          |
-| technology | Normalized product-name key, or an exact source ID       | node-js        |
-| cve        | CVE identifier, case-insensitive input                   | CVE-2026-12345 |
-| source     | Exact source ID from the catalog                         | ruby           |
-| limit      | Number of events, 1-100                                  | 100            |
-| after      | JSON only: ascending incremental cursor, exclusive       | 0              |
-| before     | JSON only: newest-first pagination, exclusive            | 123            |
+| Parameter  | Meaning                                                     | Example        |
+| ---------- | ----------------------------------------------------------- | -------------- |
+| q          | Keyword search, up to 120 characters                        | authentication |
+| type       | Advisory classification; kind remains a compatible alias    | patch          |
+| technology | Normalized product-name key, or an exact source ID          | node-js        |
+| cve        | CVE identifier, case-insensitive input                      | CVE-2026-12345 |
+| source     | Exact source ID from the catalog                            | ruby           |
+| severity   | One or more publisher/linked severity ratings               | critical,high  |
+| important  | High/Critical OR known exploited OR unrated security fix    | 1              |
+| fix        | Documented fixed versions (including structured advisories) | 1              |
+| limit      | Number of events, 1-100                                     | 100            |
+| after      | JSON only: ascending incremental cursor, exclusive          | 0              |
+| before     | JSON only: newest-first pagination, exclusive               | 123            |
 
 Different filters combine with AND. Repeated API parameters, conflicting type/kind, invalid values and simultaneous after/before produce 400. Technology input is lowercased, runs of non-ASCII-alphanumeric characters become hyphens, and edge hyphens are trimmed. For example Node.js becomes node-js, C++ becomes c-plus-plus and C# becomes c-sharp. Keys derive from evidenced product names; this is not a curated alias/ontology service. Source IDs provide a stable alternative.
 
@@ -84,7 +87,7 @@ When a newer document is classified as non-security after a published event, ext
 
 ## Caching, errors and source catalog
 
-Public event responses are cacheable for 60 seconds with a five-minute stale window. No client key is required. Hosting rate limits can return 429; honor Retry-After. Malformed requests return 400. Unavailable data returns 503 and Retry-After: 60.
+Public event responses use `Cache-Control: no-store`; each request reads the database. No client key is required. Hosting rate limits can return 429; honor Retry-After. Malformed requests return 400. Unavailable data returns 503 and Retry-After: 60.
 
 The source catalog is paginated at /api/v1/sources?page=1, with 24 records per page and optional q, channel and category filters. It is the shipped catalog, not the live database enablement state or uptime. Source changes may be observed during pagination; this endpoint is not an immutable catalog snapshot API.
 
@@ -97,3 +100,19 @@ Events from `core-osv`, `core-cve` and `core-kev` expose `extraction_method: "st
 `GET /api/v1/risk?cve=CVE-2021-44228` returns KEV membership details and dated EPSS probability/percentile with explicit provider availability. Supply up to 40 comma-separated CVEs. Optional `nvd=1` adds NVD metrics/configurations for exactly one CVE. Null means no returned record or unavailable data, not zero risk. Results can be cached for 15 minutes; enrichment outages never block the event feed. See [semantics, checkpoints and limits](structured-sources.md).
 
 The source catalog defaults to core and opted-in vendor sources. `catalog=vendor` lists the historical vendor catalog for selection; it is not a live list of enabled database rows.
+
+## Severity and patch relationships
+
+`severity=critical,high` matches any selected severity; valid values are `critical`, `high`, `medium`, `low`, `unknown` (displayed as Unrated). Values are canonicalized and deduplicated. `important=1` and `fix=1` are independent filters and combine with other filters using AND. Adding a severity to Important updates narrows the preset and can exclude unrated fixes. All filtering happens in PostgreSQL before pagination.
+
+Every event includes a `priority` snapshot with `severity` (the highest publisher or linked CVE rating), `publisher_severity`, `linked_cves`, `fix_available`, `known_exploited` and `reasons`. `payload.severity` remains the publisher's original rating. Each linked rating preserves its CVE, source URL, affected product names, native metrics and relationship evidence. Conflicting current provider ratings are retained; the highest is used for filtering. Latest provider revisions are used, withdrawn records are excluded, and a rejected CVE cannot acquire severity through an older OSV record. KEV absence is not proof of no exploitation.
+
+A publisher's `related_cves` alone never establishes remediation. New extractions provide `fixed_cves` with a product and exact remediation quotation. The product must have an evidenced fixed version; mention-only, negated, future or unsupported relationships are rejected. The deterministic guard currently recognizes English remediation wording; otherwise a patch remains eligible as an unrated security fix. Structured CVE/OSV identities and aliases establish their own advisory relationships.
+
+Historical publisher patches are linked only when their extracted title is a verbatim opening source heading that explicitly names CVE fixes and the record has documented fixed versions. Mere mentions and later related-article headlines do not qualify. This conservative backfill covers the original Ruby/GitLab fix announcement without assigning every Ruby release the GitLab rating. Other historical records may remain unrated until a future source extraction supplies explicit relationship evidence. No paid re-extraction is queued by this migration.
+
+A Ruby patch linked to a Critical GitLab vulnerability is labelled **Linked Critical CVE**; this does not assert Ruby itself or every Ruby application has the same CVSS score. Native CVSS metrics stay attached to the originating product/record, not combined into a new score.
+
+Changes to linked severity, exploitation or displayed evidence append a context-only event with `context_update: true`, a new ID, revision and RSS GUID. It preserves the source announcement and original date; it does not consume a model attempt or pretend a new release was published. Unchanged context does not emit duplicates. Consumers should replace the previous revision for the same `advisory_id`. Initial migration enrichment does not replay historical notifications; existing consumers wanting the newly introduced filters must start a fresh backfill.
+
+Severity, important and fix routing retain prior subscription matches so downgrades and withdrawals reach existing subscribers. Thus a Critical subscription may receive a later Low revision or withdrawal; `priority` describes that revision's actual classification. Publisher dates appear on cards separately from feed publication dates so backfilled releases are not presented as newly announced fixes.

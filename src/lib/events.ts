@@ -3,6 +3,7 @@ import type { Extraction } from "./schema";
 import type { EventQuery } from "./filters";
 import { isStructured } from "./structured/config";
 import type { StructuredPayload } from "./structured/normalize";
+import { priorityLabels, type Priority } from "./priority";
 export type FeedEvent = {
   id: number;
   advisory_id: string;
@@ -15,6 +16,8 @@ export type FeedEvent = {
   technologies: string[];
   cve_ids: string[];
   event_types: string[];
+  priority?: Priority;
+  context_update?: boolean;
   payload: Extraction & {
     structured?: StructuredPayload["structured"];
     correction_reason?: string;
@@ -25,7 +28,7 @@ export async function events(options: Partial<EventQuery> = {}) {
   let query = db()
     .from("events")
     .select(
-      "id,advisory_id,revision,source_id,source_url,source_published_at,published_at,extraction_method,technologies,cve_ids,event_types,payload",
+      "id,advisory_id,revision,source_id,source_url,source_published_at,published_at,extraction_method,technologies,cve_ids,event_types,payload,priority,context_update",
     )
     .order("id", { ascending: options.after !== undefined })
     .limit(options.limit ?? 30);
@@ -36,6 +39,10 @@ export async function events(options: Partial<EventQuery> = {}) {
     query = query.contains("technologies", [options.technology]);
   if (options.cve) query = query.contains("cve_ids", [options.cve]);
   if (options.source) query = query.eq("source_id", options.source);
+  if (options.severity?.length)
+    query = query.overlaps("severity_keys", options.severity);
+  if (options.important) query = query.eq("important", true);
+  if (options.fix) query = query.eq("fix_available", true);
   if (options.q)
     query = query.textSearch("search_document", options.q, {
       type: "plain",
@@ -79,6 +86,27 @@ export function rss(
     .map((row) => {
       const summary =
         row.payload.summary +
+        (row.priority
+          ? "\n\n" + priorityLabels(row.priority).join(" · ")
+          : "") +
+        (row.context_update
+          ? "\nCVE context updated; this is not a new publisher release."
+          : "") +
+        (row.priority?.linked_cves.length
+          ? "\nLinked ratings describe the referenced CVEs and their products, not every use of this dependency.\n" +
+            row.priority.linked_cves
+              .map(
+                (c) =>
+                  c.cve +
+                  ": " +
+                  c.severity +
+                  " (" +
+                  c.products.map((p) => p.name.value).join(", ") +
+                  ") — " +
+                  c.source_url,
+              )
+              .join("\n")
+          : "") +
         "\n\n" +
         (row.extraction_method === "system"
           ? "Automated extraction correction."

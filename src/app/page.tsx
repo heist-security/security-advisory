@@ -13,6 +13,7 @@ import {
 import { feedLink, groupEvents, dayLabel, typeLabels } from "@/lib/feed-view";
 import { registry } from "@/lib/registry";
 import { EventCard } from "@/components/event-card";
+import { SeverityFilter } from "@/components/severity-filter";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Security feed",
@@ -125,6 +126,31 @@ export default async function Feed({
             Filter
           </button>
           {filters.size > 0 && !error ? <a href="/">Reset filters</a> : null}
+        </div>
+        <div className="priority-filters">
+          <SeverityFilter
+            key={query.severity?.join(",") ?? "all"}
+            selected={query.severity}
+          />
+          <label>
+            <input
+              type="checkbox"
+              name="important"
+              value="1"
+              defaultChecked={!!query.important}
+            />
+            Important updates
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              name="fix"
+              value="1"
+              defaultChecked={!!query.fix}
+            />
+            Fix available
+          </label>
+          <a href="/docs#priority">How priority works</a>
         </div>
       </form>
       <section className="feed-reader" aria-label="Security announcements">

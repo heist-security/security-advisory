@@ -8,13 +8,25 @@ test("unified feed filters update both subscription formats without layout overf
     "Security feed",
   );
   if (info.project.name === "desktop") {
+    // The primary controls share one row; priority options sit below them.
     const controls = await page
       .getByRole("search")
-      .locator("input, select, button")
+      .locator(
+        ":scope > label input, :scope > label select, .filter-actions button",
+      )
       .evaluateAll((elements) =>
-        elements.map((element) => element.getBoundingClientRect().top),
+        elements.map((element) => {
+          const { top, bottom } = element.getBoundingClientRect();
+          return { top, bottom };
+        }),
       );
-    expect(Math.max(...controls) - Math.min(...controls)).toBeLessThan(1);
+    expect(controls).toHaveLength(6);
+    const tops = controls.map((control) => control.top);
+    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(1);
+    const priority = await page.locator(".priority-filters").boundingBox();
+    expect(priority!.y).toBeGreaterThanOrEqual(
+      Math.max(...controls.map((control) => control.bottom)),
+    );
   }
   await page.getByLabel("Technology", { exact: true }).fill("Node.js");
   await page.getByLabel("CVE", { exact: true }).fill("CVE-2026-12345");

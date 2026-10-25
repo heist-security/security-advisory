@@ -247,3 +247,11 @@ These are not enabled by committing repository files:
 - [ ] Confirm license, attribution, private reporting and repository protection settings.
 
 CI is not evidence that hosted controls or live model quality passed these checks.
+
+### Severity and linked patch rollout
+
+The event-priority migration adds database-side severity, Important updates and Fix available subscription indexes. It snapshots linked CVE context and backfills existing records without queueing paid extraction or replaying historical notifications. It takes the publication lock during migration; review the backfill and normal migration/deployment checks before merging. No production migration was applied during implementation.
+
+New model responses extract explicit `fixed_cves` evidence; provider severity remains unchanged. Historical linking only accepts verbatim opening remediation headings. Model relationship quality is not established by deterministic validation alone: evaluate relevant, unrelated, negated and cross-product examples before claiming extraction precision or coverage. No live paid evaluation was performed for this change.
+
+After deployment, verify `/api/v1/events?source=ruby&severity=critical&fix=1` includes the original GitLab-related fix with attributed GitLab ratings, and `/feed.xml?important=1` includes unrated security fixes. Compare website/RSS/JSON and check `context_update` revisions on a controlled fixture for late ratings, downgrades and KEV removals. Existing consumers adopting these new filters must backfill from a fresh cursor. Historical severity-routing keys intentionally deliver subsequent corrections even after their priority falls.

@@ -21,6 +21,17 @@ export const extractionSchema = z.object({
     )
     .max(30),
   related_cves: z.array(fact).max(50),
+  // Optional on historical/structured records; required in new model responses.
+  fixed_cves: z
+    .array(
+      z.object({
+        cve: z.string().regex(/^CVE-\d{4}-\d{4,}$/),
+        product: z.string().min(1).max(500),
+        evidence: z.string().min(1).max(2500),
+      }),
+    )
+    .max(50)
+    .optional(),
   severity: z.enum(["critical", "high", "medium", "low", "unknown"]),
   severity_evidence: z.string().max(1000).nullable(),
 });
@@ -59,6 +70,27 @@ export function validateEvidence(data: Extraction, text: string): Extraction {
     check(cve.evidence);
     if (!cve.evidence.includes(cve.value))
       throw new Error("CVE absent from evidence");
+  }
+  for (const link of data.fixed_cves ?? []) {
+    check(link.evidence);
+    if (
+      !link.evidence.includes(link.cve) ||
+      !link.evidence.includes(link.product) ||
+      !data.related_cves.some((c) => c.value === link.cve) ||
+      !data.products.some(
+        (p) => p.name.value === link.product && p.fixed_versions.length,
+      ) ||
+      !/\b(fix(?:es|ed)?|patch(?:es|ed)?|address(?:es|ed)?|resolv(?:es|ed))\b/i.test(
+        link.evidence,
+      ) ||
+      /\b(not|unfixed|unpatched|unresolved|unrelated|doesn't|does not|will|planned)\b/i.test(
+        link.evidence,
+      ) ||
+      data.kind === "withdrawal"
+    )
+      throw new Error(
+        "CVE fix relationship requires explicit remediation evidence and a fixed product",
+      );
   }
   if (data.severity !== "unknown") {
     check(data.severity_evidence ?? "");

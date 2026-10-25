@@ -1,4 +1,5 @@
 import type { FeedEvent } from "@/lib/events";
+import { severityLabel } from "@/lib/priority";
 type Fact = { value: string; evidence: string };
 function Evidence({
   value,
@@ -133,6 +134,33 @@ export function EventDetails({ event }: { event: FeedEvent }) {
               <Evidence value={p.severity_evidence} structured={structured} />
             ) : null}
           </div>
+        ) : null}
+        {event.priority?.linked_cves.length ? (
+          <section className="linked-ratings">
+            <h4>Linked CVE context</h4>
+            <p>
+              These ratings describe the referenced vulnerabilities and
+              products. They are not a severity rating for every application
+              using this dependency.
+            </p>
+            {event.priority.linked_cves.map((link, i) => (
+              <div key={i}>
+                <a href={link.source_url}>
+                  {link.cve} · {severityLabel(link.severity)}
+                </a>
+                <p>
+                  {link.products.map((p) => p.name.value).join(", ")}
+                  {link.known_exploited ? " · Known exploited (CISA KEV)" : ""}
+                </p>
+                {link.relationship === "fixes" ? (
+                  <>
+                    <strong>Fix relationship</strong>
+                    <blockquote>{link.relationship_evidence}</blockquote>
+                  </>
+                ) : null}
+              </div>
+            ))}
+          </section>
         ) : null}
         <dl className="record-meta">
           <div>

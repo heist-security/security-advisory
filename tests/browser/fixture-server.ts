@@ -13,6 +13,26 @@ const patch: FeedEvent = {
   technologies: ["nodejs", "node-js"],
   cve_ids: ["CVE-2026-12345"],
   event_types: ["patch"],
+  priority: {
+    severity: "critical",
+    publisher_severity: "unknown",
+    known_exploited: false,
+    fix_available: true,
+    reasons: ["linked_severity"],
+    linked_cves: [
+      {
+        cve: "CVE-2026-12345",
+        relationship: "fixes",
+        relationship_evidence: "Node.js fixes CVE-2026-12345.",
+        source_id: "core-cve",
+        source_url: "https://example.org/test-only/cve",
+        severity: "critical",
+        products: [{ name: { value: "GitLab" } }],
+        metrics: [],
+        known_exploited: false,
+      },
+    ],
+  },
   payload: {
     security_relevant: true,
     kind: "patch",
@@ -34,6 +54,14 @@ const patch: FeedEvent = {
 };
 const correction: FeedEvent = {
   ...patch,
+  priority: {
+    severity: "unknown",
+    publisher_severity: "unknown",
+    known_exploited: false,
+    fix_available: false,
+    reasons: [],
+    linked_cves: [],
+  },
   id: 2,
   revision: 2,
   extraction_method: "system",
@@ -54,6 +82,14 @@ const correction: FeedEvent = {
 };
 const ruby: FeedEvent = {
   ...patch,
+  priority: {
+    severity: "unknown",
+    publisher_severity: "unknown",
+    known_exploited: false,
+    fix_available: false,
+    reasons: [],
+    linked_cves: [],
+  },
   id: 3,
   advisory_id: "test-advisory-ruby",
   source_id: "ruby",
@@ -71,6 +107,14 @@ const ruby: FeedEvent = {
 };
 const structured: FeedEvent = {
   ...patch,
+  priority: {
+    severity: "unknown",
+    publisher_severity: "unknown",
+    known_exploited: false,
+    fix_available: false,
+    reasons: [],
+    linked_cves: [],
+  },
   id: 4,
   advisory_id: "test-advisory-osv",
   source_id: "core-osv",
@@ -115,7 +159,14 @@ const structured: FeedEvent = {
     },
   },
 };
-const rows = [structured, ruby, correction, patch];
+const routing = (row: FeedEvent) => ({
+  ...row,
+  severity_keys:
+    row.id === 2 ? ["critical", "unknown"] : [row.priority!.severity],
+  important: row.id === 2 || !!row.priority?.reasons.length,
+  fix_available: row.id === 2 || !!row.priority?.fix_available,
+});
+const rows = [structured, ruby, correction, patch].map(routing);
 // Isolated per test/project; never changes the normal four-row fixture.
 const liveStates = new Map<string, string>();
 createServer((req, res) => {
@@ -148,7 +199,23 @@ createServer((req, res) => {
     source_id: source,
     payload: { ...patch.payload, title: `Live fixture event ${id}` },
   }));
-  let data = (state ? liveRows : rows).filter((row) => {
+  let data = (state ? liveRows.map(routing) : rows).filter((row) => {
+    const selectedSeverity = url.searchParams
+      .get("severity_keys")
+      ?.slice(4, -1)
+      .split(",");
+    if (
+      selectedSeverity &&
+      !row.severity_keys.some((s) => selectedSeverity.includes(s))
+    )
+      return false;
+    if (url.searchParams.get("important") === "eq.true" && !row.important)
+      return false;
+    if (
+      url.searchParams.get("fix_available") === "eq.true" &&
+      !row.fix_available
+    )
+      return false;
     const search = url.searchParams.get("search_document");
     if (search) {
       // Only a request-boundary stub. Actual PostgreSQL search semantics are tested in PGlite.
