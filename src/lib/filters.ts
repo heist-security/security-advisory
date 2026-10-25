@@ -1,3 +1,4 @@
+import { severities, type Severity } from "./priority";
 export const eventTypes = [
   "advisory",
   "patch",
@@ -12,6 +13,9 @@ export type Filters = {
   technology?: string;
   cve?: string;
   source?: string;
+  severity?: Severity[];
+  important?: "1";
+  fix?: "1";
 };
 export type EventQuery = Filters & {
   after?: number;
@@ -50,11 +54,27 @@ export function parseEventQuery(
     "after",
     "before",
     "limit",
+    "severity",
+    "important",
+    "fix",
   ]) {
     if (params.getAll(key).length > 1)
       throw new Error("Repeated filter parameters are not supported");
   }
   const q = params.get("q")?.trim().replace(/\s+/g, " ") || undefined;
+  const rawSeverity = params.get("severity");
+  const selected = rawSeverity ? rawSeverity.split(",") : [];
+  if (
+    selected.length > 5 ||
+    selected.some((s) => !severities.includes(s as Severity))
+  )
+    throw new Error("Invalid severity");
+  const severity = selected.length
+    ? severities.filter((s) => selected.includes(s))
+    : undefined;
+  for (const key of ["important", "fix"])
+    if (params.has(key) && params.get(key) !== "1")
+      throw new Error(key + " must be 1");
   if (q && (q.length > 120 || /[\x00-\x1F\x7F]/.test(q)))
     throw new Error("Search must be 1 to 120 printable characters");
   const type = params.get("type") || params.get("kind") || undefined;
@@ -96,6 +116,9 @@ export function parseEventQuery(
     technology: rawTechnology ? technologyKey(rawTechnology) : undefined,
     cve,
     source,
+    severity,
+    important: params.has("important") ? "1" : undefined,
+    fix: params.has("fix") ? "1" : undefined,
     after,
     before,
     limit,
@@ -103,7 +126,17 @@ export function parseEventQuery(
 }
 export function filterQuery(filters: Filters) {
   const params = new URLSearchParams();
-  for (const key of ["q", "type", "technology", "cve", "source"] as const)
+  for (const key of [
+    "q",
+    "type",
+    "technology",
+    "cve",
+    "source",
+    "important",
+    "fix",
+  ] as const)
     if (filters[key]) params.set(key, filters[key]!);
+  if (filters.severity?.length)
+    params.set("severity", filters.severity.join(","));
   return params;
 }

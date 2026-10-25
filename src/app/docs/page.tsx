@@ -66,6 +66,36 @@ export default function Docs() {
           Keyword searches match the current event text and retained routing
           keys; previous free-text wording is not retained.
         </p>
+        <h2 id="priority">Severity and important updates</h2>
+        <p>
+          Use severity=critical,high to select one or more ratings (critical,
+          high, medium, low, unknown). The filter uses the highest publisher or
+          evidence-linked CVE rating. Linked ratings remain attributed to their
+          original products; a GitLab rating does not automatically describe
+          every application using Ruby.
+        </p>
+        <p>
+          important=1 includes High/Critical ratings, known exploited CVEs and
+          unrated security fixes. fix=1 selects records with documented fixed
+          versions, including structured advisories. Filters combine with AND;
+          selecting a severity alongside Important updates narrows that preset
+          and can exclude unrated fixes.
+        </p>
+        <p>
+          References alone do not establish a fix: publisher patches need
+          explicit source evidence. Older records are linked only when a
+          verbatim opening heading explicitly identifies the CVE fixes. Missing
+          links or ratings remain unknown. Announced dates show the age of a
+          release independently of when it entered the feed.
+        </p>
+        <p>
+          When linked ratings or exploitation context change, a new event is
+          emitted with context_update=true. Publisher content and severity
+          remain unchanged. Corrections retain prior severity, Important updates
+          and Fix available subscription keys, so downgrades and withdrawals
+          still reach existing subscribers. Inspect priority for the current
+          classification of each revision.
+        </p>
         <h2>Read the JSON archive</h2>
         <pre>
           {
@@ -98,8 +128,8 @@ export default function Docs() {
         <h2>Delivery and limits</h2>
         <p>
           RSS contains the latest 100 matching events by default. Use JSON for
-          full backfill. Public event reads are cached for 60 seconds with a
-          five-minute stale window. Handle 400 for invalid input, 429 for
+          full backfill. Public event reads use no-store and are fetched from
+          the database for each request. Handle 400 for invalid input, 429 for
           hosting rate limits and 503 for unavailable data; honor Retry-After.
         </p>
         <p>
