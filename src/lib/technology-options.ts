@@ -2,7 +2,8 @@ import { technologyKey } from "./filters";
 export type TechnologyOption = { value: string; label: string };
 type TechnologyRow = {
   technologies: string[];
-  payload: { products: { name: { value: string } }[] };
+  products?: unknown;
+  payload?: { products?: unknown };
 };
 export function technologyOptions(
   rows: TechnologyRow[],
@@ -12,8 +13,11 @@ export function technologyOptions(
   for (const row of rows) {
     for (const key of row.technologies)
       if (!labels.has(key)) labels.set(key, key);
-    for (const p of row.payload.products)
-      labels.set(technologyKey(p.name.value), p.name.value);
+    const products = row.products ?? row.payload?.products;
+    if (Array.isArray(products))
+      for (const p of products)
+        if (typeof p?.name?.value === "string")
+          labels.set(technologyKey(p.name.value), p.name.value);
   }
   const key = technologyKey(search);
   return [...labels]

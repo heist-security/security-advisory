@@ -267,7 +267,19 @@ createServer((req, res) => {
     "Content-Type": "application/json",
     "Cache-Control": "no-store",
   });
+  const selectedRows = data.slice(
+    0,
+    Number(url.searchParams.get("limit") ?? 100),
+  );
   res.end(
-    JSON.stringify(data.slice(0, Number(url.searchParams.get("limit") ?? 100))),
+    JSON.stringify(
+      url.searchParams.get("select") ===
+        "technologies,products:payload->products"
+        ? selectedRows.map((row) => ({
+            technologies: row.technologies,
+            products: row.payload.products,
+          }))
+        : selectedRows,
+    ),
   );
 }).listen(3038, "127.0.0.1");

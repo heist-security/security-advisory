@@ -123,4 +123,4 @@ Severity, important and fix routing retain prior subscription matches so downgra
 
 The visual feed exposes severity and technology controls. Advanced URL/API filters remain supported. Applying the simplified form replaces any advanced filters in the current URL.
 
-`GET /api/v1/technologies?q=node` returns up to 50 `{value,label}` suggestions from at most 100 recent matching public events. Search uses the existing text-search index across the archive; suggestions are bounded, not an exhaustive catalog. The picker also accepts an explicit product name when suggestions are missing or unavailable. No raw documents or credentials are exposed.
+`GET /api/v1/technologies?q=node` returns up to 50 `{value,label}` suggestions from at most 100 matching public events, ordered by technology keys when searching. The initial list without a search uses recent events. Search uses the existing text-search index across the archive and fetches only technology keys and product data; suggestions are bounded, not an exhaustive catalog. The picker also accepts an explicit product name when suggestions are missing or unavailable. No raw documents or credentials are exposed.

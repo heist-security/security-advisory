@@ -18,20 +18,25 @@ export async function GET(request: Request) {
   try {
     let query = db()
       .from("events")
-      .select("technologies,payload")
-      .order("id", { ascending: false })
+      .select("technologies,products:payload->products")
       .limit(100);
     // Search indexed public event text, then return only matching routing keys.
     // The bounded suggestion list is not an exhaustive technology catalog.
     if (q)
-      query = query.textSearch(
-        "search_document",
-        technologyKey(q)
-          .split("-")
-          .map((word) => word + ":*")
-          .join(" & "),
-        { config: "simple" },
-      );
+      query = query
+        .textSearch(
+          "search_document",
+          technologyKey(q)
+            .split("-")
+            .map((word) => word + ":*")
+            .join(" & "),
+          { config: "simple" },
+        )
+        .order("technologies", { ascending: true });
+    // A technology sort avoids the event-ID/limit plan that scans unrelated
+    // recent events for rare prefixes. Labels are sorted for display below.
+    // Only the unfiltered initial list needs recent-event ordering.
+    else query = query.order("id", { ascending: false });
     const { data, error } = await query;
     if (error) throw error;
     return Response.json(
