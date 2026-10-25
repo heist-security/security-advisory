@@ -4,8 +4,8 @@ test("feed search applies after typing stops and clearing restores the feed", as
   page,
 }) => {
   await page.goto("/");
-  await page.clock.install();
-  await page.clock.pauseAt(new Date());
+  await page.clock.install({ time: new Date("2026-10-24T00:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-10-24T00:01:00Z"));
   const search = page.getByRole("searchbox", {
     name: "Search feed",
     exact: true,
@@ -44,8 +44,8 @@ test("a selection includes pending search text and resets the feed cursor", asyn
     `/?view=events&group=${encodeURIComponent(group)}&source=nodejs&limit=1&before=2`,
   );
   await expect(page.locator("#event-1")).toBeVisible();
-  await page.clock.install();
-  await page.clock.pauseAt(new Date());
+  await page.clock.install({ time: new Date("2026-10-24T00:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-10-24T00:01:00Z"));
   await page
     .getByRole("searchbox", { name: "Search feed", exact: true })
     .fill("fictional");
@@ -70,7 +70,7 @@ test("technology suggestions do not apply until selected, and deselecting clears
   page,
 }) => {
   await page.goto("/");
-  await page.locator(".technology-filter summary").click();
+  await page.getByRole("button", { name: /^Technology/ }).click();
   await page.getByLabel("Search technologies", { exact: true }).fill("Ruby");
   const ruby = page.getByRole("checkbox", { name: "Ruby", exact: true });
   await expect(ruby).toBeVisible();
@@ -82,7 +82,7 @@ test("technology suggestions do not apply until selected, and deselecting clears
   await expect(page).toHaveURL("/?view=grouped");
   await expect(page.locator(".event-card")).toHaveCount(3);
   await page.getByLabel("Search technologies", { exact: true }).press("Escape");
-  await page.locator(".severity-filter summary").click();
+  await page.getByRole("button", { name: /^Severity/ }).click();
   const critical = page.getByRole("checkbox", {
     name: "Critical",
     exact: true,
@@ -129,4 +129,37 @@ test("source filters apply automatically and keep the selected catalog", async (
   await page.getByRole("link", { name: "Reset filters", exact: true }).click();
   await expect(page).toHaveURL("/sources?catalog=vendor");
   await expect(page.locator(".source-row")).toHaveCount(24);
+});
+
+test("filter popovers support keyboard selection, Escape and outside clicks", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const severity = page.getByRole("button", { name: /^Severity/ });
+  await severity.focus();
+  await severity.press("Enter");
+  const critical = page.getByRole("checkbox", {
+    name: "Critical",
+    exact: true,
+  });
+  await expect(critical).toBeFocused();
+  await critical.press("Space");
+  await expect(page).toHaveURL(/severity=critical/);
+  await expect(critical).toBeChecked();
+  await critical.press("Escape");
+  await expect(severity).toBeFocused();
+  await expect(severity).toHaveAttribute("aria-expanded", "false");
+
+  const technology = page.getByRole("button", { name: /^Technology/ });
+  await technology.press("Enter");
+  await expect(
+    page.getByRole("searchbox", { name: "Search technologies" }),
+  ).toBeFocused();
+  const search = page.getByRole("searchbox", {
+    name: "Search feed",
+    exact: true,
+  });
+  await search.click();
+  await expect(technology).toHaveAttribute("aria-expanded", "false");
+  await expect(search).toBeFocused();
 });

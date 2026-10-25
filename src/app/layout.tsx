@@ -6,12 +6,12 @@ import "./globals.css";
 const sans = Host_Grotesk({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-sans",
+  variable: "--font-host-grotesk",
 });
 const mono = JetBrains_Mono({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-mono",
+  variable: "--font-jetbrains-mono",
 });
 export const metadata: Metadata = {
   title: {

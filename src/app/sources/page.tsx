@@ -21,7 +21,7 @@ export default async function Sources({
     return "/sources?" + next;
   };
   return (
-    <main id="main" className="container sources-page">
+    <main id="main" className="site-container sources-page">
       <header className="catalog-heading">
         <h1>
           Sources <span className="heading-count">{result.catalog_count}</span>

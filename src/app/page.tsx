@@ -13,6 +13,9 @@ import { feedLink, groupEvents, dayLabel } from "@/lib/feed-view";
 import { FeedFilters } from "@/components/feed-filters";
 import { catalogOptions } from "@/lib/technology-catalog";
 import { EventCard } from "@/components/event-card";
+import { ArrowDown, ArrowLeft, Braces, Rss } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Security feed",
@@ -62,53 +65,90 @@ export default async function Feed({
     limit: String(query.limit),
   });
   return (
-    <main id="main" className="container browser-feed">
-      <section className="browser-heading">
+    <main id="main" className="site-container browser-feed">
+      <section className="flex items-center justify-between gap-4 py-6">
         <h1>Security feed</h1>
-        <nav className="format-links" aria-label="Feed formats">
-          <a href={"/feed.xml" + suffix}>RSS</a>
-          <a href={"/api/v1/events" + suffix}>JSON</a>
+        <nav className="flex items-center gap-2" aria-label="Feed formats">
+          <Button asChild variant="outline" size="sm">
+            <a href={"/feed.xml" + suffix}>
+              <Rss aria-hidden="true" />
+              RSS
+            </a>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <a href={"/api/v1/events" + suffix}>
+              <Braces aria-hidden="true" />
+              JSON
+            </a>
+          </Button>
         </nav>
       </section>
       <FeedFilters
         initialFilters={{ ...query, q: params.get("q") ?? "" }}
         technologies={technologies}
       />
-      <section className="feed-reader" aria-label="Security announcements">
+      <section className="mb-8 min-w-0" aria-label="Security announcements">
         {query.before !== undefined && rows.length > 0 ? (
-          <a href={latest} className="latest-link">
-            Back to latest events
-          </a>
+          <Button asChild variant="ghost" size="sm" className="mb-4">
+            <a href={latest}>
+              <ArrowLeft aria-hidden="true" />
+              Back to latest events
+            </a>
+          </Button>
         ) : null}
         {error ? (
-          <p className="reader-empty" role="alert">
-            {error}. <a href="/">Reset filters</a>
-          </p>
+          <Card role="alert" className="shadow-none">
+            <CardContent className="text-sm text-muted-foreground">
+              {error}.{" "}
+              <a href="/" className="text-primary underline underline-offset-4">
+                Reset filters
+              </a>
+            </CardContent>
+          </Card>
         ) : unavailable ? (
-          <p className="reader-empty" role="status">
-            Feed temporarily unavailable. <a href={latest}>Try again</a>
-          </p>
+          <Card role="status" className="shadow-none">
+            <CardContent className="text-sm text-muted-foreground">
+              Feed temporarily unavailable.{" "}
+              <a
+                href={latest}
+                className="text-primary underline underline-offset-4"
+              >
+                Try again
+              </a>
+            </CardContent>
+          </Card>
         ) : !rows.length ? (
-          <p className="reader-empty" role="status">
-            {query.before !== undefined ? (
-              <>
-                No earlier events. <a href={latest}>Back to latest events</a>
-              </>
-            ) : hasFilters ? (
-              "No events match your filters."
-            ) : (
-              "No events yet."
-            )}
-          </p>
+          <Card role="status" className="shadow-none">
+            <CardContent className="text-sm text-muted-foreground">
+              {query.before !== undefined ? (
+                <>
+                  No earlier events.{" "}
+                  <a
+                    href={latest}
+                    className="text-primary underline underline-offset-4"
+                  >
+                    Back to latest events
+                  </a>
+                </>
+              ) : hasFilters ? (
+                "No events match your filters."
+              ) : (
+                "No events yet."
+              )}
+            </CardContent>
+          </Card>
         ) : (
-          <div className="event-timeline">
+          <div className="space-y-6">
             {groups.map((group, index) => (
               <section
-                className="event-day"
+                className="event-day space-y-3"
                 key={group.day + "-" + index}
                 aria-labelledby={"day-" + index}
               >
-                <h2 id={"day-" + index} className="day-heading">
+                <h2
+                  id={"day-" + index}
+                  className="day-heading border-b pb-3 font-mono text-xs font-normal text-muted-foreground"
+                >
                   <time
                     dateTime={group.day}
                     title="Date added to the feed (UTC)"
@@ -129,16 +169,18 @@ export default async function Feed({
           </div>
         )}
         {hasMore && rows.length ? (
-          <div className="reader-pagination">
-            <a
-              className="button"
-              href={feedLink(query, {
-                before: String(rows.at(-1)!.id),
-                limit: String(query.limit),
-              })}
-            >
-              Older events
-            </a>
+          <div className="pt-6">
+            <Button asChild variant="outline">
+              <a
+                href={feedLink(query, {
+                  before: String(rows.at(-1)!.id),
+                  limit: String(query.limit),
+                })}
+              >
+                Older events
+                <ArrowDown aria-hidden="true" />
+              </a>
+            </Button>
           </div>
         ) : null}
       </section>

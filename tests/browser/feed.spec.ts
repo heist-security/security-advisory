@@ -71,7 +71,7 @@ test("technology multi-selection persists and matches any selected product", asy
   request,
 }) => {
   await page.goto("/");
-  await page.locator(".technology-filter summary").click();
+  await page.getByRole("button", { name: /^Technology/ }).click();
   await page.getByLabel("Search technologies", { exact: true }).fill("Node");
   await expect(
     page.getByRole("checkbox", { name: "Node.js", exact: true }),
@@ -81,7 +81,10 @@ test("technology multi-selection persists and matches any selected product", asy
   ).toHaveCount(0);
   await page.getByRole("checkbox", { name: "Node.js", exact: true }).check();
   await expect(page).toHaveURL(/technology=node-js/);
-  await expect(page.locator(".technology-filter")).toHaveAttribute("open", "");
+  await expect(page.locator(".technology-filter")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
   await page.getByLabel("Search technologies", { exact: true }).fill("Ruby");
   await page.getByRole("checkbox", { name: "Ruby", exact: true }).check();
   await page.getByLabel("Search technologies", { exact: true }).press("Escape");
@@ -103,7 +106,7 @@ test("technology multi-selection persists and matches any selected product", asy
   for (const id of [1, 2, 3]) expect(xml).toContain("heist-group-update:" + id);
   expect(xml).not.toContain("heist-group-update:4");
   await page.reload();
-  await page.locator(".technology-filter summary").click();
+  await page.getByRole("button", { name: /^Technology/ }).click();
   await page
     .getByRole("button", { name: "Remove Node.js", exact: true })
     .click();
@@ -124,13 +127,13 @@ test("search and type remain combined with canonical technology and severity sub
   await page
     .getByRole("combobox", { name: "Type", exact: true })
     .selectOption("patch");
-  await page.locator(".severity-filter summary").click();
+  await page.getByRole("button", { name: /^Severity/ }).click();
   await page.getByRole("checkbox", { name: "Critical", exact: true }).check();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(page.viewportSize()!.width);
-  await page.locator(".severity-filter summary").click();
-  await page.locator(".technology-filter summary").click();
+  await page.getByRole("button", { name: /^Severity/ }).click();
+  await page.getByRole("button", { name: /^Technology/ }).click();
   await page.getByRole("checkbox", { name: "Node.js", exact: true }).check();
   await page
     .getByRole("searchbox", { name: "Search technologies", exact: true })
@@ -169,7 +172,7 @@ test("technology picker supports custom entries, clearing and failed suggestions
     route.fulfill({ status: 503, body: "Unavailable" }),
   );
   await page.goto("/");
-  await page.locator(".technology-filter summary").click();
+  await page.getByRole("button", { name: /^Technology/ }).click();
   const search = page.getByLabel("Search technologies", { exact: true });
   await search.fill("C++");
   await expect(
@@ -191,7 +194,7 @@ test("technology picker supports custom entries, clearing and failed suggestions
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(page.viewportSize()!.width);
   await search.press("Escape");
-  await expect(page.locator(".technology-filter summary")).toBeFocused();
+  await expect(page.getByRole("button", { name: /^Technology/ })).toBeFocused();
   await expect(page).toHaveURL(/technology=c-sharp/);
 });
 test("cursor navigation retains filters and does not offer an empty extra page", async ({
@@ -272,12 +275,15 @@ test("severity filters share RSS/JSON and keep correction delivery", async ({
   request,
 }) => {
   await page.goto("/?view=events");
-  await page.locator(".severity-filter summary").click();
+  await page.getByRole("button", { name: /^Severity/ }).click();
   await page.getByRole("checkbox", { name: "Critical", exact: true }).check();
   await expect(page).toHaveURL(/severity=critical/);
-  await expect(page.locator(".severity-filter")).toHaveAttribute("open", "");
+  await expect(page.locator(".severity-filter")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
   await page.getByRole("checkbox", { name: "High", exact: true }).check();
-  await page.locator(".severity-filter summary").click();
+  await page.getByRole("button", { name: /^Severity/ }).click();
   await expect(page.locator(".event-card")).toHaveCount(2);
   await expect(page.locator("#event-1")).toContainText("Linked Critical CVE");
   await page.locator("#event-1 h3 a").click();
@@ -298,7 +304,7 @@ test("severity filters share RSS/JSON and keep correction delivery", async ({
   expect(xml).toContain("Linked Critical CVE");
   expect(xml).toContain("heist-event:2");
   await page.reload();
-  await page.locator(".severity-filter summary").click();
+  await page.getByRole("button", { name: /^Severity/ }).click();
   await expect(
     page.getByRole("checkbox", { name: "Critical", exact: true }),
   ).toBeChecked();
@@ -319,7 +325,7 @@ test("catalog results for a previously unseen product become stable subscription
     }),
   );
   await page.goto("/");
-  await page.locator(".technology-filter summary").click();
+  await page.getByRole("button", { name: /^Technology/ }).click();
   await page
     .getByRole("searchbox", { name: "Search technologies", exact: true })
     .fill("Example Engine v7.2");

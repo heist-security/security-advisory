@@ -1,11 +1,16 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import {
   technologyFamily,
   technologyLabel,
   technologyMatches,
 } from "@/lib/technology";
 import type { TechnologyOption } from "@/lib/technology-options";
+import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
+import { Input } from "./ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 export function TechnologyFilter({
   selected: values,
@@ -16,22 +21,13 @@ export function TechnologyFilter({
   initialOptions: TechnologyOption[];
   onChange: (values: string[]) => void;
 }) {
+  const id = useId();
   const [search, setSearch] = useState("");
   const [options, setOptions] = useState(initialOptions);
   const [optionsSearch, setOptionsSearch] = useState("");
   const [status, setStatus] = useState("");
   const [open, setOpen] = useState(false);
-  const details = useRef<HTMLDetailsElement>(null);
-  const input = useRef<HTMLInputElement>(null);
   const labels = useRef(new Map(initialOptions.map((o) => [o.value, o.label])));
-  useEffect(() => {
-    const close = (event: PointerEvent) => {
-      if (details.current && !details.current.contains(event.target as Node))
-        details.current.open = false;
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, []);
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
@@ -83,31 +79,26 @@ export function TechnologyFilter({
     }
   };
   return (
-    <details
-      className="technology-filter choice-filter"
-      ref={details}
-      onToggle={(event) => {
-        setOpen(event.currentTarget.open);
-        if (event.currentTarget.open) input.current?.focus();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          details.current!.open = false;
-          details.current?.querySelector("summary")?.focus();
-        }
-      }}
-    >
-      <summary>Technology{values.length ? ` (${values.length})` : ""}</summary>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" className="technology-filter">
+          Technology{values.length ? ` (${values.length})` : ""}
+          <ChevronDown aria-hidden="true" className="text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
       <input
         type="hidden"
         name="technology"
         value={values.join(",")}
         disabled={!values.length}
       />
-      <div className="technology-menu">
-        <input
-          ref={input}
+      <PopoverContent
+        align="start"
+        collisionPadding={16}
+        aria-label="Filter by technology"
+        className="w-80 max-w-[calc(100vw-2rem)] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto"
+      >
+        <Input
           type="search"
           aria-label="Search technologies"
           placeholder="Search technologies…"
@@ -123,13 +114,16 @@ export function TechnologyFilter({
         />
         {values.length ? (
           <div
-            className="selected-technologies"
+            className="flex flex-wrap gap-1.5 pt-3"
             aria-label="Selected technologies"
           >
             {values.map((value) => (
-              <button
+              <Button
                 key={value}
                 type="button"
+                variant="secondary"
+                size="xs"
+                className="h-auto max-w-full whitespace-normal py-1 text-left [overflow-wrap:anywhere]"
                 aria-label={
                   "Remove " +
                   (technologyLabel(value) ?? labels.current.get(value) ?? value)
@@ -137,53 +131,67 @@ export function TechnologyFilter({
                 onClick={() => onChange(values.filter((v) => v !== value))}
               >
                 {technologyLabel(value) ?? labels.current.get(value) ?? value}{" "}
-                <span aria-hidden="true">×</span>
-              </button>
+                <X aria-hidden="true" />
+              </Button>
             ))}
-            <button type="button" onClick={() => onChange([])}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => onChange([])}
+            >
               Clear all
-            </button>
+            </Button>
           </div>
         ) : null}
         <div
-          className="technology-options"
+          className="mt-2 max-h-56 overflow-y-auto"
           role="group"
           aria-label="Technologies"
         >
           {matches.map((o) => (
-            <label key={o.value}>
-              <input
-                type="checkbox"
+            <label
+              key={o.value}
+              htmlFor={`${id}-${o.value}`}
+              className="flex cursor-pointer items-center gap-2 rounded-sm py-2 text-sm break-words has-disabled:cursor-not-allowed has-disabled:opacity-50"
+            >
+              <Checkbox
+                id={`${id}-${o.value}`}
                 checked={values.includes(o.value)}
                 disabled={values.length >= 10 && !values.includes(o.value)}
-                onChange={(event) =>
+                onCheckedChange={(checked) =>
                   onChange(
-                    event.target.checked
+                    checked === true
                       ? [...values, o.value]
                       : values.filter((v) => v !== o.value),
                   )
                 }
               />
-              {o.label}
+              <span className="min-w-0 [overflow-wrap:anywhere]">
+                {o.label}
+              </span>
             </label>
           ))}
         </div>
         {custom ? (
-          <button
-            className="add-technology"
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2 h-auto max-w-full whitespace-normal py-2 text-left [overflow-wrap:anywhere]"
             type="button"
             disabled={values.length >= 10}
             onClick={add}
           >
+            <Plus aria-hidden="true" />
             Add “{search.trim()}”
-          </button>
+          </Button>
         ) : null}
-        <p className="technology-status" role="status">
+        <p className="mt-3 text-xs text-muted-foreground" role="status">
           {values.length >= 10
             ? "10 technologies selected (maximum)."
             : status || "Matches any selected technology."}
         </p>
-      </div>
-    </details>
+      </PopoverContent>
+    </Popover>
   );
 }
