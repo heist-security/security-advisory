@@ -1,6 +1,7 @@
 // Deterministic PostgREST fixture for browser tests. Never used by the application.
 import { createServer } from "node:http";
 import type { FeedEvent } from "../../src/lib/events";
+import { technologyFamily } from "../../src/lib/technology";
 const patch: FeedEvent = {
   id: 1,
   advisory_id: "test-advisory-node",
@@ -10,7 +11,7 @@ const patch: FeedEvent = {
   source_published_at: "2026-10-24T07:00:00Z",
   published_at: "2026-10-24T07:01:00Z",
   extraction_method: "llm",
-  technologies: ["nodejs", "node-js"],
+  technologies: ["nodejs", "node-js-8", "node-js-22"],
   cve_ids: ["CVE-2026-12345"],
   event_types: ["patch"],
   priority: {
@@ -226,11 +227,11 @@ createServer((req, res) => {
     const search = url.searchParams.get("search_document");
     if (search) {
       // Only a request-boundary stub. Actual PostgreSQL search semantics are tested in PGlite.
-      const words =
-        search
-          .slice(search.indexOf(".") + 1)
-          .toLowerCase()
-          .match(/[a-z0-9]+/g) ?? [];
+      const alternatives = search
+        .slice(search.indexOf(".") + 1)
+        .toLowerCase()
+        .split("|")
+        .map((part) => part.match(/[a-z0-9]+/g) ?? []);
       const document = JSON.stringify([
         row.payload,
         row.source_id,
@@ -238,9 +239,23 @@ createServer((req, res) => {
         row.cve_ids,
         row.event_types,
       ]).toLowerCase();
-      if (!words.length || !words.every((word) => document.includes(word)))
+      if (
+        !alternatives.some(
+          (words) =>
+            words.length && words.every((word) => document.includes(word)),
+        )
+      )
         return false;
     }
+    const families = url.searchParams.get("technology_families");
+    if (
+      families &&
+      !families
+        .slice(4, -1)
+        .split(",")
+        .some((key) => row.technologies.map(technologyFamily).includes(key))
+    )
+      return false;
     for (const key of ["technologies", "cve_ids", "event_types"] as const) {
       const value = url.searchParams.get(key);
       if (value) {

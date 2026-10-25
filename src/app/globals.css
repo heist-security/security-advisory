@@ -167,6 +167,14 @@ h1 {
   gap: 10px;
   padding: 0 0 20px;
 }
+.feed-filters .feed-search {
+  flex: 1 1 280px;
+  width: auto;
+}
+.feed-filters .type-filter {
+  width: auto;
+  min-width: 125px;
+}
 .filter-actions {
   display: flex;
   align-items: center;
@@ -873,10 +881,15 @@ pre {
   .feed-filters {
     position: relative;
   }
-  .technology-filter {
+  .feed-filters .feed-search {
+    flex-basis: 100%;
+  }
+  .technology-filter,
+  .severity-filter {
     position: static;
   }
-  .technology-menu {
+  .technology-menu,
+  .severity-filter fieldset {
     left: 0;
     right: auto;
     width: min(300px, 100%);

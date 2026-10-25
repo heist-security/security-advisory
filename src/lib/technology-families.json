@@ -1,0 +1,92 @@
+[
+  {
+    "key": "node-js",
+    "label": "Node.js",
+    "aliases": ["node", "nodejs", "node-js"],
+    "pattern": "^(node|nodejs|node-js)(-v?[0-9]+(-[0-9]+){0,3})?(-lts)?$"
+  },
+  {
+    "key": "python",
+    "label": "Python",
+    "aliases": ["python", "cpython", "python2", "python3"],
+    "pattern": "^(python|cpython|python2|python3)(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "ruby",
+    "label": "Ruby",
+    "aliases": ["ruby"],
+    "pattern": "^ruby(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "php",
+    "label": "PHP",
+    "aliases": ["php", "php5", "php7", "php8"],
+    "pattern": "^(php|php5|php7|php8)(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "go",
+    "label": "Go",
+    "aliases": ["go", "golang"],
+    "pattern": "^(go|golang)(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "java",
+    "label": "Java",
+    "aliases": ["java", "java-se"],
+    "pattern": "^(java|java-se)(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "openjdk",
+    "label": "OpenJDK",
+    "aliases": ["openjdk"],
+    "pattern": "^openjdk(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "oracle-java-se",
+    "label": "Oracle Java SE",
+    "aliases": ["oracle-java-se"],
+    "pattern": "^oracle-java-se(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "openssl",
+    "label": "OpenSSL",
+    "aliases": ["openssl"],
+    "pattern": "^openssl(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "postgresql",
+    "label": "PostgreSQL",
+    "aliases": ["postgres", "postgresql"],
+    "pattern": "^(postgres|postgresql)(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "kubernetes",
+    "label": "Kubernetes",
+    "aliases": ["kubernetes", "k8s"],
+    "pattern": "^(kubernetes|k8s)(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "nginx",
+    "label": "NGINX",
+    "aliases": ["nginx"],
+    "pattern": "^nginx(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "react",
+    "label": "React",
+    "aliases": ["react"],
+    "pattern": "^react(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "vue-js",
+    "label": "Vue.js",
+    "aliases": ["vue", "vuejs", "vue-js"],
+    "pattern": "^(vue|vuejs|vue-js)(-v?[0-9]+(-[0-9]+){0,3})?$"
+  },
+  {
+    "key": "rails",
+    "label": "Ruby on Rails",
+    "aliases": ["rails", "ruby-on-rails", "rubyonrails"],
+    "pattern": "^(rails|ruby-on-rails|rubyonrails)(-v?[0-9]+(-[0-9]+){0,3})?$"
+  }
+]

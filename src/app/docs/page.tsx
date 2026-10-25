@@ -12,8 +12,11 @@ export default function Docs() {
         </p>
         <h2>Browse visually</h2>
         <p>
-          <a href="/">Open the feed</a> to filter by severity and one or more
-          technologies, and expand source evidence and version details.
+          <a href="/">Open the feed</a> to search announcements and filter by
+          type, severity and one or more technologies. Known aliases and
+          versions share one technology choice, such as Node.js. Expand each
+          announcement for its original product names, source evidence and
+          affected versions.
         </p>
         <h2>Subscribe</h2>
         <pre>

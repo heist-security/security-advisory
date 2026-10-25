@@ -4,6 +4,7 @@ import type { EventQuery } from "./filters";
 import { isStructured } from "./structured/config";
 import type { StructuredPayload } from "./structured/normalize";
 import { priorityLabels, type Priority } from "./priority";
+import { technologyFamily } from "./technology";
 export type FeedEvent = {
   id: number;
   advisory_id: string;
@@ -36,7 +37,9 @@ export async function events(options: Partial<EventQuery> = {}) {
   if (options.before !== undefined) query = query.lt("id", options.before);
   if (options.type) query = query.contains("event_types", [options.type]);
   if (options.technology)
-    query = query.overlaps("technologies", options.technology.split(","));
+    query = query.overlaps("technology_families", [
+      ...new Set(options.technology.split(",").map(technologyFamily)),
+    ]);
   if (options.cve) query = query.contains("cve_ids", [options.cve]);
   if (options.source) query = query.eq("source_id", options.source);
   if (options.severity?.length)

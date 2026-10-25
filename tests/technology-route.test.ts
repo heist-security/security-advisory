@@ -29,7 +29,7 @@ it("finds prefix suggestions without recency sorting or loading advisory bodies"
   const params = new URL(String(fetcher.mock.calls[0][0])).searchParams;
   expect(Object.fromEntries(params)).toEqual({
     select: "technologies,products:payload->products",
-    search_document: "fts(simple).rub:*",
+    search_document: "fts(simple).(rub:*)",
     order: "technologies.asc",
     limit: "100",
   });

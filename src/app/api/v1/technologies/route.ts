@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { technologyKey } from "@/lib/filters";
 import { technologyOptions } from "@/lib/technology-options";
 import { eventHeaders, unavailable } from "@/lib/http";
+import { technologySearch } from "@/lib/technology";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -24,14 +25,9 @@ export async function GET(request: Request) {
     // The bounded suggestion list is not an exhaustive technology catalog.
     if (q)
       query = query
-        .textSearch(
-          "search_document",
-          technologyKey(q)
-            .split("-")
-            .map((word) => word + ":*")
-            .join(" & "),
-          { config: "simple" },
-        )
+        .textSearch("search_document", technologySearch(q), {
+          config: "simple",
+        })
         .order("technologies", { ascending: true });
     // A technology sort avoids the event-ID/limit plan that scans unrelated
     // recent events for rare prefixes. Labels are sorted for display below.

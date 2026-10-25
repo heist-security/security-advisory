@@ -1,4 +1,6 @@
 import { severities, type Severity } from "./priority";
+import { technologyKey, technologyFamily } from "./technology";
+export { technologyKey } from "./technology";
 export const eventTypes = [
   "advisory",
   "patch",
@@ -23,14 +25,6 @@ export type EventQuery = Filters & {
   limit: number;
 };
 export type SearchParams = Record<string, string | string[] | undefined>;
-export function technologyKey(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/\+/g, "-plus-")
-    .replace(/#/g, "-sharp-")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 export function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -123,7 +117,7 @@ export function parseEventQuery(
     q,
     type: type as EventType | undefined,
     technology: technologies.length
-      ? [...new Set(technologies.map(technologyKey))].sort().join(",")
+      ? [...new Set(technologies.map(technologyFamily))].sort().join(",")
       : undefined,
     cve,
     source,

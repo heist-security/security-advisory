@@ -32,6 +32,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      postgrest:
+        image: postgrest/postgrest:v12.2.3
+        env:
+          PGRST_DB_URI: postgresql://postgres:ci-only-password@postgres:5432/postgres
+          PGRST_DB_SCHEMAS: public
+          # Only this disposable CI database permits anonymous service-role reads.
+          PGRST_DB_ANON_ROLE: service_role
+        ports:
+          - 3001:3000
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,6 +77,8 @@ jobs:
           test "$(psql -At -c 'select processed from public.backfill_event_priority(100)')" -eq 0
           second=$(psql -At -c 'select count(*) from supabase_migrations.schema_migrations')
           test "$first" -eq "$second"
+          psql -v ON_ERROR_STOP=1 -c "update events set technologies=case id when 1 then array['node-js-8'] when 2 then array['node-gyp'] when 3 then array['nodejs-100'] else array['nodejs','renamed-product'] end where id<=4;"
+          node --test tests/technology-postgrest.test.mjs
   release:
     needs: [check, browser, migrations]
     if: >-
