@@ -14,6 +14,7 @@ import {
 } from "../src/lib/structured/pipeline";
 import { parseRiskQuery, riskContext } from "../src/lib/structured/risk";
 import { endpoints } from "../src/lib/structured/config";
+import upstreamOsv from "./fixtures/osv-upstream.json";
 
 const changed = "2026-10-24T10:00:00Z";
 const osv = {
@@ -104,14 +105,58 @@ const respond = (data: unknown) =>
   });
 
 describe("native advisory semantics", () => {
-  it("preserves package ecosystems, backports and original ranges, without interpreting a CVSS vector as a label", () => {
+  it("preserves package ecosystems, backports and original ranges while scoring CVSS vectors", () => {
     const p = normalizeRecord("core-osv", osv).payload;
     expect(p.structured.affected).toEqual(osv.affected);
     expect(p.products[0].fixed_versions[0].value).toBe("1.2.3");
     expect(p.products[1].fixed_versions[0].value).toBe("1.0.0-1+deb12u3");
     expect(p.related_cves).toHaveLength(1);
-    expect(p.severity).toBe("unknown");
+    expect(p.severity).toBe("critical");
+    expect(p.severity_evidence).toBe("/severity/0/score");
     expect(p.structured.references).toEqual(["https://example.org/advisory"]);
+  });
+  it("links the Chainguard upstream CVE without turning upstream IDs into aliases", () => {
+    const p = normalizeRecord("core-osv", upstreamOsv).payload;
+    expect(p.structured.upstream).toEqual(upstreamOsv.upstream);
+    expect(p.structured.aliases).toEqual([upstreamOsv.id]);
+    expect(p.related_cves).toEqual([
+      { value: "CVE-2026-101902", evidence: "/upstream" },
+    ]);
+    expect(p.severity).toBe("medium");
+    expect(p.severity_evidence).toBe("/severity/0/score");
+    expect(p.structured.metrics).toEqual(upstreamOsv.severity);
+    expect(p.structured.affected).toEqual(upstreamOsv.affected);
+    expect(p.products.map((p) => p.fixed_versions[0].value)).toEqual([
+      "10.0.1-r8",
+      "10.0.1-r8",
+    ]);
+  });
+  it("deduplicates upstream CVEs and does not treat merely related IDs or references as CVE identity", () => {
+    const p = normalizeRecord("core-osv", {
+      ...osv,
+      upstream: [
+        "CVE-2026-12345",
+        "CVE-2026-54321",
+        "CVE-2026-54321",
+        "GHSA-example",
+        "not-a-cve",
+      ],
+      related: ["CVE-2026-99999"],
+      references: [{ url: "https://nvd.nist.gov/vuln/detail/CVE-2026-88888" }],
+    }).payload;
+    expect(p.related_cves).toEqual([
+      { value: "CVE-2026-12345", evidence: "/aliases" },
+      { value: "CVE-2026-54321", evidence: "/upstream" },
+    ]);
+    expect(p.structured.aliases).not.toContain("CVE-2026-54321");
+  });
+  it("keeps explicit publisher labels ahead of calculated severity", () => {
+    const p = normalizeRecord("core-osv", {
+      ...osv,
+      database_specific: { severity: "LOW" },
+    }).payload;
+    expect(p.severity).toBe("low");
+    expect(p.severity_evidence).toBe("/database_specific/severity");
   });
   it("does not invent a fixed release from CVE unaffected versions or upper bounds", () => {
     const p = normalizeRecord("core-cve", cve).payload;

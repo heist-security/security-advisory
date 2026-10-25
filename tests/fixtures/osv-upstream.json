@@ -1,0 +1,100 @@
+{
+  "id": "CGA-p5j4-h8gr-5xgh",
+  "modified": "2026-10-02T05:15:13.884310909Z",
+  "published": "2026-10-01T09:24:22Z",
+  "upstream": ["CVE-2026-101902", "GHSA-9fr6-4gfg-395g"],
+  "references": [
+    {
+      "type": "WEB",
+      "url": "https://github.com/axios/axios/releases/tag/v0.34.0"
+    },
+    {
+      "type": "WEB",
+      "url": "https://github.com/axios/axios/releases/tag/v1.20.0"
+    },
+    {
+      "type": "ADVISORY",
+      "url": "https://github.com/CVEProject/cvelistV5/tree/main/cves/2026/101xxx/CVE-2026-101902.json"
+    },
+    {
+      "type": "ADVISORY",
+      "url": "https://github.com/axios/axios/security/advisories/GHSA-9fr6-4gfg-395g"
+    },
+    {
+      "type": "ADVISORY",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-101902"
+    },
+    {
+      "type": "FIX",
+      "url": "https://github.com/axios/axios/commit/d19040bda7a8be2f82c3c6e1a5bc03917daee39a"
+    },
+    { "type": "FIX", "url": "https://github.com/axios/axios/pull/11141" }
+  ],
+  "affected": [
+    {
+      "package": {
+        "name": "lerna",
+        "ecosystem": "Chainguard",
+        "purl": "pkg:apk/chainguard/lerna?arch=x86_64"
+      },
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [{ "introduced": "0" }, { "fixed": "10.0.1-r8" }]
+        }
+      ],
+      "ecosystem_specific": {
+        "components": [
+          {
+            "component_location": "/usr/local/lib/node_modules/lerna/node_modules/nx/node_modules/axios/package.json",
+            "component_purl": "pkg:npm/axios@1.18.0",
+            "latest_event_status": "fixed",
+            "latest_event_timestamp": "2026-10-01T22:57:12Z",
+            "component_name": "axios",
+            "component_version": "1.18.0",
+            "component_type": "npm"
+          }
+        ]
+      },
+      "database_specific": {
+        "source": "https://advisories.cgr.dev/chainguard/v3/osv/CGA-p5j4-h8gr-5xgh.json"
+      }
+    },
+    {
+      "package": {
+        "name": "lerna",
+        "ecosystem": "Wolfi",
+        "purl": "pkg:apk/wolfi/lerna?arch=x86_64"
+      },
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [{ "introduced": "0" }, { "fixed": "10.0.1-r8" }]
+        }
+      ],
+      "ecosystem_specific": {
+        "components": [
+          {
+            "component_name": "axios",
+            "component_version": "1.18.0",
+            "component_type": "npm",
+            "component_location": "/usr/local/lib/node_modules/lerna/node_modules/nx/node_modules/axios/package.json",
+            "component_purl": "pkg:npm/axios@1.18.0",
+            "latest_event_status": "fixed",
+            "latest_event_timestamp": "2026-10-01T22:57:12Z"
+          }
+        ]
+      },
+      "database_specific": {
+        "source": "https://advisories.cgr.dev/chainguard/v3/osv/CGA-p5j4-h8gr-5xgh.json"
+      }
+    }
+  ],
+  "schema_version": "1.9.0",
+  "severity": [
+    {
+      "type": "CVSS_V4",
+      "score": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:H/SA:N"
+    }
+  ]
+}

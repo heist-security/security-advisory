@@ -2,6 +2,7 @@ import { z } from "zod";
 import { extractionSchema, type Extraction } from "../schema";
 import { cleanText } from "../feed";
 import type { StructuredId } from "./config";
+import { osvSeverity } from "./severity";
 
 const text = z.string();
 const object = z.record(z.string(), z.unknown());
@@ -15,6 +16,7 @@ const osv = z.object({
   published: date.optional(),
   withdrawn: date.optional(),
   aliases: z.array(text).default([]),
+  upstream: z.array(text).optional(),
   summary: text.optional(),
   details: text.optional(),
   affected: z
@@ -80,6 +82,7 @@ export type StructuredPayload = Extraction & {
     id: string;
     modified: string;
     aliases: string[];
+    upstream?: string[];
     affected: unknown[];
     references: string[];
     metrics?: unknown[];
@@ -95,6 +98,7 @@ export const structuredPayloadSchema = extractionSchema.extend({
     id: text,
     modified: date,
     aliases: z.array(text),
+    upstream: z.array(text).optional(),
     affected: z.array(z.unknown()),
     references: z.array(text),
     metrics: z.array(z.unknown()).optional(),
@@ -173,6 +177,17 @@ export function normalizeRecord(
     p.related_cves = p.structured.aliases
       .filter((id) => cveId.test(id))
       .map((id) => fact(id, id === r.id ? "/id" : "/aliases"));
+    // Upstream vulnerabilities are directional relationships, not aliases of
+    // this distribution/package advisory (and must not become grouping keys).
+    if (r.upstream) {
+      p.structured.upstream = [...new Set(r.upstream)].sort();
+      const linked = new Set(p.related_cves.map((c) => c.value));
+      p.related_cves.push(
+        ...p.structured.upstream
+          .filter((id) => cveId.test(id) && !linked.has(id))
+          .map((id) => fact(id, "/upstream")),
+      );
+    }
     p.structured.affected = r.affected;
     p.structured.references = refs(r.references);
     p.structured.metrics = r.severity;
@@ -180,6 +195,13 @@ export function normalizeRecord(
     p.severity = severity(r.database_specific?.severity);
     if (p.severity !== "unknown")
       p.severity_evidence = "/database_specific/severity";
+    else {
+      const rating = osvSeverity(r.severity ?? []);
+      if (rating) {
+        p.severity = rating.severity;
+        p.severity_evidence = `/severity/${rating.index}/score`;
+      }
+    }
     p.products = r.affected.flatMap((a, index) =>
       a.package
         ? [

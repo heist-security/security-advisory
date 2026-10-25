@@ -12,9 +12,23 @@ The structured feed imports OSV, the official CVE List and CISA KEV. It uses the
 | [FIRST EPSS](https://www.first.org/epss/data)                | Small batched API lookups through `/api/v1/risk`                  | Dated global exploitation probability and percentile, not asset-specific exposure or severity.                                                                     |
 | [NVD](https://nvd.nist.gov/developers/vulnerabilities)       | Optional single-CVE enrichment through `/api/v1/risk?nvd=1`       | Additional metrics, configurations and weakness data. Availability or enrichment delays never block advisory publication.                                          |
 
-Structured payloads include `structured.provider`, `id`, `modified`, `aliases`, `affected`, `references` and optional metrics/provider metadata/exploitation context. Native affected objects retain package ecosystems, PURLs, version-type rules, default statuses, version changes, Git ranges and distribution backports. Consumers should use these objects for matching; generic technology strings and display fields are not proof that an asset is vulnerable.
+Structured payloads include `structured.provider`, `id`, `modified`, `aliases`, `affected`, `references` and optional upstream IDs/metrics/provider metadata/exploitation context. OSV `upstream` IDs remain in `structured.upstream`, separate from aliases. Upstream CVEs also enter `related_cves` with `/upstream` evidence, making them available to CVE subscriptions and linked risk context. An upstream relationship does not merge a distribution advisory with the upstream record or transfer the distribution's severity to the upstream CVE or other packages. Native affected objects retain package ecosystems, PURLs, version-type rules, default statuses, version changes, Git ranges and distribution backports. Consumers should use these objects for matching; generic technology strings and display fields are not proof that an asset is vulnerable.
 
-Display summaries are bounded and stripped of HTML. Structured `evidence` values identify upstream records or JSON pointers, rather than purported quotations. An unaffected CVE version or range boundary is not automatically treated as a fixed release. An OSV Git fix is not labeled as a package version. Severity remains unknown unless explicitly labeled by the source; this adapter does not compute CVSS vector scores. Oversized normalized records fail visibly instead of silently discarding native affected data.
+Display summaries are bounded and stripped of HTML. Structured `evidence` values identify upstream records or JSON pointers, rather than purported quotations. An unaffected CVE version or range boundary is not automatically treated as a fixed release. An OSV Git fix is not labeled as a package version. Explicit OSV severity labels take precedence; otherwise the highest valid CVSS v3.0/v3.1 base score or v4.0 vector score supplies the severity, with evidence pointing to that source metric. Original vectors remain in `structured.metrics`. Missing, malformed, unsupported and zero scores remain unrated (the feed has no `none` severity). Oversized normalized records fail visibly instead of silently discarding native affected data.
+
+### Refreshing previously imported OSV records
+
+Older normalized documents discarded `upstream`, so processing those documents again cannot recover the CVEs. After deploying the updated importer and migration `202610250013_osv_upstream_priority.sql`, recollect completed OSV entries from the API:
+
+```sh
+npm run sources:recollect-osv -- --id=CGA-p5j4-h8gr-5xgh
+npm run sources:recollect-osv -- --id=CGA-p5j4-h8gr-5xgh --apply
+# Preview all completed OSV entries, then requeue them:
+npm run sources:recollect-osv -- --all
+npm run sources:recollect-osv -- --all --apply
+```
+
+The command uses the configured backend database and defaults to a dry run. It pages completed entries in batches of 100 and conditionally requeues only entries whose status and fingerprint still match. Pending, processing and failed entries are left alone; normal collection and processing publish revisions for changed normalized payloads. Source checkpoints, original dates, event history and existing subscriptions are preserved. Unchanged normalized documents are deduplicated. Monitor collection/processing health until the backlog drains; this command queues work rather than publishing synchronously.
 
 OSV IDs are deduplicated across ecosystem index entries. CVE aliases correlate source records, but OSV, CVE and KEV remain attributable events: one CVE can have different packages, distro fixes and exploitation updates. They are not blindly collapsed by CVE ID. The same source/URL/content is idempotent, and changed documents publish revisions through the existing fenced publication RPC. Withdrawals, CVE rejections and KEV removals remain in earlier technology/CVE subscriptions. Removal from KEV is not evidence that exploitation never occurred.
 
