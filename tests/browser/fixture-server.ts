@@ -1,6 +1,7 @@
 // Deterministic PostgREST fixture for browser tests. Never used by the application.
 import { createServer } from "node:http";
 import type { FeedEvent } from "../../src/lib/events";
+import { technologyOptions } from "../../src/lib/technology-options";
 import { technologyFamily } from "../../src/lib/technology";
 const patch: FeedEvent = {
   id: 1,
@@ -189,6 +190,22 @@ createServer((req, res) => {
     res.writeHead(204).end();
     return;
   }
+  if (url.pathname === "/rest/v1/technology_catalog") {
+    const terms = (url.searchParams.get("search_document") ?? "")
+      .replace(/^fts\(simple\)\./, "")
+      .split("|")
+      .map((x) => x.match(/[a-z0-9]+/g) ?? []);
+    const options = technologyOptions(rows);
+    const catalog = options.filter((o) =>
+      terms.some((words) =>
+        words.every((w) => (o.value + " " + o.label).toLowerCase().includes(w)),
+      ),
+    );
+    res
+      .writeHead(200, { "Content-Type": "application/json" })
+      .end(JSON.stringify(catalog));
+    return;
+  }
   if (url.pathname !== "/rest/v1/events") {
     res.writeHead(404).end();
     return;
@@ -247,7 +264,9 @@ createServer((req, res) => {
       )
         return false;
     }
-    const families = url.searchParams.get("technology_families");
+    const families =
+      url.searchParams.get("technology_ids") ??
+      url.searchParams.get("or")?.match(/technology_ids\.(ov\.\{[^}]+\})/)?.[1];
     if (
       families &&
       !families

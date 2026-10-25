@@ -75,9 +75,10 @@ jobs:
           test "$(psql -At -c "select count(*) from events where priority='{}'::jsonb")" -eq 0
           test "$(psql -At -c 'select count(*) from events')" -eq 2000
           test "$(psql -At -c 'select processed from public.backfill_event_priority(100)')" -eq 0
+          test "$(psql -At -c 'select processed from public.backfill_event_technologies(100)')" -eq 0
           second=$(psql -At -c 'select count(*) from supabase_migrations.schema_migrations')
           test "$first" -eq "$second"
-          psql -v ON_ERROR_STOP=1 -c "update events set technologies=case id when 1 then array['node-js-8'] when 2 then array['node-gyp'] when 3 then array['nodejs-100'] else array['nodejs','renamed-product'] end where id<=4;"
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/technology-catalog.sql
           node --test tests/technology-postgrest.test.mjs
   release:
     needs: [check, browser, migrations]

@@ -12,8 +12,19 @@ const families = catalog.map((family) => ({
   ...family,
   match: new RegExp(family.pattern),
 }));
+// Only explicit, separated versions are removable for arbitrary product names.
+// Digits inside names (HTTP/2, log4j2, OAuth2, etc.) remain part of the identity.
+export function technologyProductName(value: string) {
+  return value
+    .trim()
+    .replace(
+      /\s+(?:version\s+|v)?[0-9]+(?:\.[0-9]+){0,3}(?:\s+\(?(?:LTS|Current)\)?)?$/i,
+      "",
+    )
+    .trim();
+}
 export function technologyFamily(value: string) {
-  const key = technologyKey(value);
+  const key = technologyKey(technologyProductName(value));
   return families.find((family) => family.match.test(key))?.key ?? key;
 }
 export function technologyLabel(value: string) {
@@ -28,13 +39,14 @@ export function technologyMatches(value: string, search: string) {
   return (
     !key ||
     value.includes(key) ||
+    technologyFamily(value) === technologyFamily(search) ||
     (family &&
       (family.key === technologyFamily(search) ||
         family.aliases.some((alias) => alias.includes(key))))
   );
 }
 export function technologySearch(value: string) {
-  const key = technologyKey(value);
+  const key = technologyKey(technologyProductName(value));
   const family = families.find((entry) => entry.key === technologyFamily(key));
   const terms = family ? family.aliases : [key];
   return terms

@@ -12,7 +12,7 @@ import {
 } from "@/lib/filters";
 import { feedLink, groupEvents, dayLabel } from "@/lib/feed-view";
 import { TechnologyFilter } from "@/components/technology-filter";
-import { technologyOptions } from "@/lib/technology-options";
+import { catalogOptions } from "@/lib/technology-catalog";
 import { EventCard } from "@/components/event-card";
 import { SeverityFilter } from "@/components/severity-filter";
 export const dynamic = "force-dynamic";
@@ -48,6 +48,8 @@ export default async function Feed({
       unavailable = true;
     }
   }
+  const technologies =
+    !unavailable && !error ? await catalogOptions().catch(() => []) : [];
   const filters = filterQuery(query),
     suffix = filters.size ? "?" + filters : "";
   const groups = groupEvents(rows);
@@ -96,7 +98,7 @@ export default async function Feed({
         <TechnologyFilter
           key={query.technology ?? "all"}
           selected={query.technology?.split(",")}
-          initialOptions={technologyOptions(rows)}
+          initialOptions={technologies}
         />
         <div className="filter-actions">
           <button type="submit" className="button">

@@ -315,3 +315,34 @@ test("severity filters share RSS/JSON and keep correction delivery", async ({
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(page.viewportSize()!.width);
 });
+
+test("catalog results for a previously unseen product become stable subscriptions", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/technologies?*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [{ value: "example-engine", label: "Example Engine" }],
+      }),
+    }),
+  );
+  await page.goto("/");
+  await page.locator(".technology-filter summary").click();
+  await page
+    .getByRole("searchbox", { name: "Search technologies", exact: true })
+    .fill("Example Engine v7.2");
+  await page
+    .getByRole("checkbox", { name: "Example Engine", exact: true })
+    .check();
+  await page
+    .getByRole("searchbox", { name: "Search technologies", exact: true })
+    .press("Escape");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await expect(page).toHaveURL(/technology=example-engine/);
+  await expect(
+    page
+      .getByRole("navigation", { name: "Feed formats" })
+      .getByRole("link", { name: "RSS", exact: true }),
+  ).toHaveAttribute("href", "/feed.xml?technology=example-engine");
+});

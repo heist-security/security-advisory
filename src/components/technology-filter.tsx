@@ -19,6 +19,7 @@ export function TechnologyFilter({
   ]);
   const [search, setSearch] = useState("");
   const [options, setOptions] = useState(initialOptions);
+  const [optionsSearch, setOptionsSearch] = useState("");
   const [status, setStatus] = useState("");
   const [open, setOpen] = useState(false);
   const details = useRef<HTMLDetailsElement>(null);
@@ -47,6 +48,7 @@ export function TechnologyFilter({
         if (controller.signal.aborted) return;
         for (const o of result.data) labels.current.set(o.value, o.label);
         setOptions(result.data);
+        setOptionsSearch(search);
         setStatus(
           result.data.length
             ? ""
@@ -65,7 +67,10 @@ export function TechnologyFilter({
     };
   }, [search, open]);
   const key = technologyFamily(search);
-  const matches = options.filter((o) => technologyMatches(o.value, search));
+  const matches =
+    optionsSearch === search
+      ? options
+      : options.filter((o) => technologyMatches(o.value, search));
   const custom =
     key &&
     key.length <= 100 &&

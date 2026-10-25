@@ -61,10 +61,10 @@ test(
       return result;
     };
     await migrate(new URL(database), env, execute, async () => {});
-    assert.equal(batches, 21);
+    assert.equal(batches, 42);
     assert.equal(lastProgress, "2000|0|t");
     await migrate(new URL(database), env, execute, async () => {});
-    assert.equal(batches, 22);
+    assert.equal(batches, 44);
     assert.equal(lastProgress, "2000|0|t");
     for (const path of files) assert.equal(existsSync(path), false);
   },

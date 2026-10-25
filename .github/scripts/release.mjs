@@ -120,48 +120,64 @@ export async function migrate(
     // libpq does not expand connection URIs supplied through PGDATABASE.
     // Keep the password in a private file rather than process arguments/env.
     const connection = psqlEnvironment(database, env, certificate, directory);
-    const deadline = Date.now() + 15 * 60 * 1000;
-    for (let attempt = 0; attempt < 5000 && Date.now() < deadline; attempt++) {
-      const batch = execute(
-        "psql",
-        [
-          "--no-psqlrc",
-          "--no-password",
-          "--quiet",
-          "--tuples-only",
-          "--no-align",
-          "--set=ON_ERROR_STOP=1",
-          "--set=VERBOSITY=sqlstate",
-          "--command",
-          "set lock_timeout='5s'; set statement_timeout='30s'; select last_id,processed,done from public.backfill_event_priority(100);",
-        ],
-        {
-          env: connection,
-          encoding: "utf8",
-          stdio: ["ignore", "pipe", "pipe"],
-          timeout: 45000,
-          maxBuffer: 65536,
-        },
-      );
-      if (batch.error || batch.status !== 0)
-        throw new ReleaseError(
-          "Priority backfill failed (" +
-            migrationFailure(batch) +
-            "); deployment stopped. Completed batches are retained for retry.",
+    for (const [label, procedure] of [
+      ["Priority", "backfill_event_priority"],
+      ["Technology", "backfill_event_technologies"],
+    ]) {
+      let completed = false;
+      const deadline = Date.now() + 15 * 60 * 1000;
+      for (
+        let attempt = 0;
+        attempt < 5000 && Date.now() < deadline;
+        attempt++
+      ) {
+        const batch = execute(
+          "psql",
+          [
+            "--no-psqlrc",
+            "--no-password",
+            "--quiet",
+            "--tuples-only",
+            "--no-align",
+            "--set=ON_ERROR_STOP=1",
+            "--set=VERBOSITY=sqlstate",
+            "--command",
+            `set lock_timeout='5s'; set statement_timeout='30s'; select last_id,processed,done from public.${procedure}(100);`,
+          ],
+          {
+            env: connection,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+            timeout: 45000,
+            maxBuffer: 65536,
+          },
         );
-      const progress = String(batch.stdout ?? "")
-        .trim()
-        .match(/^(\d+)\|(\d+)\|([tf])$/);
-      if (!progress)
+        if (batch.error || batch.status !== 0)
+          throw new ReleaseError(
+            label +
+              " backfill failed (" +
+              migrationFailure(batch) +
+              "); deployment stopped. Completed batches are retained for retry.",
+          );
+        const progress = String(batch.stdout ?? "")
+          .trim()
+          .match(/^(\d+)\|(\d+)\|([tf])$/);
+        if (!progress)
+          throw new ReleaseError(
+            "Invalid backfill response; deployment stopped.",
+          );
+        if (progress[3] === "t") {
+          completed = true;
+          break;
+        }
+        await pause(100);
+      }
+      if (!completed)
         throw new ReleaseError(
-          "Invalid backfill response; deployment stopped.",
+          label +
+            " backfill timed out; deployment stopped. Retry resumes completed batches.",
         );
-      if (progress[3] === "t") return;
-      await pause(100);
     }
-    throw new ReleaseError(
-      "Priority backfill timed out; deployment stopped. Retry resumes completed batches.",
-    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

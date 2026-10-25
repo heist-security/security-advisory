@@ -10,10 +10,7 @@ it("finds prefix suggestions without recency sorting or loading advisory bodies"
   vi.stubEnv("SUPABASE_URL", "https://database.example.test");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-placeholder");
   const fetcher = vi.fn(async (_input: RequestInfo | URL) =>
-    Response.json([
-      { technologies: ["ruby"], products: [{ name: { value: "Ruby" } }] },
-      { technologies: ["old-ruby"], products: null },
-    ]),
+    Response.json([{ value: "ruby", label: "Ruby" }]),
   );
   vi.stubGlobal("fetch", fetcher);
   const response = await GET(
@@ -21,21 +18,21 @@ it("finds prefix suggestions without recency sorting or loading advisory bodies"
   );
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({
-    data: [
-      { value: "old-ruby", label: "old-ruby" },
-      { value: "ruby", label: "Ruby" },
-    ],
+    data: [{ value: "ruby", label: "Ruby" }],
   });
+  expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toBe(
+    "/rest/v1/technology_catalog",
+  );
   const params = new URL(String(fetcher.mock.calls[0][0])).searchParams;
   expect(Object.fromEntries(params)).toEqual({
-    select: "technologies,products:payload->products",
+    select: "value:id,label",
     search_document: "fts(simple).(rub:*)",
-    order: "technologies.asc",
-    limit: "100",
+    order: "label.asc,id.asc",
+    limit: "50",
   });
 });
 
-it("keeps the initial suggestion list recent and rejects invalid searches before querying", async () => {
+it("uses the full catalog for initial suggestions and rejects invalid searches before querying", async () => {
   vi.stubEnv("SUPABASE_URL", "https://database.example.test");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-placeholder");
   const fetcher = vi.fn(async (_input: RequestInfo | URL) => Response.json([]));
@@ -45,7 +42,7 @@ it("keeps the initial suggestion list recent and rejects invalid searches before
   ).toBe(200);
   expect(
     new URL(String(fetcher.mock.calls[0][0])).searchParams.get("order"),
-  ).toBe("id.desc");
+  ).toBe("label.asc,id.asc");
   for (const q of ["q=ruby&q=node", "q=!!!", "q=" + "x".repeat(101)])
     expect(
       (await GET(new Request("https://feed.example/api/v1/technologies?" + q)))

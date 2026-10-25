@@ -41,7 +41,7 @@ it("filters technology unions in the database before pagination", async () => {
   expect(
     Object.fromEntries(new URL(String(fetcher.mock.calls[0][0])).searchParams),
   ).toMatchObject({
-    technology_families: "ov.{node-js,ruby}",
+    or: "(technology_ids.ov.{node-js,ruby},technologies.ov.{node-js,ruby})",
     severity_keys: "ov.{critical}",
     id: "gt.5",
     limit: "1",
