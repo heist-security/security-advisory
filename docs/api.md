@@ -4,19 +4,19 @@ All publishers contribute to one event stream. The visual page at `/`, RSS and J
 
 ## Filters
 
-| Parameter  | Meaning                                                     | Example        |
-| ---------- | ----------------------------------------------------------- | -------------- |
-| q          | Keyword search, up to 120 characters                        | authentication |
-| type       | Advisory classification; kind remains a compatible alias    | patch          |
-| technology | Normalized product-name key, or an exact source ID          | node-js        |
-| cve        | CVE identifier, case-insensitive input                      | CVE-2026-12345 |
-| source     | Exact source ID from the catalog                            | ruby           |
-| severity   | One or more publisher/linked severity ratings               | critical,high  |
-| important  | High/Critical OR known exploited OR unrated security fix    | 1              |
-| fix        | Documented fixed versions (including structured advisories) | 1              |
-| limit      | Number of events, 1-100                                     | 100            |
-| after      | JSON only: ascending incremental cursor, exclusive          | 0              |
-| before     | JSON only: newest-first pagination, exclusive               | 123            |
+| Parameter  | Meaning                                                       | Example        |
+| ---------- | ------------------------------------------------------------- | -------------- |
+| q          | Keyword search, up to 120 characters                          | authentication |
+| type       | Advisory classification; kind remains a compatible alias      | patch          |
+| technology | Up to 10 comma-separated product-name keys or source IDs (OR) | node-js        |
+| cve        | CVE identifier, case-insensitive input                        | CVE-2026-12345 |
+| source     | Exact source ID from the catalog                              | ruby           |
+| severity   | One or more publisher/linked severity ratings                 | critical,high  |
+| important  | High/Critical OR known exploited OR unrated security fix      | 1              |
+| fix        | Documented fixed versions (including structured advisories)   | 1              |
+| limit      | Number of events, 1-100                                       | 100            |
+| after      | JSON only: ascending incremental cursor, exclusive            | 0              |
+| before     | JSON only: newest-first pagination, exclusive                 | 123            |
 
 Different filters combine with AND. Repeated API parameters, conflicting type/kind, invalid values and simultaneous after/before produce 400. Technology input is lowercased, runs of non-ASCII-alphanumeric characters become hyphens, and edge hyphens are trimmed. For example Node.js becomes node-js, C++ becomes c-plus-plus and C# becomes c-sharp. Keys derive from evidenced product names; this is not a curated alias/ontology service. Source IDs provide a stable alternative.
 
@@ -116,3 +116,11 @@ A Ruby patch linked to a Critical GitLab vulnerability is labelled **Linked Crit
 Changes to linked severity, exploitation or displayed evidence append a context-only event with `context_update: true`, a new ID, revision and RSS GUID. It preserves the source announcement and original date; it does not consume a model attempt or pretend a new release was published. Unchanged context does not emit duplicates. Consumers should replace the previous revision for the same `advisory_id`. Initial migration enrichment does not replay historical notifications; existing consumers wanting the newly introduced filters must start a fresh backfill.
 
 Severity, important and fix routing retain prior subscription matches so downgrades and withdrawals reach existing subscribers. Thus a Critical subscription may receive a later Low revision or withdrawal; `priority` describes that revision's actual classification. Publisher dates appear on cards separately from feed publication dates so backfilled releases are not presented as newly announced fixes.
+
+### Technology multi-select
+
+`technology=node-js,ruby` matches any selected technology. It combines with severity and other filters using AND, before pagination. Single-technology URLs continue to work. Values are normalized, deduplicated and sorted; each must be at most 100 characters. Repeated `technology` parameters are rejected.
+
+The visual feed exposes severity and technology controls. Advanced URL/API filters remain supported. Applying the simplified form replaces any advanced filters in the current URL.
+
+`GET /api/v1/technologies?q=node` returns up to 50 `{value,label}` suggestions from at most 100 recent matching public events. Search uses the existing text-search index across the archive; suggestions are bounded, not an exhaustive catalog. The picker also accepts an explicit product name when suggestions are missing or unavailable. No raw documents or credentials are exposed.

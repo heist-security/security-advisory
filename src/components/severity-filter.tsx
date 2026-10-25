@@ -5,7 +5,7 @@ import { severities, severityLabel, type Severity } from "@/lib/priority";
 export function SeverityFilter({ selected = [] }: { selected?: Severity[] }) {
   const [values, setValues] = useState(selected);
   return (
-    <details className="severity-filter">
+    <details className="severity-filter choice-filter">
       <summary>Severity{values.length ? ` (${values.length})` : ""}</summary>
       <input
         type="hidden"

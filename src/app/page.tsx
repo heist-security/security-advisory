@@ -3,15 +3,15 @@ import { events } from "@/lib/events";
 import { configured } from "@/lib/db";
 import type { FeedEvent } from "@/lib/events";
 import {
-  eventTypes,
   filterQuery,
   pageParams,
   parseEventQuery,
   type EventQuery,
   type SearchParams,
 } from "@/lib/filters";
-import { feedLink, groupEvents, dayLabel, typeLabels } from "@/lib/feed-view";
-import { registry } from "@/lib/registry";
+import { feedLink, groupEvents, dayLabel } from "@/lib/feed-view";
+import { TechnologyFilter } from "@/components/technology-filter";
+import { technologyOptions } from "@/lib/technology-options";
 import { EventCard } from "@/components/event-card";
 import { SeverityFilter } from "@/components/severity-filter";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,6 @@ export const metadata: Metadata = {
   description:
     "Browse security advisories, patches and mitigations in one open feed. Search by technology, CVE or source and inspect the evidence.",
 };
-const sources = [...registry].sort((a, b) => a.name.localeCompare(b.name));
 export default async function Feed({
   searchParams,
 }: {
@@ -67,90 +66,20 @@ export default async function Feed({
         role="search"
         aria-label="Filter the feed"
       >
-        <label>
-          Search
-          <input
-            name="q"
-            type="search"
-            maxLength={120}
-            placeholder="Search announcements…"
-            defaultValue={query.q ?? ""}
-          />
-        </label>
-        <label>
-          Type
-          <select name="type" defaultValue={query.type ?? ""}>
-            <option value="">All types</option>
-            {eventTypes.map((type) => (
-              <option key={type} value={type}>
-                {typeLabels[type]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Technology
-          <input
-            name="technology"
-            placeholder="e.g. Node.js"
-            maxLength={100}
-            defaultValue={query.technology ?? ""}
-          />
-        </label>
-        <label>
-          CVE
-          <input
-            name="cve"
-            placeholder="CVE-2026-12345"
-            maxLength={28}
-            defaultValue={query.cve ?? ""}
-          />
-        </label>
-        <label>
-          Source
-          <select name="source" defaultValue={query.source ?? ""}>
-            <option value="">All sources</option>
-            {query.source &&
-            !sources.some((source) => source.id === query.source) ? (
-              <option value={query.source}>{query.source}</option>
-            ) : null}
-            {sources.map((source) => (
-              <option key={source.id} value={source.id}>
-                {source.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SeverityFilter
+          key={query.severity?.join(",") ?? "all"}
+          selected={query.severity}
+        />
+        <TechnologyFilter
+          key={query.technology ?? "all"}
+          selected={query.technology?.split(",")}
+          initialOptions={technologyOptions(rows)}
+        />
         <div className="filter-actions">
           <button type="submit" className="button">
             Filter
           </button>
-          {filters.size > 0 && !error ? <a href="/">Reset filters</a> : null}
-        </div>
-        <div className="priority-filters">
-          <SeverityFilter
-            key={query.severity?.join(",") ?? "all"}
-            selected={query.severity}
-          />
-          <label>
-            <input
-              type="checkbox"
-              name="important"
-              value="1"
-              defaultChecked={!!query.important}
-            />
-            Important updates
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              name="fix"
-              value="1"
-              defaultChecked={!!query.fix}
-            />
-            Fix available
-          </label>
-          <a href="/docs#priority">How priority works</a>
+          {filters.size > 0 ? <a href="/">Reset filters</a> : null}
         </div>
       </form>
       <section className="feed-reader" aria-label="Security announcements">

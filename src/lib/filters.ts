@@ -37,7 +37,10 @@ export function first(value: string | string[] | undefined) {
 export function pageParams(values: SearchParams) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(values))
-    params.set(key, first(value).slice(0, 200));
+    params.set(
+      key,
+      key === "technology" ? first(value) : first(value).slice(0, 200),
+    );
   return params;
 }
 export function parseEventQuery(
@@ -87,11 +90,17 @@ export function parseEventQuery(
   if (type && !eventTypes.includes(type as EventType))
     throw new Error("Invalid event type");
   const rawTechnology = params.get("technology")?.trim();
+  const technologies = rawTechnology
+    ? rawTechnology.split(",").map((v) => v.trim())
+    : [];
   if (
-    rawTechnology &&
-    (rawTechnology.length > 100 || !technologyKey(rawTechnology))
+    technologies.length > 10 ||
+    technologies.some(
+      (v) =>
+        !technologyKey(v) || v.length > 100 || technologyKey(v).length > 100,
+    )
   )
-    throw new Error("Invalid technology");
+    throw new Error("Select up to 10 technologies, each 1 to 100 characters");
   const cve = params.get("cve")?.trim().toUpperCase() || undefined;
   if (cve && !/^CVE-\d{4}-\d{4,19}$/.test(cve)) throw new Error("Invalid CVE");
   const source = params.get("source") || undefined;
@@ -113,7 +122,9 @@ export function parseEventQuery(
   return {
     q,
     type: type as EventType | undefined,
-    technology: rawTechnology ? technologyKey(rawTechnology) : undefined,
+    technology: technologies.length
+      ? [...new Set(technologies.map(technologyKey))].sort().join(",")
+      : undefined,
     cve,
     source,
     severity,
