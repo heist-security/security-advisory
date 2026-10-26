@@ -323,6 +323,113 @@ test("suppresses migration diagnostics and removes the certificate on failure", 
   assert.equal(existsSync(certificate), false);
 });
 
+test("retries schema lock timeouts and deadlocks before starting backfills", async () => {
+  for (const code of ["55P03", "40P01"]) {
+    const env = environment();
+    const commands = [],
+      delays = [];
+    let schemaCalls = 0;
+    await migrate(
+      configuration(env),
+      env,
+      (cmd, args) => {
+        commands.push(cmd);
+        if (cmd === "supabase") {
+          assert.deepEqual(args.slice(0, 3), ["db", "push", "--db-url"]);
+          return ++schemaCalls <= 2
+            ? { status: 1, stderr: `ERROR: private details (SQLSTATE ${code})` }
+            : { status: 0 };
+        }
+        return { status: 0, stdout: "100|0|t" };
+      },
+      async (ms) => delays.push(ms),
+    );
+    assert.deepEqual(commands, [
+      "supabase",
+      "supabase",
+      "supabase",
+      "psql",
+      "psql",
+      "psql",
+    ]);
+    assert.deepEqual(delays, [1000, 2000]);
+  }
+});
+
+test("persistent schema contention stops before backfills or deployment", async () => {
+  const f = fixture();
+  let calls = 0,
+    certificate;
+  const delays = [];
+  f.options.apply = (database, env) =>
+    migrate(
+      database,
+      env,
+      (cmd, args) => {
+        assert.equal(cmd, "supabase");
+        calls++;
+        certificate = new URL(args[3]).searchParams.get("sslrootcert");
+        return { status: 1, stderr: "ERROR: private details (SQLSTATE 55P03)" };
+      },
+      async (ms) => delays.push(ms),
+    );
+  await assert.rejects(
+    release(f.options),
+    /Migration failed \(database lock timeout\)/,
+  );
+  assert.equal(calls, 6);
+  assert.deepEqual(delays, [1000, 2000, 4000, 8000, 10000]);
+  assert.equal(existsSync(certificate), false);
+  assert.ok(!f.calls.some((call) => call.method === "POST"));
+});
+
+test("schema retries retain the overall migration deadline", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 0 });
+  const env = environment();
+  const timeouts = [];
+  await assert.rejects(
+    migrate(
+      configuration(env),
+      env,
+      (_cmd, _args, options) => {
+        timeouts.push(options.timeout);
+        t.mock.timers.tick(4 * 60 * 1000);
+        return { status: 1, stderr: "ERROR: 55P03 private details" };
+      },
+      async (ms) => t.mock.timers.tick(ms),
+    ),
+    /Migration failed \(database lock timeout\)/,
+  );
+  assert.deepEqual(timeouts, [480000, 239000]);
+});
+
+test("schema pushes do not retry ambiguous failures or permanent SQL errors", async () => {
+  for (const failure of [
+    { status: 1, stderr: "ERROR: private details (SQLSTATE 57014)" },
+    { status: 1, stderr: "ERROR: private details (SQLSTATE 42501)" },
+    { status: 1, stderr: "connection to server failed" },
+    { status: 1, stderr: "private diagnostic without SQLSTATE" },
+    { error: { code: "ETIMEDOUT" }, stderr: "ERROR: 55P03 private details" },
+  ]) {
+    const env = environment();
+    let calls = 0;
+    await assert.rejects(
+      migrate(
+        configuration(env),
+        env,
+        (cmd) => {
+          assert.equal(cmd, "supabase");
+          calls++;
+          return failure;
+        },
+        async () => assert.fail("must not retry"),
+      ),
+      /Migration failed/,
+    );
+    assert.equal(calls, 1);
+  }
+});
+
 test("backfill batches finish before deployment and retain safe failure categories", async () => {
   const env = environment();
   let calls = 0;
