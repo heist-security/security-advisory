@@ -15,10 +15,13 @@ test("feed search applies after typing stops and clearing restores the feed", as
   await search.fill("Ruby ");
   await page.clock.runFor(299);
   await expect(page).toHaveURL("/");
+  await expect(page.getByRole("status")).toHaveText("Loading advisories…");
+  await expect(page.locator(".event-card")).toHaveCount(0);
   await page.clock.runFor(1);
   await expect(page).toHaveURL(/q=Ruby/);
   await expect(page.locator(".event-card")).toHaveCount(1);
   await expect(page.locator("#event-3")).toBeVisible();
+  await expect(page.getByText("Loading advisories…")).toHaveCount(0);
   await expect(search).toBeFocused();
   await expect(search).toHaveValue("Ruby ");
   await search.pressSequentially("advisory");
@@ -34,6 +37,50 @@ test("feed search applies after typing stops and clearing restores the feed", as
       .getByRole("navigation", { name: "Feed formats" })
       .getByRole("link", { name: "RSS", exact: true }),
   ).toHaveAttribute("href", "/feed.xml?view=grouped");
+});
+
+test("filter changes show a skeleton until results arrive and keep controls usable", async ({
+  page,
+}) => {
+  await page.goto("/");
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === "/" && url.searchParams.has("type"),
+    async (route) => {
+      await waiting;
+      await route.continue();
+    },
+  );
+  await page.getByRole("button", { name: /^Type/ }).click();
+  await page.getByRole("checkbox", { name: "Advisory", exact: true }).check();
+  try {
+    await expect(page.getByRole("status")).toHaveText("Loading advisories…");
+    await expect(
+      page.getByRole("region", { name: "Security announcements" }),
+    ).toHaveAttribute("aria-busy", "true");
+    await expect(page.locator(".event-card")).toHaveCount(0);
+    await expect(
+      page.getByRole("searchbox", { name: "Search feed", exact: true }),
+    ).toBeEnabled();
+    await expect(
+      page.getByRole("checkbox", { name: "Advisory", exact: true }),
+    ).toBeChecked();
+  } finally {
+    release();
+  }
+  await expect(page).toHaveURL(/type=advisory/);
+  await expect(page.locator(".event-card")).toHaveCount(2);
+  await expect(page.getByText("Loading advisories…")).toHaveCount(0);
+  await page.getByRole("button", { name: /^Type/ }).click();
+  await page
+    .getByRole("searchbox", { name: "Search feed", exact: true })
+    .fill("no-such-advisory");
+  await expect(page.getByRole("status")).toHaveText(
+    "No events match your filters.",
+  );
 });
 
 test("a selection includes pending search text and resets the feed cursor", async ({

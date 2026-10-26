@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
-import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader } from "./ui/card";
-import { EventKindBadge } from "./event-kind-badge";
+import { EventBadges, EventMetadata } from "./event-metadata";
 import type { FeedEvent } from "@/lib/events";
-import { priorityLabels } from "@/lib/priority";
 import { advisoryPath, itemLink, itemPath } from "@/lib/item-links";
 import { SourceDetails } from "./event-details";
 
@@ -96,23 +94,13 @@ export function AdvisoryDetail({
       <article className="space-y-6">
         <Card className="shadow-none">
           <CardHeader className="gap-4">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <EventKindBadge kind={event.payload.kind} />
-              {event.payload.kind !== "withdrawal"
-                ? priorityLabels(event.priority).map((label) => (
-                    <Badge variant="secondary" key={label}>
-                      {label}
-                    </Badge>
-                  ))
-                : null}
-              <span>
-                {members.length} source{" "}
-                {members.length === 1 ? "record" : "records"}
-              </span>
-            </div>
+            <EventBadges event={event} />
             <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
               {event.payload.title}
             </h1>
+            <EventMetadata event={event}>
+              {members.length === 1 ? <span>1 source record</span> : null}
+            </EventMetadata>
             <p className="text-base leading-relaxed whitespace-pre-line text-muted-foreground">
               {event.payload.summary}
             </p>
