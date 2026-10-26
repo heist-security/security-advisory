@@ -41,34 +41,48 @@ test("sparse grouped filters use bounded reads for HTML, JSON and RSS page sizes
   }
 });
 
-test("broad grouped subscriptions remain responsive on a 60,000-event archive", () => {
+test("broad grouped subscriptions remain responsive immediately after 60,000 publications", () => {
   // Compact documents isolate snapshot-member lookup costs from payload I/O.
   // One GIN overlap scan with tens of thousands of keys becomes quadratic;
   // probing each matching event avoids that work, even with a cached plan.
   execFileSync("psql", ["-XqAt", "-v", "ON_ERROR_STOP=1"], {
     input: `truncate documents restart identity cascade;
+      alter table advisory_group_updates set (autovacuum_enabled=false);
       set test.group_query_rows='60000';
       set test.group_query_words='1';
       ${readFileSync(new URL("./fixtures/group-query.sql", import.meta.url), "utf8")}
       vacuum analyze events;`,
     encoding: "utf8",
   });
-  for (const updates of [false, true]) {
-    for (const filters of [
-      { type: "advisory" },
-      { severity: ["high"] },
-      { q: "fixture", source: "core-cve" },
-    ]) {
-      const result = execFileSync("psql", ["-XqAt", "-v", "ON_ERROR_STOP=1"], {
-        input: `set plan_cache_mode=force_generic_plan;
-          set statement_timeout='3s';
-          select item->>'id' from query_advisory_groups('${JSON.stringify(filters)}',21,null,null,${updates}) item;`,
-        encoding: "utf8",
-      });
-      assert.deepEqual(
-        result.trim().split("\n").map(Number),
-        Array.from({ length: 21 }, (_, index) => 60000 - index),
-      );
+  try {
+    // Do not vacuum snapshot membership: reads must stay fast while ingestion
+    // is active, rather than depending on when autovacuum drains GIN entries.
+    for (const updates of [false, true]) {
+      for (const filters of [
+        { type: "advisory" },
+        { severity: ["high"] },
+        { q: "fixture", source: "core-cve" },
+      ]) {
+        const result = execFileSync(
+          "psql",
+          ["-XqAt", "-v", "ON_ERROR_STOP=1"],
+          {
+            input: `set plan_cache_mode=force_generic_plan;
+            set statement_timeout='3s';
+            select item->>'id' from query_advisory_groups('${JSON.stringify(filters)}',21,null,null,${updates}) item;`,
+            encoding: "utf8",
+          },
+        );
+        assert.deepEqual(
+          result.trim().split("\n").map(Number),
+          Array.from({ length: 21 }, (_, index) => 60000 - index),
+        );
+      }
     }
+  } finally {
+    execFileSync("psql", ["-XqAt", "-v", "ON_ERROR_STOP=1"], {
+      input: "alter table advisory_group_updates reset (autovacuum_enabled);",
+      encoding: "utf8",
+    });
   }
 });

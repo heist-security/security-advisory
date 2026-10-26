@@ -13,8 +13,12 @@ through event indexes before looking up current groups or historical snapshots.
 Previously only text searches took that path. Snapshot lookups probe each
 matching event separately and deduplicate before pagination, avoiding expensive
 large-array overlap queries for broad subscriptions. No backfill is required.
+The snapshot-member index uses immediate GIN updates and drains its existing
+pending list during migration: otherwise every event lookup rescans pending
+entries until autovacuum catches up, making reads slow just after ingestion.
 Regression checks cover sparse/empty filters, cursors, corrections, and broad
-subscriptions on a 60,000-event PostgreSQL fixture.
+subscriptions immediately after 60,000 publications with snapshot autovacuum
+disabled.
 
 Failed feed reads now log the duration, view, filter names, and a known database
 error category. They omit filter values and raw error messages. After the normal

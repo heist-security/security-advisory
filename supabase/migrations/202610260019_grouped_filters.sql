@@ -5,6 +5,12 @@ set local lock_timeout='5s';
 set local statement_timeout='30s';
 select pg_advisory_xact_lock(719432001);
 
+-- Each matching event probes this index. A GIN pending list would be scanned
+-- again for every probe, making broad feeds slow immediately after ingestion.
+-- Index new snapshot members directly and flush entries already queued by 018.
+alter index public.advisory_group_updates_members set (fastupdate=off);
+select gin_clean_pending_list('public.advisory_group_updates_members');
+
 create or replace function public.query_advisory_groups(filters jsonb default '{}',p_limit integer default 30,p_after bigint default null,p_before bigint default null,updates boolean default false)
 returns setof jsonb language plpgsql stable set search_path=public set plan_cache_mode=force_custom_plan as $$
 begin
