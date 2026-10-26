@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./site.css" layer(components);
 
 @custom-variant dark (&:is(.dark *));
 
@@ -51,14 +50,16 @@
   --border: #e4e3e0;
   --input: var(--border);
   --ring: #346fe0;
-  --surface: var(--muted);
-  --blue: #346fe0;
-  --blue-hover: var(--primary);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  a:focus-visible,
+  button:focus-visible,
+  summary:focus-visible {
+    @apply rounded-sm outline-2 outline-offset-4 outline-ring;
   }
   body {
     @apply bg-background font-sans text-foreground;

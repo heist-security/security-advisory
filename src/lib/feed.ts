@@ -51,7 +51,7 @@ export function articleText(html: string) {
   const selected = article.length ? article : main.length ? main : $("body");
   return boundedText(cleanText(selected.html() ?? ""));
 }
-export function boundedText(text: string) {
+function boundedText(text: string) {
   if (!text || text.length > 50000)
     throw new Error(
       "Empty or oversized document; requires a dedicated adapter",

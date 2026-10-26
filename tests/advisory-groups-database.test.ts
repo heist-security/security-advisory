@@ -1,3 +1,14 @@
+import type { FeedEvent } from "../src/lib/events";
+import type { Priority } from "../src/lib/priority";
+type GroupMember = FeedEvent & { priority: Priority };
+type GroupResult = {
+  id: number;
+  group_id: string;
+  primary: GroupMember;
+  changed: GroupMember;
+  members: GroupMember[];
+  superseded_by: string[];
+};
 import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
@@ -70,7 +81,7 @@ async function publish(
   url = "https://osv.dev/vulnerability/" + payload.structured.id,
 ) {
   const job = (
-    await db.query<any>(
+    await db.query<{ id: number; lease_token: string }>(
       `insert into documents(source_id,source_url,content_hash,body,status,lease_token,leased_until)
      values($1,$2,gen_random_uuid()::text,'Source body','processing',gen_random_uuid(),now()+interval '2 minutes') returning *`,
       [source, url],
@@ -90,13 +101,10 @@ async function groups(
   updates = false,
 ) {
   return (
-    await db.query<any>("select query_advisory_groups($1,$2,$3,$4,$5) item", [
-      JSON.stringify(filters),
-      limit,
-      after,
-      before,
-      updates,
-    ])
+    await db.query<{ item: GroupResult }>(
+      "select query_advisory_groups($1,$2,$3,$4,$5) item",
+      [JSON.stringify(filters), limit, after, before, updates],
+    )
   ).rows.map((r) => r.item);
 }
 
@@ -113,7 +121,7 @@ it("groups matching OSV copies, prefers the reviewed primary and retains every s
   });
   expect(rows[0].members).toHaveLength(2);
   expect(
-    rows[0].members.find((m: any) => m.payload.structured.id === go).payload
+    rows[0].members.find((m) => m.payload.structured?.id === go)!.payload
       .products,
   ).toHaveLength(2);
   expect(rows[0].primary.payload.products).toHaveLength(1);
@@ -172,6 +180,37 @@ it("filters matching members before group pagination, with all conditions on the
   expect(await groups({}, null, second[0].id, 1)).toHaveLength(0);
 });
 
+it("matches any selected type before pagination and keeps conditions on the same member", async () => {
+  await publish({ ...record(), title: "Advisory-only wording" });
+  await publish({ ...record(go), kind: "patch" });
+  const unrelated = record("TEST-123");
+  unrelated.structured.references = [];
+  await publish({ ...unrelated, kind: "mitigation" });
+  const union = await groups({ type: "patch,mitigation" });
+  expect(union).toHaveLength(2);
+  expect(await groups({ type: "patch" })).toHaveLength(1);
+  expect(
+    await groups({ type: "patch,mitigation", q: "Advisory-only wording" }),
+  ).toHaveLength(0);
+  const first = await groups({ type: "patch,mitigation" }, null, null, 1);
+  const next = await groups({ type: "patch,mitigation" }, null, first[0].id, 1);
+  expect(first[0].group_id).not.toBe(next[0].group_id);
+  expect(
+    await groups({ type: "patch,mitigation" }, null, next[0].id, 1),
+  ).toHaveLength(0);
+  await publish({ ...record(go), kind: "withdrawal" });
+  const corrections = await groups(
+    { type: "patch,mitigation" },
+    union[0].id,
+    null,
+    100,
+    true,
+  );
+  expect(
+    corrections.some((row) => row.changed.payload.kind === "withdrawal"),
+  ).toBe(true);
+});
+
 it("publishes changed secondary evidence, withdrawals and reversions with immutable update snapshots", async () => {
   await publish();
   await publish(record(go));
@@ -193,7 +232,7 @@ it("publishes changed secondary evidence, withdrawals and reversions with immuta
   );
   expect(updates).toHaveLength(1);
   expect(updates[0].changed.payload.kind).toBe("withdrawal");
-  expect(updates[0].primary.payload.structured.id).toBe(ghsa);
+  expect(updates[0].primary.payload.structured?.id).toBe(ghsa);
   await publish(record(go));
   expect(await groups({}, updates[0].id, null, 100, true)).toHaveLength(1);
   expect(
@@ -207,9 +246,9 @@ it("keeps source attribution when the primary withdraws and retains the remainin
   await publish({ ...record(), kind: "withdrawal" });
   const rows = await groups();
   expect(rows).toHaveLength(1);
-  expect(rows[0].primary.payload.structured.id).toBe(go);
+  expect(rows[0].primary.payload.structured?.id).toBe(go);
   expect(
-    rows[0].members.find((m: any) => m.payload.structured.id === ghsa).payload
+    rows[0].members.find((m) => m.payload.structured?.id === ghsa)!.payload
       .kind,
   ).toBe("withdrawal");
 });
@@ -227,9 +266,9 @@ it("coalesces linked context revisions and delivers a downgrade once to previous
     true,
   );
   expect(updates).toHaveLength(1);
-  expect(
-    updates[0].members.every((m: any) => m.priority.severity === "low"),
-  ).toBe(true);
+  expect(updates[0].members.every((m) => m.priority.severity === "low")).toBe(
+    true,
+  );
   const next = updates[0].id;
   const metadata = record();
   metadata.severity = "low";
@@ -245,7 +284,7 @@ it("records membership corrections when an anchor arrives late or ranges diverge
   expect(await groups()).toHaveLength(1);
   const updates = await groups({}, first.id, null, 100, true);
   expect(
-    updates.find((u: any) => u.group_id === first.group_id).superseded_by,
+    updates.find((u) => u.group_id === first.group_id)!.superseded_by,
   ).toEqual([key]);
   const changed = record(go);
   changed.structured.affected = [{ ...affected, versions: ["99.0.0"] }];
@@ -266,7 +305,9 @@ it("backfills only current source states in resumable batches without rewriting 
   await db.exec("alter table events enable trigger publish_advisory_group");
   for (let i = 0; i < 10; i++) {
     const result = (
-      await db.query<any>("select * from backfill_advisory_groups(1)")
+      await db.query<{ done: boolean }>(
+        "select * from backfill_advisory_groups(1)",
+      )
     ).rows[0];
     if (result.done) break;
   }
@@ -281,8 +322,11 @@ it("backfills only current source states in resumable batches without rewriting 
     ).rows,
   ).toEqual(before);
   expect(
-    (await db.query<any>("select processed from backfill_advisory_groups(1)"))
-      .rows[0].processed,
+    (
+      await db.query<{ processed: number }>(
+        "select processed from backfill_advisory_groups(1)",
+      )
+    ).rows[0].processed,
   ).toBe(0);
 });
 
@@ -421,7 +465,9 @@ it("bounds page reads on a populated feed, including cached plans and selective 
       );
       expect(rows).toHaveLength(entry.count);
       expect(rows[0]?.id).toBe(entry.first);
-      const result = await db.query<any>(
+      const result = await db.query<{
+        "QUERY PLAN": { Plan: Record<string, number> }[];
+      }>(
         "explain (analyze,buffers,format json) select * from query_advisory_groups($1,21,$2,$3,$4)",
         [
           JSON.stringify(entry.filters),

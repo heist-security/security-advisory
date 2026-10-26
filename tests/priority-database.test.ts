@@ -1,3 +1,12 @@
+import type { FeedEvent } from "../src/lib/events";
+import type { Priority } from "../src/lib/priority";
+type PriorityEvent = FeedEvent & {
+  document_id: number;
+  priority: Priority;
+  important: boolean;
+  fix_available: boolean;
+  severity_keys: string[];
+};
 import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { beforeEach, afterEach, it, expect } from "vitest";
@@ -19,7 +28,8 @@ beforeEach(async (context) => {
         file.endsWith("009_priority_backfill.sql") ||
         file.endsWith("012_advisory_groups.sql") ||
         file.endsWith("013_osv_upstream_priority.sql") ||
-        file.endsWith("014_grouped_feed_query.sql"))
+        file.endsWith("014_grouped_feed_query.sql") ||
+        file.endsWith("015_event_type_filters.sql"))
     ))
       await db.exec(readFileSync(new URL(file, folder), "utf8"));
 }, 30000);
@@ -68,7 +78,7 @@ async function publish(
   url = "https://example.test/" + source,
 ) {
   const job = (
-    await db.query<any>(
+    await db.query<{ id: number; lease_token: string }>(
       `insert into documents(source_id,source_url,content_hash,body,status,lease_token,leased_until)
     values($1,$2,gen_random_uuid()::text,$3,'processing',gen_random_uuid(),now()+interval '2 minutes') returning *`,
       [source, url, body],
@@ -83,7 +93,7 @@ async function publish(
 }
 async function latest(source = "ruby") {
   return (
-    await db.query<any>(
+    await db.query<PriorityEvent>(
       "select * from events where source_id=$1 order by id desc limit 1",
       [source],
     )

@@ -47,7 +47,7 @@ export async function events(
     .limit(options.limit ?? 30);
   if (options.after !== undefined) query = query.gt("id", options.after);
   if (options.before !== undefined) query = query.lt("id", options.before);
-  if (options.type) query = query.contains("event_types", [options.type]);
+  if (options.type?.length) query = query.overlaps("event_types", options.type);
   if (options.technology) {
     const ids = [
       ...new Set(options.technology.split(",").map(technologyFamily)),
@@ -85,20 +85,23 @@ export async function eventById(id: number): Promise<FeedEvent | null> {
   if (error) throw error;
   return data ? publicEvent(data as FeedEvent) : null;
 }
-export function xml(value: string) {
-  return value
-    .replace(
-      /[<>&"']/g,
-      (c) =>
-        ({
-          "<": "&lt;",
-          ">": "&gt;",
-          "&": "&amp;",
-          '"': "&quot;",
-          "'": "&apos;",
-        })[c]!,
-    )
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, "");
+function xml(value: string) {
+  return (
+    value
+      .replace(
+        /[<>&"']/g,
+        (c) =>
+          ({
+            "<": "&lt;",
+            ">": "&gt;",
+            "&": "&amp;",
+            '"': "&quot;",
+            "'": "&apos;",
+          })[c]!,
+      )
+      // eslint-disable-next-line no-control-regex -- Strip characters forbidden by XML 1.0.
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, "")
+  );
 }
 export function rss(
   rows: FeedEvent[],

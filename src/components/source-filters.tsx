@@ -1,5 +1,7 @@
 "use client";
 import { useAutoFilters } from "./use-auto-filters";
+import { Input } from "./ui/input";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
 
 export function SourceFilters({
   initialFilters,
@@ -19,8 +21,10 @@ export function SourceFilters({
   );
   return (
     <form
-      className="filters catalog-filters"
+      className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr]"
       action="/sources"
+      role="search"
+      aria-label="Filter sources"
       aria-busy={pending}
       onSubmit={(event) => {
         event.preventDefault();
@@ -30,41 +34,48 @@ export function SourceFilters({
       {filters.catalog ? (
         <input type="hidden" name="catalog" value={filters.catalog} />
       ) : null}
-      <label>
+      <label className="grid gap-2 text-sm font-medium sm:col-span-2 lg:col-span-1">
         Search
-        <input
+        <Input
           name="q"
+          type="search"
           placeholder="Search sources…"
           value={filters.q}
           onChange={(event) => update({ q: event.target.value }, 300)}
           maxLength={100}
         />
       </label>
-      <label>
+      <label className="grid gap-2 text-sm font-medium [&>div]:w-full">
         Channel
-        <select
+        <NativeSelect
           name="channel"
           value={filters.channel}
           onChange={(event) => update({ channel: event.target.value })}
         >
-          <option value="">All channels</option>
-          <option value="security-advisories">Advisories</option>
-          <option value="mixed-announcements">Mixed announcements</option>
-          <option value="release-notes">Release notes</option>
-        </select>
+          <NativeSelectOption value="">All channels</NativeSelectOption>
+          <NativeSelectOption value="security-advisories">
+            Advisories
+          </NativeSelectOption>
+          <NativeSelectOption value="mixed-announcements">
+            Mixed announcements
+          </NativeSelectOption>
+          <NativeSelectOption value="release-notes">
+            Release notes
+          </NativeSelectOption>
+        </NativeSelect>
       </label>
-      <label>
+      <label className="grid gap-2 text-sm font-medium [&>div]:w-full">
         Category
-        <select
+        <NativeSelect
           name="category"
           value={filters.category}
           onChange={(event) => update({ category: event.target.value })}
         >
-          <option value="">All categories</option>
+          <NativeSelectOption value="">All categories</NativeSelectOption>
           {categories.map((category) => (
-            <option key={category}>{category}</option>
+            <NativeSelectOption key={category}>{category}</NativeSelectOption>
           ))}
-        </select>
+        </NativeSelect>
       </label>
     </form>
   );

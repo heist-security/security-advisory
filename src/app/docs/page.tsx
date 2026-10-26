@@ -1,9 +1,19 @@
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import type { Metadata } from "next";
 export const metadata: Metadata = { title: "API documentation" };
 export default function Docs() {
   return (
-    <main id="main" className="site-container">
-      <article className="prose">
+    <main id="main" className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
+      <article className="space-y-5 text-sm leading-7 [overflow-wrap:anywhere] [&>h1]:text-3xl [&>h1]:font-semibold [&>h1]:tracking-tight [&>h2]:pt-5 [&>h2]:text-xl [&>h2]:font-semibold [&>h2]:tracking-tight [&>p]:text-muted-foreground [&_a]:text-primary [&_a:hover]:underline">
         <h1>API documentation</h1>
         <p>
           All sources publish into one feed, available visually, as RSS, or as
@@ -12,12 +22,12 @@ export default function Docs() {
         </p>
         <h2>Browse visually</h2>
         <p>
-          <a href="/">Open the feed</a> to search announcements and filter by
-          type, severity and one or more technologies. Technology search covers
-          the full observed product catalog. Release versions share a product
-          choice; packages retain their ecosystem and namespace. Open each
-          announcement for its source records, affected versions, evidence and
-          revision history.
+          <Link href="/">Open the feed</Link> to search announcements and filter
+          by type, severity and one or more technologies. Technology search
+          covers the full observed product catalog. Release versions share a
+          product choice; packages retain their ecosystem and namespace. Open
+          each announcement for its source records, affected versions, evidence
+          and revision history.
         </p>
         <h2>Subscribe</h2>
         <p>
@@ -25,11 +35,15 @@ export default function Docs() {
           view=grouped for the same groups in JSON and RSS. Each group preserves
           its source records and their individual fixes and ratings.
         </p>
-        <pre>
-          {
-            "/feed.xml?view=grouped\n/feed.xml?view=grouped&technology=node-js\n/api/v1/events?view=grouped\n/api/v1/events?view=grouped&after=0"
-          }
-        </pre>
+        <Card className="gap-0 bg-muted py-0 shadow-none">
+          <CardContent className="p-4">
+            <pre className="overflow-x-auto font-mono text-xs leading-relaxed">
+              {
+                "/feed.xml?view=grouped\n/feed.xml?view=grouped&technology=node-js\n/api/v1/events?view=grouped\n/api/v1/events?view=grouped&after=0"
+              }
+            </pre>
+          </CardContent>
+        </Card>
         <p>
           Grouped JSON returns current groups by default; after=0 starts its
           update history. RSS publishes meaningful group updates, including
@@ -40,52 +54,56 @@ export default function Docs() {
           their original behavior; start a fresh cursor when switching views.
         </p>
         <h2>Filter the shared stream</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Parameter</th>
-              <th>Meaning</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>q</td>
-              <td>
+        <Table className="[&_td]:whitespace-normal [&_td]:align-top [&_td:first-child]:font-mono [&_td:first-child]:text-xs">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Parameter</TableHead>
+              <TableHead>Meaning</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow>
+              <TableCell>q</TableCell>
+              <TableCell>
                 Search published text and subscription keys; up to 120
                 characters
-              </td>
-            </tr>
-            <tr>
-              <td>type</td>
-              <td>advisory, patch, mitigation, withdrawal or other</td>
-            </tr>
-            <tr>
-              <td>technology</td>
-              <td>
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>type</TableCell>
+              <TableCell>
+                One or more comma-separated types: advisory, patch, mitigation,
+                withdrawal or other (matches any)
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>technology</TableCell>
+              <TableCell>
                 Up to 10 comma-separated product keys or source IDs, e.g.
                 node-js,ruby (matches any)
-              </td>
-            </tr>
-            <tr>
-              <td>cve</td>
-              <td>A CVE identifier</td>
-            </tr>
-            <tr>
-              <td>source</td>
-              <td>Exact ID from the source catalog</td>
-            </tr>
-            <tr>
-              <td>limit</td>
-              <td>1–100 events</td>
-            </tr>
-          </tbody>
-        </table>
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>cve</TableCell>
+              <TableCell>A CVE identifier</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>source</TableCell>
+              <TableCell>Exact ID from the source catalog</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>limit</TableCell>
+              <TableCell>1–100 events</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
         <p>
-          Filters combine with AND. Source and legacy technology keys are
-          available in event responses. Corrections retain earlier subscription
-          keys, so an update can reach you even if its latest classification
-          changes. Keyword searches match the current event text and retained
-          routing keys; previous free-text wording is not retained.
+          Selected types match with OR; different filters combine with AND.
+          Source and legacy technology keys are available in event responses.
+          Corrections retain earlier subscription keys, so an update can reach
+          you even if its latest classification changes. Keyword searches match
+          the current event text and retained routing keys; previous free-text
+          wording is not retained.
         </p>
         <h2 id="priority">Severity and important updates</h2>
         <p>
@@ -118,11 +136,15 @@ export default function Docs() {
           classification of each revision.
         </p>
         <h2>Read the JSON archive</h2>
-        <pre>
-          {
-            '/api/v1/events?after=0&limit=100\n\n{\n  "schema_version": "1",\n  "data": [],\n  "next_after": 0,\n  "next_before": null\n}'
-          }
-        </pre>
+        <Card className="gap-0 bg-muted py-0 shadow-none">
+          <CardContent className="p-4">
+            <pre className="overflow-x-auto font-mono text-xs leading-relaxed">
+              {
+                '/api/v1/events?after=0&limit=100\n\n{\n  "schema_version": "1",\n  "data": [],\n  "next_after": 0,\n  "next_before": null\n}'
+              }
+            </pre>
+          </CardContent>
+        </Card>
         <p>
           Process each batch, save next_after, and continue with that cursor and
           the same filters. Empty batches preserve your cursor. IDs can have
@@ -159,7 +181,7 @@ export default function Docs() {
           </a>
         </p>
         <p>
-          <a href="/sources">Source coverage</a>
+          <Link href="/sources">Source coverage</Link>
         </p>
       </article>
     </main>

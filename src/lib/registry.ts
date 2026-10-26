@@ -29,18 +29,6 @@ export const registry: RegistrySource[] = [
   })),
   ...vendorRegistry.filter((source) => selectedVendors.has(source.id)),
 ];
-export const channelCounts = Object.fromEntries(
-  ["security-advisories", "mixed-announcements", "release-notes"].map(
-    (channel) => [
-      channel,
-      registry.filter((source) => source.channel === channel).length,
-    ],
-  ),
-);
-export const categories = [
-  ...new Set(registry.map((source) => source.category)),
-].sort();
-export const categoryCount = categories.length;
 export function sourcePage(params: URLSearchParams) {
   const q = (params.get("q") ?? "").slice(0, 100).toLowerCase();
   const channel = params.get("channel") ?? "",

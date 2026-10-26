@@ -18,7 +18,11 @@
     "eval:live": "node --env-file-if-exists=.env.local --import tsx scripts/evaluate.ts",
     "sources:configure": "node --env-file-if-exists=.env.local --import tsx scripts/configure-sources.ts",
     "sources:recollect-osv": "node --env-file-if-exists=.env.local --import tsx scripts/recollect-osv.ts",
-    "sources:verify-structured": "node --import tsx scripts/verify-structured.ts"
+    "sources:verify-structured": "node --import tsx scripts/verify-structured.ts",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "npm run lint -- --fix",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run test:release",
+    "test:release": "node --test tests/deployment.test.mjs"
   },
   "dependencies": {
     "@pandatix/js-cvss": "0.4.4",
@@ -39,19 +43,25 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.11",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.6.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "^10.13.0",
+    "eslint-config-next": "16.4.3",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
     "prettier": "3.9.10",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vitest": "^4.1.10"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13.0"
   },
   "license": "MIT"
 }

@@ -18,7 +18,9 @@ test("PostgREST filters indexed technology families before pagination", async ()
       response = await fetch("http://127.0.0.1:3001/events?" + query, {
         signal: AbortSignal.timeout(2000),
       });
-    } catch {}
+    } catch {
+      // PostgREST may still be starting; retry within the bounded loop.
+    }
     if (response?.ok) break;
     await setTimeout(500);
   }

@@ -1,3 +1,9 @@
+import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader } from "./ui/card";
+import { EventKindBadge } from "./event-kind-badge";
 import type { FeedEvent } from "@/lib/events";
 import { priorityLabels } from "@/lib/priority";
 import { advisoryPath, itemLink, itemPath } from "@/lib/item-links";
@@ -11,25 +17,32 @@ export function DetailUnavailable({
   returnTo: string;
 }) {
   return (
-    <main id="main" className="site-container advisory-detail">
-      <a className="detail-back" href={returnTo}>
-        Back to feed
-      </a>
-      <h1>Advisory temporarily unavailable</h1>
-      <p role="alert">
-        We couldn’t load this advisory.{" "}
-        <a
-          href={
-            href +
-            (returnTo === "/"
-              ? ""
-              : "?" + new URLSearchParams({ from: returnTo }))
-          }
-        >
-          Try again
-        </a>
-        .
-      </p>
+    <main
+      id="main"
+      className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 [overflow-wrap:anywhere] sm:px-8 sm:py-8"
+    >
+      <Button asChild variant="ghost" size="sm">
+        <Link href={returnTo}>Back to feed</Link>
+      </Button>
+      <h1 className="text-2xl font-semibold tracking-tight">
+        Advisory temporarily unavailable
+      </h1>
+      <Alert variant="destructive">
+        <AlertDescription>
+          We couldn’t load this advisory.{" "}
+          <Link
+            href={
+              href +
+              (returnTo === "/"
+                ? ""
+                : "?" + new URLSearchParams({ from: returnTo }))
+            }
+          >
+            Try again
+          </Link>
+          .
+        </AlertDescription>
+      </Alert>
     </main>
   );
 }
@@ -56,13 +69,19 @@ export function AdvisoryDetail({
     return itemPath(event) + (params.size ? "?" + params : "") + "#history";
   };
   return (
-    <main id="main" className="site-container advisory-detail">
-      <nav className="detail-navigation" aria-label="Advisory navigation">
-        <a className="detail-back" href={returnTo}>
-          ← Back to feed
-        </a>
+    <main
+      id="main"
+      className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 [overflow-wrap:anywhere] sm:px-8 sm:py-8"
+    >
+      <nav
+        className="flex flex-wrap items-center justify-between gap-3 text-sm"
+        aria-label="Advisory navigation"
+      >
+        <Button asChild variant="ghost" size="sm">
+          <Link href={returnTo}>← Back to feed</Link>
+        </Button>
         {!event.group && event.group_id ? (
-          <a
+          <Link
             href={
               advisoryPath(event.group_id) +
               (returnTo === "/"
@@ -71,89 +90,102 @@ export function AdvisoryDetail({
             }
           >
             View current advisory
-          </a>
+          </Link>
         ) : null}
       </nav>
-      <article>
-        <header className="advisory-heading">
-          <div className="event-meta">
-            <span className={"badge " + event.payload.kind}>
-              {event.payload.kind}
-            </span>
-            {event.payload.kind !== "withdrawal"
-              ? priorityLabels(event.priority).map((label) => (
-                  <span className="priority-label" key={label}>
-                    {label}
-                  </span>
-                ))
-              : null}
-            <span>
-              {members.length} source{" "}
-              {members.length === 1 ? "record" : "records"}
-            </span>
-          </div>
-          <h1>{event.payload.title}</h1>
-          <p className="advisory-summary">{event.payload.summary}</p>
-          <div className="advisory-dates">
-            {event.source_published_at ? (
+      <article className="space-y-6">
+        <Card className="shadow-none">
+          <CardHeader className="gap-4">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <EventKindBadge kind={event.payload.kind} />
+              {event.payload.kind !== "withdrawal"
+                ? priorityLabels(event.priority).map((label) => (
+                    <Badge variant="secondary" key={label}>
+                      {label}
+                    </Badge>
+                  ))
+                : null}
               <span>
-                Announced{" "}
-                <time dateTime={event.source_published_at}>
-                  {new Date(event.source_published_at).toLocaleDateString(
-                    "en-GB",
-                    {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      timeZone: "UTC",
-                    },
-                  )}
-                </time>
+                {members.length} source{" "}
+                {members.length === 1 ? "record" : "records"}
               </span>
-            ) : null}
-            <span>
-              {event.group
-                ? "Group revision " + event.group.revision
-                : "Source revision " + event.revision}
-            </span>
-          </div>
-          <a className="original-link" href={event.source_url}>
-            Original source ↗
-          </a>
-        </header>
+            </div>
+            <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
+              {event.payload.title}
+            </h1>
+            <p className="text-base leading-relaxed whitespace-pre-line text-muted-foreground">
+              {event.payload.summary}
+            </p>
+            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+              {event.source_published_at ? (
+                <span>
+                  Announced{" "}
+                  <time dateTime={event.source_published_at}>
+                    {new Date(event.source_published_at).toLocaleDateString(
+                      "en-GB",
+                      {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        timeZone: "UTC",
+                      },
+                    )}
+                  </time>
+                </span>
+              ) : null}
+              <span>
+                {event.group
+                  ? "Group revision " + event.group.revision
+                  : "Source revision " + event.revision}
+              </span>
+            </div>
+            <Button asChild variant="outline" size="sm" className="w-fit">
+              <a href={event.source_url}>Original source ↗</a>
+            </Button>
+          </CardHeader>
+        </Card>
         {event.context_update ? (
-          <p className="detail-update">
-            CVE context updated. The publisher announcement is unchanged.
-          </p>
+          <Alert role="status">
+            <AlertDescription>
+              CVE context updated. The publisher announcement is unchanged.
+            </AlertDescription>
+          </Alert>
         ) : null}
         {event.group &&
         event.group.change !== "published" &&
         event.group.changed.id !== primaryId ? (
-          <p className="detail-update">
-            Updated source:{" "}
-            <a href={"#source-" + event.group.changed.advisory_id}>
-              {event.group.changed.payload.structured?.id ??
-                event.group.changed.source_id}
-            </a>
-            {event.group.changed.payload.kind === "withdrawal"
-              ? ". This source record was withdrawn."
-              : ". See its source record below."}
-          </p>
+          <Alert role="status">
+            <AlertDescription>
+              Updated source:{" "}
+              <a href={"#source-" + event.group.changed.advisory_id}>
+                {event.group.changed.payload.structured?.id ??
+                  event.group.changed.source_id}
+              </a>
+              {event.group.changed.payload.kind === "withdrawal"
+                ? ". This source record was withdrawn."
+                : ". See its source record below."}
+            </AlertDescription>
+          </Alert>
         ) : null}
         {event.group?.superseded_by.length ? (
-          <section className="detail-update">
-            <h2>Group membership updated</h2>
-            <p>This advisory is now represented by:</p>
-            <ul>
-              {event.group.superseded_by.map((id) => (
-                <li key={id}>
-                  <a href={advisoryPath(id)}>{id}</a>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <Alert role="status">
+            <AlertTitle>Group membership updated</AlertTitle>
+            <AlertDescription>
+              <p>This advisory is now represented by:</p>
+              <ul>
+                {event.group.superseded_by.map((id) => (
+                  <li key={id}>
+                    <Link href={advisoryPath(id)}>{id}</Link>
+                  </li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
         ) : null}
-        <nav className="detail-sections" aria-label="Advisory sections">
+        <nav
+          className="flex flex-wrap gap-2 border-y py-3 text-sm [&_a]:rounded-md [&_a]:px-3 [&_a]:py-2 [&_a:hover]:bg-accent"
+          aria-label="Advisory sections"
+        >
           {members.map((member) => (
             <a key={member.advisory_id} href={"#source-" + member.advisory_id}>
               {member.payload.structured?.id ?? member.source_id}
@@ -162,7 +194,7 @@ export function AdvisoryDetail({
           ))}
           {event.group ? <a href="#history">Revision history</a> : null}
         </nav>
-        <div className="source-records">
+        <div className="space-y-6">
           {members.map((member) => (
             <SourceDetails
               key={member.advisory_id}
@@ -172,59 +204,71 @@ export function AdvisoryDetail({
           ))}
         </div>
         {event.group ? (
-          <section id="history" className="revision-history">
-            <h2>Revision history</h2>
-            {!historyAvailable ? (
-              <p role="status">
-                Revision history is temporarily unavailable.{" "}
-                <a href={historyHref(historyBefore)}>Try again</a>.
-              </p>
-            ) : !history?.length ? (
-              <p>
-                No {historyBefore === undefined ? "source" : "earlier"}{" "}
-                revisions available.
-              </p>
-            ) : (
-              <ol>
-                {history.slice(0, 10).map((row) => (
-                  <li key={row.id}>
-                    <a href={itemLink(row, returnTo)}>
-                      <time dateTime={row.published_at}>
-                        {new Date(row.published_at).toLocaleDateString(
-                          "en-GB",
-                          {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                            timeZone: "UTC",
-                          },
-                        )}
-                      </time>
-                      <span>
-                        {row.payload.structured?.id ?? row.source_id} · Revision{" "}
-                        {row.revision}
-                      </span>
-                      <span>
-                        {row.payload.kind === "withdrawal"
-                          ? "Withdrawn"
-                          : row.context_update
-                            ? "Risk context updated"
-                            : "Source updated"}
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ol>
-            )}
-            <div className="history-pagination">
-              {historyBefore !== undefined ? (
-                <a href={historyHref()}>Latest revisions</a>
-              ) : null}
-              {history && history.length > 10 ? (
-                <a href={historyHref(history[9].id)}>Older revisions</a>
-              ) : null}
-            </div>
-          </section>
+          <Card id="history" className="scroll-mt-6 shadow-none">
+            <CardHeader>
+              <h2 className="text-xl font-semibold tracking-tight">
+                Revision history
+              </h2>
+            </CardHeader>
+            <CardContent>
+              {!historyAvailable ? (
+                <p role="status">
+                  Revision history is temporarily unavailable.{" "}
+                  <Link href={historyHref(historyBefore)}>Try again</Link>.
+                </p>
+              ) : !history?.length ? (
+                <p>
+                  No {historyBefore === undefined ? "source" : "earlier"}{" "}
+                  revisions available.
+                </p>
+              ) : (
+                <ol className="divide-y">
+                  {history.slice(0, 10).map((row) => (
+                    <li key={row.id}>
+                      <Link
+                        className="grid gap-2 rounded-md py-4 text-sm hover:bg-muted sm:grid-cols-[110px_1fr_auto] sm:gap-3"
+                        href={itemLink(row, returnTo)}
+                      >
+                        <time
+                          className="text-muted-foreground"
+                          dateTime={row.published_at}
+                        >
+                          {new Date(row.published_at).toLocaleDateString(
+                            "en-GB",
+                            {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              timeZone: "UTC",
+                            },
+                          )}
+                        </time>
+                        <span>
+                          {row.payload.structured?.id ?? row.source_id} ·
+                          Revision {row.revision}
+                        </span>
+                        <span>
+                          {row.payload.kind === "withdrawal"
+                            ? "Withdrawn"
+                            : row.context_update
+                              ? "Risk context updated"
+                              : "Source updated"}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              <div className="mt-4 flex flex-wrap gap-4 text-sm text-primary">
+                {historyBefore !== undefined ? (
+                  <Link href={historyHref()}>Latest revisions</Link>
+                ) : null}
+                {history && history.length > 10 ? (
+                  <Link href={historyHref(history[9].id)}>Older revisions</Link>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
         ) : null}
       </article>
     </main>

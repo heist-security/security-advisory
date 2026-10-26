@@ -4,26 +4,39 @@ Please open an issue for substantial changes before implementation. Use the priv
 
 ## Development
 
-Use Node.js 22 or later, run npm ci, and follow the README for database setup.
+Use Node.js 22.13 or later, run `npm ci`, and follow the README for database setup.
 
 Before a pull request:
 
     npm run format
-    npm run typecheck
-    npm test
+    npm run check
     npm run build
     npm run test:browser
     npm run check:secrets
 
-Browser tests require Chromium: npx playwright install chromium.
+Browser tests require a production build and Chromium: `npm run build` and
+`npx playwright install chromium`. They use a local fixture database API.
+Unit and database tests run with Vitest and PGlite; release-script tests run with
+Node’s test runner. The PostgreSQL/PostgREST integration checks run in CI.
 
-The feed UI uses [shadcn/ui](https://ui.shadcn.com/docs) with Tailwind CSS v4.
+`npm run check` runs linting, formatting checks, type checking, and functional
+tests. Use `npm run lint:fix` for automatic lint fixes. ESLint uses the recommended
+JavaScript, [Next.js Core Web Vitals and TypeScript flat configurations](https://nextjs.org/docs/app/api-reference/config/eslint), with
+`eslint-config-prettier` keeping formatting rules separate.
+
+The TypeScript 7 compiler runs via the `@typescript/native` npm alias. The
+`typescript` alias provides [Microsoft’s TypeScript 6 compatibility API](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0) required
+by typescript-eslint. Keep both until the parser supports the TypeScript 7 API.
+
+The entire UI uses [shadcn/ui](https://ui.shadcn.com/docs) with Tailwind CSS v4.
 Reusable components live in `src/components/ui`; add more with
 `npx shadcn@latest add <component>`. Keep shared colors and typography in
 `src/app/globals.css` and use the `cn` helper in `src/lib/utils.ts` when composing
-classes. `src/app/site.css` retains the styles for the shared shell and other pages
-in the components layer so Tailwind utilities can override them.
+classes. Use those primitives and Tailwind utilities for pages, forms, navigation, and
+status messages; avoid introducing a parallel page-specific stylesheet.
 
+Keep tests focused on current behavior. Avoid screenshot generation, pixel-level
+layout assertions, frozen source counts, or tests for superseded implementations.
 Keep changes focused. Add regression coverage for ingestion, publication, filter and access-control changes. Never commit credentials, .env files or real customer data.
 
 ## Source contributions

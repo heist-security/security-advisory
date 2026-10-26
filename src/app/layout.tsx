@@ -29,8 +29,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={sans.variable + " " + mono.variable}>
-      <body>
-        <a className="skip-link" href="#main">
+      <body className="flex min-h-screen flex-col antialiased">
+        <a
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-background focus:p-3 focus:ring-2 focus:ring-ring"
+          href="#main"
+        >
           Skip to content
         </a>
         <SiteHeader />

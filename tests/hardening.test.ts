@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import Parser from "rss-parser";
-import { parseEventQuery, pageParams } from "../src/lib/filters";
+import { parseEventQuery, filterQuery, pageParams } from "../src/lib/filters";
 import { sourcePage } from "../src/lib/registry";
-import { articleText, documentText } from "../src/lib/feed";
+import { articleText, documentText, type Source } from "../src/lib/feed";
 import { validateEvidence, type Extraction } from "../src/lib/schema";
 import { rss, type FeedEvent } from "../src/lib/events";
 import { failureReason } from "../src/lib/errors";
@@ -38,7 +38,7 @@ describe("validated subscription filters", () => {
     ).toMatchObject({
       technology: "node-js",
       cve: "CVE-2026-12345",
-      type: "patch",
+      type: ["patch"],
       after: 0,
     });
   });
@@ -53,6 +53,29 @@ describe("validated subscription filters", () => {
       "technology=!!!",
     ])
       expect(() => parseEventQuery(new URLSearchParams(q))).toThrow();
+  });
+  it("canonicalizes type unions and keeps the kind alias compatible", () => {
+    const query = parseEventQuery(
+      new URLSearchParams("type=patch,advisory,patch"),
+    );
+    expect(query.type).toEqual(["advisory", "patch"]);
+    expect(filterQuery(query).get("type")).toBe("advisory,patch");
+    expect(
+      parseEventQuery(new URLSearchParams("kind=patch,advisory")).type,
+    ).toEqual(query.type);
+    expect(
+      parseEventQuery(
+        new URLSearchParams("type=patch,advisory&kind=advisory,patch"),
+      ).type,
+    ).toEqual(query.type);
+    for (const value of [
+      "type=patch,unknown",
+      "type=patch,",
+      "type=patch&type=advisory",
+      "type=patch&kind=advisory",
+      "type=" + Array(6).fill("patch").join(","),
+    ])
+      expect(() => parseEventQuery(new URLSearchParams(value))).toThrow();
   });
   it("handles repeated browser parameters and bounds source pagination", () => {
     expect(pageParams({ q: ["ruby", "node"] }).get("q")).toBe("ruby");
@@ -117,7 +140,7 @@ describe("source and publication boundaries", () => {
           feed_url: "https://github.com/trusted/project/releases.atom",
           allowed_origins: ["https://github.com"],
           item_url_prefix: "https://github.com/trusted/project/",
-        } as any,
+        } as Source,
         { link: "https://github.com/trusted/project/releases/tag/v1" },
       ),
     ).rejects.toThrow("source path");

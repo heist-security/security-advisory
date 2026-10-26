@@ -1,3 +1,7 @@
+import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader } from "./ui/card";
 import type { FeedEvent } from "@/lib/events";
 import { severityLabel } from "@/lib/priority";
 type Fact = { value: string; evidence: string };
@@ -9,11 +13,13 @@ function Evidence({
   structured: boolean;
 }) {
   return structured ? (
-    <p>
-      Source reference: <code>{value}</code>
+    <p className="text-sm text-muted-foreground">
+      Source reference: <code className="font-mono text-xs">{value}</code>
     </p>
   ) : (
-    <blockquote>{value}</blockquote>
+    <blockquote className="my-3 border-l-2 border-primary/30 pl-4 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
+      {value}
+    </blockquote>
   );
 }
 function Facts({
@@ -26,18 +32,20 @@ function Facts({
   structured: boolean;
 }) {
   return (
-    <div className="fact-group">
-      <dt>{label}</dt>
-      <dd>
+    <div className="grid gap-2 py-3 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-4">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="min-w-0">
         {facts.length ? (
           facts.map((fact, i) => (
-            <div className="fact" key={i}>
-              <strong>{fact.value}</strong>
+            <div className="space-y-2" key={i}>
+              <strong className="font-mono text-xs font-medium">
+                {fact.value}
+              </strong>
               <Evidence value={fact.evidence} structured={structured} />
             </div>
           ))
         ) : (
-          <span className="unspecified">
+          <span className="text-xs text-muted-foreground">
             {structured
               ? "Not stated in this record"
               : "Not stated in this extraction"}
@@ -57,41 +65,48 @@ export function SourceDetails({
   const p = event.payload;
   const structured = event.extraction_method === "structured";
   return (
-    <section className="source-record" id={"source-" + event.advisory_id}>
-      <header className="source-record-heading">
-        <h2>
+    <Card
+      className="source-record scroll-mt-6 gap-4 shadow-none"
+      id={"source-" + event.advisory_id}
+    >
+      <CardHeader className="space-y-2">
+        <h2 className="text-xl font-semibold tracking-tight">
           <a href={event.source_url}>{p.structured?.id ?? event.source_id}</a>
         </h2>
-        <p>
+        <p className="text-sm text-muted-foreground">
           {primary ? "Primary source · " : ""}Revision {event.revision}
           {p.kind === "withdrawal" ? " · Withdrawn" : ""}
         </p>
         {!primary ? (
           <>
             <h3>{p.title}</h3>
-            <p className="source-description">{p.summary}</p>
+            <p className="text-sm leading-relaxed whitespace-pre-line text-muted-foreground">
+              {p.summary}
+            </p>
           </>
         ) : null}
-      </header>
-      <div className="source-evidence">
-        <p className="detail-disclaimer">
+      </CardHeader>
+      <CardContent className="space-y-5 text-sm leading-relaxed [&_h3]:mb-2 [&_h3]:font-semibold [&_a]:text-primary [&_a:hover]:underline">
+        <p className="detail-disclaimer text-muted-foreground">
           {structured
             ? "Imported from structured advisory data. Source references identify upstream records or fields; verify affected versions and your deployed configuration."
             : "These are machine-extracted claims. Quotations show the recorded source text; verify the original announcement before acting."}
         </p>
         {event.extraction_method === "system" ? (
-          <div className="correction-note">
-            <strong>Correction to Heist’s extraction</strong>
-            <p>
-              This replaces the earlier extraction. It does not mean that the
-              publisher withdrew its announcement.
-            </p>
-            {p.supersedes_event_id ? (
-              <a href={"/events/" + p.supersedes_event_id}>
-                View the preceding event
-              </a>
-            ) : null}
-          </div>
+          <Alert role="status" className="bg-muted">
+            <AlertTitle>Correction to Heist’s extraction</AlertTitle>
+            <AlertDescription>
+              <p>
+                This replaces the earlier extraction. It does not mean that the
+                publisher withdrew its announcement.
+              </p>
+              {p.supersedes_event_id ? (
+                <Link href={"/events/" + p.supersedes_event_id}>
+                  View the preceding event
+                </Link>
+              ) : null}
+            </AlertDescription>
+          </Alert>
         ) : null}
         {p.evidence ? (
           <div className="supporting-quote">
@@ -100,7 +115,7 @@ export function SourceDetails({
           </div>
         ) : null}
         {p.products.map((product, i) => (
-          <section className="product-evidence" key={i}>
+          <section className="border-t pt-5" key={i}>
             <h3>{product.name.value}</h3>
             <Evidence value={product.name.evidence} structured={structured} />
             <dl>
@@ -123,12 +138,14 @@ export function SourceDetails({
           </section>
         ))}
         {p.structured?.affected.length ? (
-          <section className="native-affected">
+          <section className="space-y-3">
             <h3>Structured affected-version data</h3>
             <p>
               Original package identities and version rules from this source.
             </p>
-            <pre>{JSON.stringify(p.structured.affected, null, 2)}</pre>
+            <pre className="max-w-full overflow-x-auto rounded-md border bg-muted p-4 font-mono text-xs">
+              {JSON.stringify(p.structured.affected, null, 2)}
+            </pre>
           </section>
         ) : null}
         {p.related_cves.length ? (
@@ -156,7 +173,7 @@ export function SourceDetails({
           </div>
         ) : null}
         {event.priority?.linked_cves.length ? (
-          <section className="linked-ratings">
+          <section className="linked-ratings space-y-3">
             <h3>Linked CVE context</h3>
             <p>
               These ratings describe the referenced vulnerabilities and
@@ -164,7 +181,7 @@ export function SourceDetails({
               using this dependency.
             </p>
             {event.priority.linked_cves.map((link, i) => (
-              <div key={i}>
+              <div key={i} className="space-y-2 rounded-md border p-4">
                 <a href={link.source_url}>
                   {link.cve} · {severityLabel(link.severity)}
                 </a>
@@ -175,23 +192,25 @@ export function SourceDetails({
                 {link.relationship === "fixes" ? (
                   <>
                     <strong>Fix relationship</strong>
-                    <blockquote>{link.relationship_evidence}</blockquote>
+                    <blockquote className="border-l-2 border-primary/30 pl-4 text-muted-foreground">
+                      {link.relationship_evidence}
+                    </blockquote>
                   </>
                 ) : null}
               </div>
             ))}
           </section>
         ) : null}
-        <dl className="record-meta">
+        <dl className="space-y-3 border-y py-4 text-xs [&>div]:grid [&>div]:gap-2 sm:[&>div]:grid-cols-[140px_minmax(0,1fr)] [&_dt]:text-muted-foreground">
           <div>
             <dt>Event</dt>
-            <dd>
+            <dd className="min-w-0">
               #{event.id} · Revision {event.revision}
             </dd>
           </div>
           <div>
             <dt>Added to Heist Feed</dt>
-            <dd>
+            <dd className="min-w-0">
               <time dateTime={event.published_at}>
                 {new Date(event.published_at).toUTCString()}
               </time>
@@ -200,7 +219,7 @@ export function SourceDetails({
           {event.source_published_at ? (
             <div>
               <dt>Publisher date</dt>
-              <dd>
+              <dd className="min-w-0">
                 <time dateTime={event.source_published_at}>
                   {new Date(event.source_published_at).toUTCString()}
                 </time>
@@ -208,8 +227,10 @@ export function SourceDetails({
             </div>
           ) : null}
         </dl>
-        <a href={event.source_url}>Read the original announcement</a>
-      </div>
-    </section>
+        <Button asChild variant="outline" size="sm">
+          <a href={event.source_url}>Read the original announcement</a>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

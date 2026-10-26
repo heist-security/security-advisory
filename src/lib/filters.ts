@@ -14,7 +14,7 @@ export type Filters = {
   view?: "events" | "grouped";
   group?: string;
   q?: string;
-  type?: EventType;
+  type?: EventType[];
   technology?: string;
   cve?: string;
   source?: string;
@@ -28,7 +28,7 @@ export type EventQuery = Filters & {
   limit: number;
 };
 export type SearchParams = Record<string, string | string[] | undefined>;
-export function first(value: string | string[] | undefined) {
+function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 export function pageParams(values: SearchParams) {
@@ -82,17 +82,23 @@ export function parseEventQuery(
   for (const key of ["important", "fix"])
     if (params.has(key) && params.get(key) !== "1")
       throw new Error(key + " must be 1");
+  // eslint-disable-next-line no-control-regex -- Reject control characters in public search input.
   if (q && (q.length > 120 || /[\x00-\x1F\x7F]/.test(q)))
     throw new Error("Search must be 1 to 120 printable characters");
-  const type = params.get("type") || params.get("kind") || undefined;
-  if (
-    params.get("type") &&
-    params.get("kind") &&
-    params.get("type") !== params.get("kind")
-  )
+  const parseTypes = (value: string | null) => {
+    if (!value) return undefined;
+    const values = value.split(",");
+    if (
+      values.length > eventTypes.length ||
+      values.some((item) => !eventTypes.includes(item as EventType))
+    )
+      throw new Error("Invalid event type");
+    return eventTypes.filter((item) => values.includes(item));
+  };
+  const types = parseTypes(params.get("type"));
+  const kinds = parseTypes(params.get("kind"));
+  if (types && kinds && types.join(",") !== kinds.join(","))
     throw new Error("Conflicting type and kind");
-  if (type && !eventTypes.includes(type as EventType))
-    throw new Error("Invalid event type");
   const rawTechnology = params.get("technology")?.trim();
   const technologies = rawTechnology
     ? rawTechnology.split(",").map((v) => v.trim())
@@ -127,7 +133,7 @@ export function parseEventQuery(
     view: view as Filters["view"],
     group,
     q,
-    type: type as EventType | undefined,
+    type: types ?? kinds,
     technology: technologies.length
       ? [...new Set(technologies.map(technologyFamily))].sort().join(",")
       : undefined,
@@ -153,8 +159,11 @@ export function filterQuery(filters: Filters) {
     "source",
     "important",
     "fix",
-  ] as const)
-    if (filters[key]) params.set(key, filters[key]!);
+  ] as const) {
+    const value = filters[key];
+    if (value && (!Array.isArray(value) || value.length))
+      params.set(key, Array.isArray(value) ? value.join(",") : value);
+  }
   if (filters.severity?.length)
     params.set("severity", filters.severity.join(","));
   return params;

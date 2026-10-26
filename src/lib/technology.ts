@@ -1,5 +1,7 @@
 import catalog from "./technology-families.json";
 
+export type TechnologyOption = { value: string; label: string };
+
 export function technologyKey(value: string) {
   return value
     .toLowerCase()

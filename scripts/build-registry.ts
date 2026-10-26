@@ -39,7 +39,7 @@ on conflict(id) do update set name=excluded.name,feed_url=excluded.feed_url,allo
   category=excluded.category,channel=excluded.channel,adapter=excluded.adapter,homepage=excluded.homepage,
   discovery_url=excluded.discovery_url,discovery_notes=excluded.discovery_notes,rationale=excluded.rationale,
   limitations=excluded.limitations,verification=excluded.verification,item_url_prefix=excluded.item_url_prefix,
-  poll_interval_minutes=excluded.poll_interval_minutes,max_feed_bytes=excluded.max_feed_bytes;\nupdate public.sources set enabled=false where id not in (select value->>\'id\' from jsonb_array_elements($registry$${JSON.stringify(registry)}$registry$::jsonb));
+  poll_interval_minutes=excluded.poll_interval_minutes,max_feed_bytes=excluded.max_feed_bytes;\nupdate public.sources set enabled=false where id not in (select value->>'id' from jsonb_array_elements($registry$${JSON.stringify(registry)}$registry$::jsonb));
 `;
 if (JSON.stringify(registry).includes("$registry$"))
   throw new Error("Unsafe SQL delimiter in registry");

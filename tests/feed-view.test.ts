@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { parseEventQuery, filterQuery } from "../src/lib/filters";
-import { feedLink, groupEvents } from "../src/lib/feed-view";
+import { feedLink, groupEvents, feedTimestamp } from "../src/lib/feed-view";
 import type { FeedEvent } from "../src/lib/events";
 import { groupRouteId, returnToFeed } from "../src/lib/item-links";
 
@@ -51,6 +51,7 @@ it("groups by UTC publication day while preserving event order", () => {
     { id: 2, published_at: "2026-10-23T21:00:00Z" },
     { id: 1, published_at: "2026-10-22T21:00:00Z" },
   ] as FeedEvent[];
+  expect(feedTimestamp(rows[0].published_at)).toBe("23 Oct 2026, 22:30 UTC");
   const groups = groupEvents(rows);
   expect(
     groups.map((group) => ({

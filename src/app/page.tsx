@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { events } from "@/lib/events";
 import { configured } from "@/lib/db";
@@ -65,9 +66,9 @@ export default async function Feed({
     limit: String(query.limit),
   });
   return (
-    <main id="main" className="site-container browser-feed">
+    <main id="main" className="mx-auto w-full max-w-7xl px-4 sm:px-8">
       <section className="flex items-center justify-between gap-4 py-6">
-        <h1>Security feed</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Security feed</h1>
         <nav className="flex items-center gap-2" aria-label="Feed formats">
           <Button asChild variant="outline" size="sm">
             <a href={"/feed.xml" + suffix}>
@@ -90,31 +91,34 @@ export default async function Feed({
       <section className="mb-8 min-w-0" aria-label="Security announcements">
         {query.before !== undefined && rows.length > 0 ? (
           <Button asChild variant="ghost" size="sm" className="mb-4">
-            <a href={latest}>
+            <Link href={latest}>
               <ArrowLeft aria-hidden="true" />
               Back to latest events
-            </a>
+            </Link>
           </Button>
         ) : null}
         {error ? (
           <Card role="alert" className="shadow-none">
             <CardContent className="text-sm text-muted-foreground">
               {error}.{" "}
-              <a href="/" className="text-primary underline underline-offset-4">
+              <Link
+                href="/"
+                className="text-primary underline underline-offset-4"
+              >
                 Reset filters
-              </a>
+              </Link>
             </CardContent>
           </Card>
         ) : unavailable ? (
           <Card role="status" className="shadow-none">
             <CardContent className="text-sm text-muted-foreground">
               Feed temporarily unavailable.{" "}
-              <a
+              <Link
                 href={latest}
                 className="text-primary underline underline-offset-4"
               >
                 Try again
-              </a>
+              </Link>
             </CardContent>
           </Card>
         ) : !rows.length ? (
@@ -123,12 +127,12 @@ export default async function Feed({
               {query.before !== undefined ? (
                 <>
                   No earlier events.{" "}
-                  <a
+                  <Link
                     href={latest}
                     className="text-primary underline underline-offset-4"
                   >
                     Back to latest events
-                  </a>
+                  </Link>
                 </>
               ) : hasFilters ? (
                 "No events match your filters."
@@ -171,7 +175,7 @@ export default async function Feed({
         {hasMore && rows.length ? (
           <div className="pt-6">
             <Button asChild variant="outline">
-              <a
+              <Link
                 href={feedLink(query, {
                   before: String(rows.at(-1)!.id),
                   limit: String(query.limit),
@@ -179,7 +183,7 @@ export default async function Feed({
               >
                 Older events
                 <ArrowDown aria-hidden="true" />
-              </a>
+              </Link>
             </Button>
           </div>
         ) : null}
