@@ -3,22 +3,10 @@ import type { FeedEvent } from "@/lib/events";
 import { technologyKey, type Filters } from "@/lib/filters";
 import { feedLink, feedTimestamp } from "@/lib/feed-view";
 import { itemLink, summaryPreview } from "@/lib/item-links";
-import { registry, vendorRegistry } from "@/lib/registry";
-import { severityLabel, type Severity } from "@/lib/priority";
-import { Badge } from "./ui/badge";
+import { EventBadges, EventMetadata } from "./event-metadata";
 import { Card, CardDescription, CardFooter, CardHeader } from "./ui/card";
 import { advisoryCvss, scoreCves } from "@/lib/advisory-scores";
 import { ScoreBadges } from "./score-badges";
-const severityStyles: Record<Severity, string> = {
-  critical: "border-red-200 bg-red-50 text-red-800",
-  high: "border-orange-200 bg-orange-50 text-orange-800",
-  medium: "border-amber-200 bg-amber-50 text-amber-800",
-  low: "border-blue-200 bg-blue-50 text-blue-800",
-  unknown: "border-border bg-muted text-muted-foreground",
-};
-const sourceNames = new Map(
-  [...vendorRegistry, ...registry].map((source) => [source.id, source.name]),
-);
 export function EventCard({
   event,
   filters = {},
@@ -29,10 +17,6 @@ export function EventCard({
   returnTo?: string;
 }) {
   const href = itemLink(event, returnTo);
-  const severity =
-    event.payload.kind === "withdrawal"
-      ? "unknown"
-      : (event.priority?.severity ?? event.payload.severity);
   const products = event.payload.products.slice(0, 3);
   const cves = event.payload.related_cves.slice(0, 2);
   const remaining =
@@ -47,50 +31,17 @@ export function EventCard({
     >
       <Card className="gap-3 rounded-lg py-5 shadow-none">
         <CardHeader className="gap-2 px-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className={severityStyles[severity]}>
-              {severityLabel(severity)}
-            </Badge>
+          <EventBadges event={event}>
             {event.payload.kind !== "withdrawal" ? (
               <ScoreBadges cvss={advisoryCvss(event)} cves={scoreCves(event)} />
             ) : null}
-            {event.payload.kind !== "withdrawal" &&
-            event.priority?.fix_available ? (
-              <Badge variant="secondary">Fix available</Badge>
-            ) : null}
-          </div>
+          </EventBadges>
           <h3 className="text-lg leading-snug font-medium tracking-tight">
             <Link href={href} className="hover:text-primary">
               {event.payload.title}
             </Link>
           </h3>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>
-              Type: <span className="capitalize">{event.payload.kind}</span>
-            </span>
-            <span>
-              Source:{" "}
-              <Link
-                className="event-source hover:text-primary hover:underline"
-                href={feedLink({ ...filters, source: event.source_id })}
-              >
-                {sourceNames.get(event.source_id) ?? event.source_id}
-              </Link>
-            </span>
-            {event.group && event.group.members.length > 1 ? (
-              <span className="group-sources">
-                {event.group.members.length} source records
-              </span>
-            ) : null}
-            {event.context_update ? <span>Risk context updated</span> : null}
-            {event.payload.kind !== "withdrawal" &&
-            event.priority?.known_exploited ? (
-              <span>Known exploited</span>
-            ) : null}
-            {event.group?.changed.payload.kind === "withdrawal" &&
-            event.payload.kind !== "withdrawal" ? (
-              <span>Source withdrawal</span>
-            ) : null}
+          <EventMetadata event={event} filters={filters}>
             <time
               dateTime={event.published_at}
               title="Date added to the feed (UTC)"
@@ -98,7 +49,7 @@ export function EventCard({
             >
               {feedTimestamp(event.published_at)}
             </time>
-          </div>
+          </EventMetadata>
           <CardDescription className="text-sm leading-relaxed">
             <p className="event-summary line-clamp-2">
               {summaryPreview(event.payload.summary)}

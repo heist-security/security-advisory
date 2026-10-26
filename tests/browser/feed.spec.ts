@@ -39,6 +39,15 @@ test("the feed opens source details and earlier correction revisions", async ({
   await expect(page.locator(".event-card")).toHaveCount(4);
   await page.locator("#event-1 h3 a").click();
   await expect(page).toHaveURL(/\/events\/1/);
+  const header = page.locator("article > [data-slot=card]").first();
+  await expect(header.locator("[data-slot=badge]")).toHaveText([
+    "Critical",
+    "Fix available",
+  ]);
+  await expect(header).toContainText("Type: patch");
+  await expect(header.locator(".event-source")).toHaveText(
+    "Node.js announcements",
+  );
   await expect(page.getByText("Fixed versions", { exact: true })).toBeVisible();
   await expect(
     page.locator("blockquote").filter({ hasText: "Fixed in 99.0.1." }).last(),
@@ -46,6 +55,8 @@ test("the feed opens source details and earlier correction revisions", async ({
   await page.getByRole("link", { name: "Back to feed", exact: false }).click();
   await expect(page).toHaveURL(/view=events/);
   await page.locator("#event-2 h3 a").click();
+  await expect(header.locator("[data-slot=badge]")).toHaveText(["Unrated"]);
+  await expect(header).toContainText("Type: withdrawal");
   await expect(
     page.getByText("Correction to Heist’s extraction", { exact: true }),
   ).toBeVisible();

@@ -32,6 +32,10 @@ test("grouped advisories retain source history, return filters and subscription 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "OAuth2 Proxy authentication bypass",
   );
+  const header = page.locator("article > [data-slot=card]").first();
+  await expect(header.locator("[data-slot=badge]")).toHaveText(["Unrated"]);
+  await expect(header).toContainText("Type: advisory");
+  await expect(header.locator(".group-sources")).toHaveText("2 source records");
   await expect(page.locator(".source-record")).toHaveCount(2);
   await expect(
     page.locator(".source-record").last().getByText("7.15.2", { exact: true }),

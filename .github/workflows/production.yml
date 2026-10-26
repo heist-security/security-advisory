@@ -82,6 +82,12 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/technology-catalog.sql
           node --test tests/technology-postgrest.test.mjs
           node --test tests/advisory-groups-postgrest.test.mjs
+          # Exercise sparse search on realistic, toasted advisory documents.
+          # PostgreSQL 17 and PGlite can choose different plans here.
+          psql -v ON_ERROR_STOP=1 -c 'truncate documents restart identity cascade;'
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/group-query.sql
+          psql -v ON_ERROR_STOP=1 -c 'vacuum analyze events;'
+          node --test tests/grouped-search-postgres.test.mjs
   release:
     needs: [check, browser, migrations]
     if: >-

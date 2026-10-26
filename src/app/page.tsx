@@ -89,109 +89,110 @@ export default async function Feed({
       <FeedFilters
         initialFilters={{ ...query, q: params.get("q") ?? "" }}
         technologies={technologies}
-      />
-      <section className="mb-8 min-w-0" aria-label="Security announcements">
-        {query.before !== undefined && rows.length > 0 ? (
-          <Button asChild variant="ghost" size="sm" className="mb-4">
-            <Link href={latest}>
-              <ArrowLeft aria-hidden="true" />
-              Back to latest events
-            </Link>
-          </Button>
-        ) : null}
-        {error ? (
-          <Card role="alert" className="shadow-none">
-            <CardContent className="text-sm text-muted-foreground">
-              {error}.{" "}
-              <Link
-                href="/"
-                className="text-primary underline underline-offset-4"
-              >
-                Reset filters
-              </Link>
-            </CardContent>
-          </Card>
-        ) : unavailable ? (
-          <Card role="status" className="shadow-none">
-            <CardContent className="text-sm text-muted-foreground">
-              Feed temporarily unavailable.{" "}
-              <Link
-                href={latest}
-                className="text-primary underline underline-offset-4"
-              >
-                Try again
-              </Link>
-            </CardContent>
-          </Card>
-        ) : !rows.length ? (
-          <Card role="status" className="shadow-none">
-            <CardContent className="text-sm text-muted-foreground">
-              {query.before !== undefined ? (
-                <>
-                  No earlier events.{" "}
-                  <Link
-                    href={latest}
-                    className="text-primary underline underline-offset-4"
-                  >
-                    Back to latest events
-                  </Link>
-                </>
-              ) : hasFilters ? (
-                "No events match your filters."
-              ) : (
-                "No events yet."
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <ScoreProvider cves={[...new Set(rows.flatMap(scoreCves))].sort()}>
-            <div className="space-y-6">
-              {groups.map((group, index) => (
-                <section
-                  className="event-day space-y-3"
-                  key={group.day + "-" + index}
-                  aria-labelledby={"day-" + index}
-                >
-                  <h2
-                    id={"day-" + index}
-                    className="day-heading border-b pb-3 font-mono text-xs font-normal text-muted-foreground"
-                  >
-                    <time
-                      dateTime={group.day}
-                      title="Date added to the feed (UTC)"
-                    >
-                      {dayLabel(group.day)}
-                    </time>
-                  </h2>
-                  {group.events.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      filters={query}
-                      returnTo={returnTo}
-                    />
-                  ))}
-                </section>
-              ))}
-            </div>
-          </ScoreProvider>
-        )}
-        {hasMore && rows.length ? (
-          <div className="pt-6">
-            <Button asChild variant="outline">
-              <Link
-                href={feedLink(query, {
-                  before: String(rows.at(-1)!.id),
-                  limit: String(query.limit),
-                })}
-              >
-                Older events
-                <ArrowDown aria-hidden="true" />
+      >
+        <section className="mb-8 min-w-0" aria-label="Security announcements">
+          {query.before !== undefined && rows.length > 0 ? (
+            <Button asChild variant="ghost" size="sm" className="mb-4">
+              <Link href={latest}>
+                <ArrowLeft aria-hidden="true" />
+                Back to latest events
               </Link>
             </Button>
-          </div>
-        ) : null}
-      </section>
+          ) : null}
+          {error ? (
+            <Card role="alert" className="shadow-none">
+              <CardContent className="text-sm text-muted-foreground">
+                {error}.{" "}
+                <Link
+                  href="/"
+                  className="text-primary underline underline-offset-4"
+                >
+                  Reset filters
+                </Link>
+              </CardContent>
+            </Card>
+          ) : unavailable ? (
+            <Card role="status" className="shadow-none">
+              <CardContent className="text-sm text-muted-foreground">
+                Feed temporarily unavailable.{" "}
+                <Link
+                  href={latest}
+                  className="text-primary underline underline-offset-4"
+                >
+                  Try again
+                </Link>
+              </CardContent>
+            </Card>
+          ) : !rows.length ? (
+            <Card role="status" className="shadow-none">
+              <CardContent className="text-sm text-muted-foreground">
+                {query.before !== undefined ? (
+                  <>
+                    No earlier events.{" "}
+                    <Link
+                      href={latest}
+                      className="text-primary underline underline-offset-4"
+                    >
+                      Back to latest events
+                    </Link>
+                  </>
+                ) : hasFilters ? (
+                  "No events match your filters."
+                ) : (
+                  "No events yet."
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <ScoreProvider cves={[...new Set(rows.flatMap(scoreCves))].sort()}>
+              <div className="space-y-6">
+                {groups.map((group, index) => (
+                  <section
+                    className="event-day space-y-3"
+                    key={group.day + "-" + index}
+                    aria-labelledby={"day-" + index}
+                  >
+                    <h2
+                      id={"day-" + index}
+                      className="day-heading border-b pb-3 font-mono text-xs font-normal text-muted-foreground"
+                    >
+                      <time
+                        dateTime={group.day}
+                        title="Date added to the feed (UTC)"
+                      >
+                        {dayLabel(group.day)}
+                      </time>
+                    </h2>
+                    {group.events.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        filters={query}
+                        returnTo={returnTo}
+                      />
+                    ))}
+                  </section>
+                ))}
+              </div>
+            </ScoreProvider>
+          )}
+          {hasMore && rows.length ? (
+            <div className="pt-6">
+              <Button asChild variant="outline">
+                <Link
+                  href={feedLink(query, {
+                    before: String(rows.at(-1)!.id),
+                    limit: String(query.limit),
+                  })}
+                >
+                  Older events
+                  <ArrowDown aria-hidden="true" />
+                </Link>
+              </Button>
+            </div>
+          ) : null}
+        </section>
+      </FeedFilters>
     </main>
   );
 }
