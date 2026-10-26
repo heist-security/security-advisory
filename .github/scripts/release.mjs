@@ -126,6 +126,7 @@ export async function migrate(
       ["Advisory grouping", "backfill_advisory_groups"],
     ]) {
       let completed = false;
+      let contentionRetries = 0;
       const deadline = Date.now() + 15 * 60 * 1000;
       for (
         let attempt = 0;
@@ -153,13 +154,27 @@ export async function migrate(
             maxBuffer: 65536,
           },
         );
-        if (batch.error || batch.status !== 0)
+        if (batch.error || batch.status !== 0) {
+          const failure = migrationFailure(batch);
+          // These SQL errors roll back the batch and its checkpoint. Retry the
+          // same procedure, without rerunning DDL or relaxing lock deadlines.
+          if (
+            !batch.error &&
+            ["database lock timeout", "database deadlock"].includes(failure) &&
+            contentionRetries < 5 &&
+            Date.now() < deadline
+          ) {
+            await pause(Math.min(1000 * 2 ** contentionRetries++, 10000));
+            continue;
+          }
           throw new ReleaseError(
             label +
               " backfill failed (" +
-              migrationFailure(batch) +
+              failure +
               "); deployment stopped. Completed batches are retained for retry.",
           );
+        }
+        contentionRetries = 0;
         const progress = String(batch.stdout ?? "")
           .trim()
           .match(/^(\d+)\|(\d+)\|([tf])$/);

@@ -397,3 +397,88 @@ test("an advisory grouping backfill failure prevents deployment", async () => {
     /Advisory grouping backfill failed \(query timeout or cancellation\)/,
   );
 });
+
+test("retries rolled-back contention on the same batch, with bounded backoff", async () => {
+  for (const code of ["55P03", "40P01"]) {
+    const env = environment();
+    const commands = [],
+      delays = [];
+    let calls = 0;
+    await migrate(
+      configuration(env),
+      env,
+      (cmd, args) => {
+        if (cmd === "supabase") return { status: 0 };
+        commands.push(args.at(-1));
+        if (++calls <= 2)
+          return { status: 1, stderr: `ERROR: ${code} private details` };
+        return { status: 0, stdout: "100|0|t" };
+      },
+      async (ms) => {
+        delays.push(ms);
+      },
+    );
+    assert.equal(calls, 5);
+    assert.equal(commands[0], commands[1]);
+    assert.equal(commands[1], commands[2]);
+    assert.deepEqual(delays, [1000, 2000]);
+  }
+});
+
+test("persistent contention stops before deployment and cleans up credentials", async () => {
+  const f = fixture();
+  let calls = 0,
+    passfile;
+  const delays = [];
+  f.options.apply = (database, env) =>
+    migrate(
+      database,
+      env,
+      (cmd, _args, options) => {
+        if (cmd === "supabase") return { status: 0 };
+        passfile = options.env.PGPASSFILE;
+        calls++;
+        return { status: 1, stderr: "ERROR: 55P03 private details" };
+      },
+      async (ms) => {
+        delays.push(ms);
+      },
+    );
+  await assert.rejects(
+    release(f.options),
+    /Priority backfill failed \(database lock timeout\)/,
+  );
+  assert.equal(calls, 6);
+  assert.deepEqual(delays, [1000, 2000, 4000, 8000, 10000]);
+  assert.equal(existsSync(passfile), false);
+  assert.ok(!f.calls.some((call) => call.method === "POST"));
+});
+
+test("does not retry ambiguous transport failures, query timeouts, or permanent SQL errors", async () => {
+  for (const failure of [
+    { status: 1, stderr: "ERROR: 57014 private details" },
+    { status: 1, stderr: "ERROR: 42501 private details" },
+    { status: 1, stderr: "ERROR: 42P01 private details" },
+    { status: 1, stderr: "connection to server failed" },
+    { error: { code: "ETIMEDOUT" }, stderr: "ERROR: 55P03 private details" },
+  ]) {
+    const env = environment();
+    let calls = 0;
+    await assert.rejects(
+      migrate(
+        configuration(env),
+        env,
+        (cmd) => {
+          if (cmd === "supabase") return { status: 0 };
+          calls++;
+          return failure;
+        },
+        async () => {
+          assert.fail("must not retry");
+        },
+      ),
+      /backfill failed/,
+    );
+    assert.equal(calls, 1);
+  }
+});
