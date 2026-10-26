@@ -494,6 +494,53 @@ it("bounds page reads on a populated feed, including cached plans and selective 
       },
     ];
     for (const updates of [false, true]) {
+      for (const filters of [
+        { type: "advisory,patch", severity: ["critical", "high"] },
+        { q: "fixture", source: "core-cve" },
+      ]) {
+        cases.push(
+          {
+            filters,
+            after: null,
+            before: null,
+            updates,
+            first: 6000,
+            count: 21,
+          },
+          {
+            filters,
+            after: 3000,
+            before: null,
+            updates,
+            first: 3001,
+            count: 21,
+          },
+          {
+            filters,
+            after: null,
+            before: 3000,
+            updates,
+            first: 2999,
+            count: 21,
+          },
+          {
+            filters,
+            after: 5997,
+            before: null,
+            updates,
+            first: 5998,
+            count: 3,
+          },
+          {
+            filters,
+            after: 6000,
+            before: null,
+            updates,
+            first: undefined,
+            count: 0,
+          },
+        );
+      }
       cases.push(
         {
           filters: { q: "Brotli" },
@@ -585,15 +632,14 @@ it("bounds page reads on a populated feed, including cached plans and selective 
       );
       const plan = result.rows[0]["QUERY PLAN"][0].Plan;
       expect(plan["Actual Rows"]).toBe(entry.count);
-      // A broad query matches all 6,000 large documents. Sparse/empty searches
-      // must stay independent of that archive size (the previous plan exceeds
-      // 500 reads even for two matches, and scans every update snapshot).
+      // Broad pages and sparse/empty searches must both stay independent of
+      // the 6,000-document archive, even with large toasted search documents.
       expect(
         plan["Shared Hit Blocks"] + plan["Shared Read Blocks"],
         JSON.stringify(entry),
       ).toBeLessThan(
-        entry.filters.q === "fixture"
-          ? 25000
+        entry.filters.q === "fixture" || entry.filters.type === "advisory,patch"
+          ? 2000
           : entry.filters.q
             ? 500
             : Object.keys(entry.filters).length
