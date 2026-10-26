@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./test";
 
 test("feed search applies after typing stops and clearing restores the feed", async ({
   page,

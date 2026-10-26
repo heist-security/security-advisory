@@ -29,7 +29,7 @@ const patch: FeedEvent = {
         source_url: "https://example.org/test-only/cve",
         severity: "critical",
         products: [{ name: { value: "GitLab" } }],
-        metrics: [],
+        metrics: [{ cvssV3_1: { baseScore: 9.8, baseSeverity: "CRITICAL" } }],
         known_exploited: false,
       },
     ],
@@ -165,6 +165,12 @@ const structured: FeedEvent = {
         },
       ],
       references: [],
+      metrics: [
+        {
+          type: "CVSS_V3",
+          score: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        },
+      ],
     },
   },
 };

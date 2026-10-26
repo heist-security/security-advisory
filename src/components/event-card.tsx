@@ -7,6 +7,8 @@ import { registry, vendorRegistry } from "@/lib/registry";
 import { severityLabel, type Severity } from "@/lib/priority";
 import { Badge } from "./ui/badge";
 import { Card, CardDescription, CardFooter, CardHeader } from "./ui/card";
+import { advisoryCvss, scoreCves } from "@/lib/advisory-scores";
+import { ScoreBadges } from "./score-badges";
 const severityStyles: Record<Severity, string> = {
   critical: "border-red-200 bg-red-50 text-red-800",
   high: "border-orange-200 bg-orange-50 text-orange-800",
@@ -49,6 +51,9 @@ export function EventCard({
             <Badge variant="outline" className={severityStyles[severity]}>
               {severityLabel(severity)}
             </Badge>
+            {event.payload.kind !== "withdrawal" ? (
+              <ScoreBadges cvss={advisoryCvss(event)} cves={scoreCves(event)} />
+            ) : null}
             {event.payload.kind !== "withdrawal" &&
             event.priority?.fix_available ? (
               <Badge variant="secondary">Fix available</Badge>
