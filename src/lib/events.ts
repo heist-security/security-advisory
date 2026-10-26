@@ -1,6 +1,7 @@
 import { db } from "./db";
 import type { Extraction } from "./schema";
-import type { EventQuery } from "./filters";
+import { filterQuery, type EventQuery } from "./filters";
+import { databaseFailureReason } from "./errors";
 import {
   groupedEvents,
   publicEvent,
@@ -37,6 +38,26 @@ export async function events(
   options: Partial<EventQuery> = {},
   updates = false,
 ) {
+  const started = performance.now();
+  try {
+    return await readEvents(options, updates);
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        operation: "feed_query",
+        reason: databaseFailureReason(error),
+        view: options.view ?? "events",
+        filters: [...filterQuery(options).keys()].filter(
+          (key) => key !== "view",
+        ),
+        updates: updates || options.after !== undefined,
+        duration_ms: Math.round(performance.now() - started),
+      }),
+    );
+    throw error;
+  }
+}
+async function readEvents(options: Partial<EventQuery>, updates: boolean) {
   if (options.view === "grouped") return groupedEvents(options, updates);
   let query = db()
     .from("events")

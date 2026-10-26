@@ -1,5 +1,28 @@
 # Operations and launch checks
 
+## Intermittent filtered-feed failures — 26 October 2026
+
+Read-only checks reproduced “Feed temporarily unavailable” twice for
+`/?view=grouped&severity=critical&type=patch`, each after about eight seconds.
+An empty mitigation/low-severity combination also failed, while broader filters
+and text search succeeded. Production database diagnostics were unavailable;
+the timing is consistent with a query timeout.
+
+Migration `202610260019_grouped_filters.sql` resolves all filter combinations
+through event indexes before looking up current groups or historical snapshots.
+Previously only text searches took that path. Snapshot lookups probe each
+matching event separately and deduplicate before pagination, avoiding expensive
+large-array overlap queries for broad subscriptions. No backfill is required.
+Regression checks cover sparse/empty filters, cursors, corrections, and broad
+subscriptions on a 60,000-event PostgreSQL fixture.
+
+Failed feed reads now log the duration, view, filter names, and a known database
+error category. They omit filter values and raw error messages. After the normal
+production release applies this migration and deploys the application, repeat
+the failing URLs and inspect `feed_query` logs for query cancellations, lock
+waits, or connection failures. Local verification does not establish production
+recovery.
+
 ## Release lock contention — 26 October 2026
 
 Production run [40275054364](https://github.com/heist-security/security-advisory/actions/runs/40275054364)

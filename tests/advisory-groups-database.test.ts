@@ -209,10 +209,14 @@ it("matches any selected type before pagination and keeps conditions on the same
   await publish({ ...record(go), kind: "patch" });
   const unrelated = record("TEST-123");
   unrelated.structured.references = [];
-  await publish({ ...unrelated, kind: "mitigation" });
+  await publish({ ...unrelated, kind: "mitigation", severity: "low" });
   const union = await groups({ type: "patch,mitigation" });
   expect(union).toHaveLength(2);
   expect(await groups({ type: "patch" })).toHaveLength(1);
+  expect(await groups({ type: "patch", severity: ["critical"] })).toHaveLength(
+    1,
+  );
+  expect(await groups({ type: "patch", severity: ["low"] })).toHaveLength(0);
   expect(
     await groups({ type: "patch,mitigation", q: "Advisory-only wording" }),
   ).toHaveLength(0);
@@ -417,7 +421,7 @@ it("bounds page reads on a populated feed, including cached plans and selective 
   await db.exec("set plan_cache_mode=force_generic_plan");
   try {
     const cases: {
-      filters: Record<string, string>;
+      filters: Record<string, string | string[] | undefined>;
       after: number | null;
       before: number | null;
       updates: boolean;
@@ -524,6 +528,39 @@ it("bounds page reads on a populated feed, including cached plans and selective 
           count: 0,
         },
       );
+      for (const filters of [
+        { type: "patch" },
+        { severity: ["critical"] },
+        { type: "patch", severity: ["critical"] },
+        { important: "1" },
+        { fix: "1" },
+      ]) {
+        cases.push(
+          {
+            filters,
+            after: null,
+            before: null,
+            updates,
+            first: 3000,
+            count: 2,
+          },
+          { filters, after: null, before: 3000, updates, first: 1, count: 1 },
+          { filters, after: 0, before: null, updates, first: 1, count: 2 },
+        );
+      }
+      for (const filters of [
+        { type: "mitigation" },
+        { type: "patch", severity: ["low"] },
+      ]) {
+        cases.push({
+          filters,
+          after: null,
+          before: null,
+          updates,
+          first: undefined,
+          count: 0,
+        });
+      }
     }
     for (const entry of cases) {
       const rows = await groups(
@@ -555,7 +592,13 @@ it("bounds page reads on a populated feed, including cached plans and selective 
         plan["Shared Hit Blocks"] + plan["Shared Read Blocks"],
         JSON.stringify(entry),
       ).toBeLessThan(
-        entry.filters.q === "fixture" ? 25000 : entry.filters.q ? 500 : 2000,
+        entry.filters.q === "fixture"
+          ? 25000
+          : entry.filters.q
+            ? 500
+            : Object.keys(entry.filters).length
+              ? 200
+              : 2000,
       );
     }
   } finally {

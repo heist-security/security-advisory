@@ -1,4 +1,30 @@
 // Persist only known categories. Never store provider responses, source text, keys or arbitrary error messages.
+export function databaseFailureReason(error: unknown) {
+  const e = error as { code?: string; name?: string };
+  switch (e?.code) {
+    case "57014":
+      return "query_canceled";
+    case "55P03":
+      return "lock_timeout";
+    case "40P01":
+      return "deadlock";
+    case "53300":
+      return "connection_limit";
+    case "PGRST003":
+      return "connection_timeout";
+    case "PGRST000":
+    case "PGRST001":
+    case "PGRST002":
+      return "database_unavailable";
+    case "42P01":
+    case "42883":
+    case "PGRST202":
+      return "schema_mismatch";
+  }
+  if (e?.name === "AbortError" || e?.name === "TimeoutError") return "timeout";
+  return "database_query_failed";
+}
+
 export function failureReason(error: unknown) {
   const e = error as { status?: number; name?: string; message?: string };
   if (/checkpoint outside|backfill required/.test(e?.message ?? ""))
