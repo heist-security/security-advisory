@@ -4,14 +4,20 @@ import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { beforeEach, afterEach, it, expect } from "vitest";
 let db: PGlite;
-beforeEach(async () => {
+beforeEach(async (context) => {
   db = new PGlite();
   await db.exec(
     "create role anon; create role authenticated; create role service_role bypassrls;",
   );
   const folder = new URL("../supabase/migrations/", import.meta.url);
   for (const file of readdirSync(folder)
-    .filter((f) => f.endsWith(".sql"))
+    .filter(
+      (f) =>
+        f.endsWith(".sql") &&
+        (context.task.name !==
+          "backfills search for existing events when the migration is applied" ||
+          f < "202610240005_feed_search.sql"),
+    )
     .sort())
     await db.exec(readFileSync(new URL(file, folder), "utf8"));
   // Production starts structured-only; these publication tests opt into Ruby.
@@ -183,9 +189,6 @@ it("searches indexed public text and retained CVE keys across corrections", asyn
   expect(await matches("authentication")).toHaveLength(1);
 });
 it("backfills search for existing events when the migration is applied", async () => {
-  await db.exec(
-    "alter table events drop column search_document; drop function event_search_document(text,jsonb,text[],text[],text[]);",
-  );
   await enqueue("existing-event");
   await finish(await claim(), {
     ...payload,

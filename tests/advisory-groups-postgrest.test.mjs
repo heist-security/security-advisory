@@ -2,18 +2,22 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 // Runs only against the disposable PostgreSQL/PostgREST service in CI, after
-// the production upgrade fixture and all three real backfills have completed.
-const endpoint = "http://localhost:3001/rpc/query_advisory_groups";
+// the production upgrade fixture and all real backfills have completed.
+const endpoint = "http://localhost:3001/rpc/";
 async function groups(options = {}) {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      filters: { source: "core-cve" },
-      p_limit: 1,
-      ...options,
-    }),
-  });
+  const { updates, ...params } = options;
+  const response = await fetch(
+    endpoint + (updates ? "query_advisory_updates" : "query_advisory_current"),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filters: { source: "core-cve" },
+        p_limit: 1,
+        ...params,
+      }),
+    },
+  );
   assert.equal(response.status, 200);
   return response.json();
 }

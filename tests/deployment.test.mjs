@@ -351,6 +351,7 @@ test("retries schema lock timeouts and deadlocks before starting backfills", asy
       "psql",
       "psql",
       "psql",
+      "psql",
     ]);
     assert.deepEqual(delays, [1000, 2000]);
   }
@@ -443,7 +444,7 @@ test("backfill batches finish before deployment and retain safe failure categori
     },
     async () => {},
   );
-  assert.equal(calls, 4);
+  assert.equal(calls, 5);
   await assert.rejects(
     migrate(configuration(env), env, (cmd) =>
       cmd === "supabase"
@@ -505,6 +506,19 @@ test("an advisory grouping backfill failure prevents deployment", async () => {
   );
 });
 
+test("a feed read-model backfill failure prevents deployment", async () => {
+  const f = fixture();
+  f.options.apply = (database, env) =>
+    migrate(database, env, (cmd, args) => {
+      if (cmd === "supabase") return { status: 0 };
+      return args.at(-1).includes("backfill_advisory_feed")
+        ? { status: 1, stderr: "ERROR: 57014 private data" }
+        : { status: 0, stdout: "100|0|t" };
+    });
+  await assert.rejects(release(f.options), /Advisory feed backfill failed/);
+  assert.ok(!f.calls.some((call) => call.method === "POST"));
+});
+
 test("retries rolled-back contention on the same batch, with bounded backoff", async () => {
   for (const code of ["55P03", "40P01"]) {
     const env = environment();
@@ -525,7 +539,7 @@ test("retries rolled-back contention on the same batch, with bounded backoff", a
         delays.push(ms);
       },
     );
-    assert.equal(calls, 5);
+    assert.equal(calls, 6);
     assert.equal(commands[0], commands[1]);
     assert.equal(commands[1], commands[2]);
     assert.deepEqual(delays, [1000, 2000]);

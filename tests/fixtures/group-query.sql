@@ -26,8 +26,16 @@ select advisory_id,id,group_id from events;
 insert into advisory_group_updates(group_id,revision,member_ids,primary_event_id,changed_event_id,change,published_at)
 select group_id,1,array[id],id,id,'published',published_at from events order by id;
 update advisory_groups g set latest_update_id=u.id from advisory_group_updates u where u.group_id=g.id;
+insert into advisory_feed_members(feed_id,event_id,group_id,source_id,event_types,severity_keys,cve_ids,technology_ids,technologies,important,fix_available,search_document)
+select u.id,e.id,u.group_id,e.source_id,e.event_types,e.severity_keys,e.cve_ids,e.technology_ids,e.technologies,e.important,e.fix_available,e.search_document
+from advisory_group_updates u join events e on e.id=u.primary_event_id;
+insert into advisory_update_members(feed_id,event_id,group_id,source_id,event_types,severity_keys,cve_ids,technology_ids,technologies,important,fix_available,search_document)
+select u.id,e.id,u.group_id,e.source_id,e.event_types,e.severity_keys,e.cve_ids,e.technology_ids,e.technologies,e.important,e.fix_available,e.search_document
+from advisory_group_updates u join events e on e.id=u.primary_event_id;
 commit;
 analyze events;
 analyze advisory_groups;
 analyze advisory_group_members;
 analyze advisory_group_updates;
+analyze advisory_feed_members;
+analyze advisory_update_members;

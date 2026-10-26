@@ -1,5 +1,23 @@
 # Operations and launch checks
 
+## Feed read model migration — 26 October 2026
+
+`202610260020_feed_read_model.sql` replaces the proposed adaptive-query patch
+with separate relational read models for current groups and historical updates.
+The release runner completes `backfill_advisory_feed(100)` after the existing
+backfills and before application deployment. Inspect `advisory_feed_backfill`
+for progress; retry resumes committed batches. Do not reset its checkpoint or
+deploy the new application before completion. Existing application instances
+continue serving through the compatibility RPC during the copy.
+
+The backfill only copies membership and filtering metadata. It preserves event
+IDs, update IDs, payloads, subscription cursors, and notification history.
+Publication maintains both models transactionally after migration. See
+[feed storage and queries](advisory-grouping.md#feed-storage-and-queries) for
+the schema and compatibility behavior. Verify both the original critical-patch
+URL and `/?view=grouped&type=advisory%2Cpatch&severity=critical%2Chigh` after
+production deployment; local performance checks do not establish live recovery.
+
 ## Schema migration lock retry — 26 October 2026
 
 Production run [40298637801](https://github.com/heist-security/security-advisory/actions/runs/40298637801)
