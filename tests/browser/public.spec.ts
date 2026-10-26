@@ -1,4 +1,39 @@
 import { test, expect } from "@playwright/test";
+import { load } from "cheerio";
+
+test("robots advertises a sitemap whose public and advisory URLs resolve", async ({
+  request,
+}) => {
+  const robots = await request.get("/robots.txt");
+  expect(robots.status()).toBe(200);
+  expect(await robots.text()).toContain(
+    "Sitemap: http://127.0.0.1:3039/sitemap.xml",
+  );
+  const index = await request.get("/sitemap.xml");
+  expect(index.status()).toBe(200);
+  expect(index.headers()["content-type"]).toContain("application/xml");
+  const parts = load(await index.text(), { xml: true })("sitemap > loc")
+    .map((_, node) => load(node).text())
+    .get();
+  expect(parts).toHaveLength(2);
+  const urls: string[] = [];
+  for (const part of parts) {
+    const response = await request.get(part);
+    expect(response.status()).toBe(200);
+    urls.push(
+      ...load(await response.text(), { xml: true })("url > loc")
+        .map((_, node) => load(node).text())
+        .get(),
+    );
+  }
+  expect(urls).toHaveLength(6);
+  expect(new Set(urls).size).toBe(6);
+  for (const url of urls) {
+    expect(new URL(url).search).toBe("");
+    expect((await request.get(url, { maxRedirects: 0 })).status()).toBe(200);
+  }
+});
+
 test("source pages are bounded and repeated query parameters never crash", async ({
   page,
   request,

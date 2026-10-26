@@ -108,6 +108,30 @@ async function groups(
   ).rows.map((r) => r.item);
 }
 
+it("lists only occupied sitemap parts and restricts the query to the server role", async () => {
+  const parts = async () =>
+    (
+      await db.query<{ parts: number[] }>(
+        "select advisory_sitemap_parts() parts",
+      )
+    ).rows[0].parts;
+  expect(await parts()).toEqual([]);
+  await publish();
+  expect(await parts()).toEqual([0]);
+  await db.exec("update advisory_groups set latest_update_id=50001");
+  expect(await parts()).toEqual([50]);
+  await db.exec("update advisory_groups set active=false");
+  expect(await parts()).toEqual([]);
+  const permissions = await db.query<{ role: string; allowed: boolean }>(
+    "select role,has_function_privilege(role,'advisory_sitemap_parts()','execute') allowed from unnest(array['anon','authenticated','service_role']) role",
+  );
+  expect(permissions.rows).toEqual([
+    { role: "anon", allowed: false },
+    { role: "authenticated", allowed: false },
+    { role: "service_role", allowed: true },
+  ]);
+});
+
 it("groups matching OSV copies, prefers the reviewed primary and retains every source's evidence", async () => {
   await publish();
   const first = (await groups())[0];
