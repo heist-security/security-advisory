@@ -77,6 +77,9 @@ jobs:
           test "$(psql -At -c 'select processed from public.backfill_event_priority(100)')" -eq 0
           test "$(psql -At -c 'select processed from public.backfill_event_technologies(100)')" -eq 0
           test "$(psql -At -c 'select processed from public.backfill_advisory_groups(100)')" -eq 0
+          test "$(psql -At -c 'select processed from public.backfill_advisory_feed(100)')" -eq 0
+          test "$(psql -At -c 'select count(*) from advisory_feed_members')" -eq 2000
+          test "$(psql -At -c 'select count(*) from advisory_update_members')" -eq 2000
           second=$(psql -At -c 'select count(*) from supabase_migrations.schema_migrations')
           test "$first" -eq "$second"
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/technology-catalog.sql
@@ -96,7 +99,7 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: production
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

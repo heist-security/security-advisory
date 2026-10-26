@@ -61,11 +61,11 @@ test(
       return result;
     };
     await migrate(new URL(database), env, execute, async () => {});
-    assert.equal(batches, 63);
-    assert.equal(lastProgress, "2000|0|t");
+    assert.equal(batches, 64);
+    assert.equal(lastProgress, "0|0|t");
     await migrate(new URL(database), env, execute, async () => {});
-    assert.equal(batches, 66);
-    assert.equal(lastProgress, "2000|0|t");
+    assert.equal(batches, 68);
+    assert.equal(lastProgress, "0|0|t");
 
     // Hold the real publication lock in another database session. Completed
     // backfills must return without waiting for it; unfinished work must retry.
@@ -103,7 +103,7 @@ test(
       await migrate(new URL(database), env, execute, async () => {
         assert.fail("completed backfills must not wait for publication");
       });
-      assert.equal(batches, 69);
+      assert.equal(batches, 72);
       const reset = spawnSync(
         "psql",
         [

@@ -145,6 +145,7 @@ export async function migrate(
       ["Priority", "backfill_event_priority"],
       ["Technology", "backfill_event_technologies"],
       ["Advisory grouping", "backfill_advisory_groups"],
+      ["Advisory feed", "backfill_advisory_feed"],
     ]) {
       let completed = false;
       let contentionRetries = 0;

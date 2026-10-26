@@ -25,7 +25,7 @@ test("sparse grouped filters use bounded reads for HTML, JSON and RSS page sizes
           {
             input: `set plan_cache_mode=force_generic_plan;
             explain (analyze,buffers,format json)
-            select * from query_advisory_groups('${JSON.stringify(filters)}',${limit},null,null,${updates});`,
+            select * from ${updates ? "query_advisory_updates" : "query_advisory_current"}('${JSON.stringify(filters)}',${limit},null,null);`,
             encoding: "utf8",
           },
         );
@@ -51,7 +51,7 @@ test("broad grouped subscriptions remain responsive immediately after 60,000 pub
       set test.group_query_words='1';
       ${readFileSync(new URL("./fixtures/group-query.sql", import.meta.url), "utf8")}
       begin;
-      set local session_replication_role=replica;
+
       update events set important=(id%4=0),fix_available=(id%4=0) where id%4=0 or id=1;
       commit;
       vacuum analyze events;`,
@@ -106,7 +106,7 @@ test("broad grouped subscriptions remain responsive immediately after 60,000 pub
     // match. A fixed recent window followed by an archive scan regresses here.
     execFileSync("psql", ["-XqAt", "-v", "ON_ERROR_STOP=1"], {
       input: `begin;
-        set local session_replication_role=replica;
+
         update events set severity_keys=array['low'],important=false,fix_available=false
           where id>59000 or id between 30001 and 31000;
         commit;
@@ -160,7 +160,7 @@ function checkPage({
   expected,
   budget,
 }) {
-  const query = `query_advisory_groups('${JSON.stringify(filters)}',${limit},${after},${before},${updates})`;
+  const query = `${updates ? "query_advisory_updates" : "query_advisory_current"}('${JSON.stringify(filters)}',${limit},${after},${before})`;
   const sql = (input) =>
     execFileSync("psql", ["-XqAt", "-v", "ON_ERROR_STOP=1"], {
       input:

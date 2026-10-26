@@ -39,13 +39,20 @@ export async function groupedEvents(
   updates = false,
 ): Promise<FeedEvent[]> {
   const { limit, after, before, view: _view, type, ...filters } = options;
-  const { data, error } = await db().rpc("query_advisory_groups", {
-    filters: { ...filters, ...(type?.length ? { type: type.join(",") } : {}) },
-    p_limit: limit ?? 30,
-    p_after: after ?? null,
-    p_before: before ?? null,
-    updates: updates || after !== undefined,
-  });
+  const { data, error } = await db().rpc(
+    updates || after !== undefined
+      ? "query_advisory_updates"
+      : "query_advisory_current",
+    {
+      filters: {
+        ...filters,
+        ...(type?.length ? { type: type.join(",") } : {}),
+      },
+      p_limit: limit ?? 30,
+      p_after: after ?? null,
+      p_before: before ?? null,
+    },
+  );
   if (error) throw error;
   return (data as GroupRow[]).map((row) => ({
     ...publicEvent(row.primary),

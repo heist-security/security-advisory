@@ -31,6 +31,23 @@ When late identity evidence merges provisional groups, the old group's update ha
 
 Migration `202610250012_advisory_groups.sql` adds the private grouping tables, queries and publication trigger. The release runner drains `backfill_advisory_groups(100)` in resumable transactions after priority and technology backfills and before deployment. It creates historical baselines without changing raw IDs, payloads, revisions or dates. Group metadata on raw events is updated. Interrupted runs resume from their committed checkpoint. Existing installations using a manual deployment must also finish this backfill before enabling grouped reads.
 
+## Feed storage and queries
+
+Migration `202610260020_feed_read_model.sql` separates current browsing from update delivery:
+
+| Read model                | One row per                        | Query                    |
+| ------------------------- | ---------------------------------- | ------------------------ |
+| `advisory_feed_members`   | Current group and source event     | `query_advisory_current` |
+| `advisory_update_members` | Historical update and source event | `query_advisory_updates` |
+
+Each membership stores the feed cursor and the source's filter columns, including its search vector. Queries filter these records, select distinct feed IDs in cursor order, and load source payloads only for that page. Conditions remain on the same source row. The query builder adds only requested predicates and binds every filter value; it does not sample the archive, classify filters, or force a cached query plan.
+
+Publication updates these records in the same transaction as the group and its update history. A new mirror changes current membership without altering historical snapshots; an inactive group leaves current browsing while its updates remain available. Metadata corrections to an existing event synchronize its filter columns in both tables. Original events and subscription routing semantics are preserved. The tradeoff is additional indexed storage and writes during publication.
+
+The original snapshot arrays remain inputs for publication and migration compatibility. Feed filtering and member hydration use the relational tables. `query_advisory_groups` remains a compatibility endpoint for older application instances: it uses the prior query until the new copy completes, then delegates to the explicit current/history queries.
+
+The release runner drains `backfill_advisory_feed(100)` after grouping and before deploying the new application. `advisory_feed_backfill` checkpoints current groups and historical updates separately. Each batch serializes with publication, commits independently, and can resume without replaying notifications. A failed copy blocks deployment; the existing application continues using the compatibility endpoint. New installations populate the read models through publication triggers.
+
 ## List and detail pages
 
 The feed list contains a short summary and a bounded set of technology/CVE tags. It has no inline evidence panels. Group titles open `/advisories/<encoded-group-id>`, which shows all current source records, their individual versions and ratings, native affected data, and a paginated revision history. Each historical revision opens `/events/<event-id>`. These source-event pages retain the exact published revision and link to the current advisory.

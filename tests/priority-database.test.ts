@@ -34,7 +34,7 @@ beforeEach(async (context) => {
         file.endsWith("017_advisory_sitemap.sql") ||
         file.endsWith("018_grouped_search.sql") ||
         file.endsWith("019_grouped_filters.sql") ||
-        file.endsWith("020_grouped_feed_pages.sql"))
+        file.endsWith("020_feed_read_model.sql"))
     ))
       await db.exec(readFileSync(new URL(file, folder), "utf8"));
 }, 30000);

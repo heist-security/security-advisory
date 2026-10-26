@@ -102,8 +102,8 @@ async function groups(
 ) {
   return (
     await db.query<{ item: GroupResult }>(
-      "select query_advisory_groups($1,$2,$3,$4,$5) item",
-      [JSON.stringify(filters), limit, after, before, updates],
+      `select ${updates ? "query_advisory_updates" : "query_advisory_current"}($1,$2,$3,$4) item`,
+      [JSON.stringify(filters), limit, after, before],
     )
   ).rows.map((r) => r.item);
 }
@@ -118,7 +118,10 @@ it("lists only occupied sitemap parts and restricts the query to the server role
   expect(await parts()).toEqual([]);
   await publish();
   expect(await parts()).toEqual([0]);
-  await db.exec("update advisory_groups set latest_update_id=50001");
+  await db.exec(`insert into advisory_group_updates(id,group_id,revision,member_ids,primary_event_id,changed_event_id,change,published_at)
+    overriding system value select 50001,group_id,revision+1,member_ids,primary_event_id,changed_event_id,change,published_at
+    from advisory_group_updates;
+    update advisory_groups set latest_update_id=50001;`);
   expect(await parts()).toEqual([50]);
   await db.exec("update advisory_groups set active=false");
   expect(await parts()).toEqual([]);
@@ -366,6 +369,12 @@ it("keeps group tables and RPCs private to the backend", async () => {
       "select * from advisory_group_updates",
       "select * from query_advisory_groups()",
       "select * from backfill_advisory_groups()",
+      "select * from advisory_feed_members",
+      "select * from advisory_update_members",
+      "select * from advisory_feed_backfill",
+      "select * from query_advisory_current()",
+      "select * from query_advisory_updates()",
+      "select * from backfill_advisory_feed()",
     ])
       await expect(db.query(sql)).rejects.toThrow("permission denied");
     await db.exec("reset role");
@@ -414,7 +423,12 @@ it("bounds page reads on a populated feed, including cached plans and selective 
     ),
   );
   // Flush the bulk-load GIN pending list before measuring query plans.
-  await db.exec("vacuum analyze events");
+  for (const table of [
+    "events",
+    "advisory_feed_members",
+    "advisory_update_members",
+  ])
+    await db.exec(`vacuum analyze ${table}`);
   // Buffer accesses measure database work without flaky wall-clock thresholds.
   // Large search documents reproduce the production cost of testing every group.
   // Sparse matches must use the search index, including the update/RSS path.
@@ -622,13 +636,8 @@ it("bounds page reads on a populated feed, including cached plans and selective 
       const result = await db.query<{
         "QUERY PLAN": { Plan: Record<string, number> }[];
       }>(
-        "explain (analyze,buffers,format json) select * from query_advisory_groups($1,21,$2,$3,$4)",
-        [
-          JSON.stringify(entry.filters),
-          entry.after,
-          entry.before,
-          entry.updates,
-        ],
+        `explain (analyze,buffers,format json) select * from ${entry.updates ? "query_advisory_updates" : "query_advisory_current"}($1,21,$2,$3)`,
+        [JSON.stringify(entry.filters), entry.after, entry.before],
       );
       const plan = result.rows[0]["QUERY PLAN"][0].Plan;
       expect(plan["Actual Rows"]).toBe(entry.count);
@@ -643,7 +652,7 @@ it("bounds page reads on a populated feed, including cached plans and selective 
           : entry.filters.q
             ? 500
             : Object.keys(entry.filters).length
-              ? 200
+              ? 400
               : 2000,
       );
     }

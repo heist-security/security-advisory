@@ -98,13 +98,12 @@ it("exposes grouped snapshots with independent cursors and intact primary/member
     ),
   ).toBe(true);
   const [url, options] = fetch.mock.calls[0];
-  expect(url.toString()).toContain("/rpc/query_advisory_groups");
+  expect(url.toString()).toContain("/rpc/query_advisory_current");
   expect(JSON.parse(options.body)).toEqual({
     filters: { technology: "node-js", type: "advisory,patch" },
     p_limit: 2,
     p_after: null,
     p_before: 9,
-    updates: false,
   });
 });
 it("requests the immutable group update stream for after cursors and preserves empty cursors", async () => {
@@ -113,7 +112,9 @@ it("requests the immutable group update stream for after cursors and preserves e
     new Request("https://feed.example.test/api/v1/events?view=grouped&after=7"),
   );
   expect(await result.json()).toMatchObject({ data: [], next_after: 7 });
-  expect(JSON.parse(fetch.mock.calls[0][1].body).updates).toBe(true);
+  expect(fetch.mock.calls[0][0].toString()).toContain(
+    "/rpc/query_advisory_updates",
+  );
 });
 it("uses group-update RSS GUIDs and includes scoped source information and escaped changed details", async () => {
   const fetch = database();
@@ -127,7 +128,9 @@ it("uses group-update RSS GUIDs and includes scoped source information and escap
   expect(xml).toContain("GO-2026-5236");
   expect(xml).toContain("&amp;lt;source&amp;gt; &amp;amp; mitigation.");
   expect(xml).toContain("/feed.xml?view=grouped");
-  expect(JSON.parse(fetch.mock.calls[0][1].body).updates).toBe(true);
+  expect(fetch.mock.calls[0][0].toString()).toContain(
+    "/rpc/query_advisory_updates",
+  );
 });
 it("preserves the legacy event endpoint and rejects malformed/repeated group options", async () => {
   const fetch = database([primary]);

@@ -255,17 +255,19 @@ createServer(async (req, res) => {
       .end(JSON.stringify(groups));
     return;
   }
-  const grouped = url.pathname === "/rest/v1/rpc/query_advisory_groups";
-  let updates = false;
+  const grouped = [
+    "/rest/v1/rpc/query_advisory_current",
+    "/rest/v1/rpc/query_advisory_updates",
+  ].includes(url.pathname);
+  const updates = url.pathname === "/rest/v1/rpc/query_advisory_updates";
   if (grouped) {
     let body = "";
     for await (const chunk of req) body += chunk;
     const rpc = JSON.parse(body);
-    updates = rpc.updates;
     if (rpc.filters.group === "osv:GHSA-2222-2222-2222") {
       res.writeHead(200, { "Content-Type": "application/json" }).end(
         JSON.stringify(
-          rpc.updates
+          updates
             ? [
                 {
                   id: 199,
