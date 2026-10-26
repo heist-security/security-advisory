@@ -136,118 +136,29 @@ export async function migrate(
           "); deployment stopped. Inspect the database and migration history privately.",
       );
     }
-    // Schema DDL has committed. Backfill separately so readers remain available
-    // and interrupted releases resume from the last committed batch.
-    // libpq does not expand connection URIs supplied through PGDATABASE.
-    // Keep the password in a private file rather than process arguments/env.
-    const connection = psqlEnvironment(database, env, certificate, directory);
-    for (const [label, procedure] of [
-      ["Priority", "backfill_event_priority"],
-      ["Technology", "backfill_event_technologies"],
-      ["Advisory grouping", "backfill_advisory_groups"],
-      ["Advisory feed", "backfill_advisory_feed"],
-    ]) {
-      let completed = false;
-      let contentionRetries = 0;
-      const deadline = Date.now() + 15 * 60 * 1000;
-      for (
-        let attempt = 0;
-        attempt < 5000 && Date.now() < deadline;
-        attempt++
-      ) {
-        const batch = execute(
-          "psql",
-          [
-            "--no-psqlrc",
-            "--no-password",
-            "--quiet",
-            "--tuples-only",
-            "--no-align",
-            "--set=ON_ERROR_STOP=1",
-            "--set=VERBOSITY=sqlstate",
-            "--command",
-            `set lock_timeout='5s'; set statement_timeout='30s'; select last_id,processed,done from public.${procedure}(100);`,
-          ],
-          {
-            env: connection,
-            encoding: "utf8",
-            stdio: ["ignore", "pipe", "pipe"],
-            timeout: 45000,
-            maxBuffer: 65536,
-          },
-        );
-        if (batch.error || batch.status !== 0) {
-          const failure = migrationFailure(batch);
-          // These SQL errors roll back the batch and its checkpoint. Retry the
-          // same procedure, without rerunning DDL or relaxing lock deadlines.
-          if (
-            !batch.error &&
-            ["database lock timeout", "database deadlock"].includes(failure) &&
-            contentionRetries < 5 &&
-            Date.now() < deadline
-          ) {
-            await pause(Math.min(1000 * 2 ** contentionRetries++, 10000));
-            continue;
-          }
-          throw new ReleaseError(
-            label +
-              " backfill failed (" +
-              failure +
-              "); deployment stopped. Completed batches are retained for retry.",
-          );
-        }
-        contentionRetries = 0;
-        const progress = String(batch.stdout ?? "")
-          .trim()
-          .match(/^(\d+)\|(\d+)\|([tf])$/);
-        if (!progress)
-          throw new ReleaseError(
-            "Invalid backfill response; deployment stopped.",
-          );
-        if (progress[3] === "t") {
-          completed = true;
-          break;
-        }
-        await pause(100);
-      }
-      if (!completed)
-        throw new ReleaseError(
-          label +
-            " backfill timed out; deployment stopped. Retry resumes completed batches.",
-        );
-    }
+    const imported = execute(
+      "node",
+      ["--import", "tsx", "scripts/migrate-feed.ts"],
+      {
+        env: {
+          PATH: env.PATH,
+          HOME: env.HOME,
+          DATABASE_URL: database.toString(),
+          DATABASE_CA_CERT: env.SUPABASE_DB_CA_CERT,
+        },
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 15 * 60 * 1000,
+        maxBuffer: 2 * 1024 * 1024,
+      },
+    );
+    if (imported.error || imported.status !== 0)
+      throw new ReleaseError(
+        "Canonical feed import failed; deployment stopped. Committed batches are retained for retry. Inspect the database privately.",
+      );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
-}
-
-function psqlEnvironment(database, env, certificate, directory) {
-  const host = database.hostname.replace(/^\[|\]$/g, "");
-  const port = database.port || "5432";
-  const name = decodeURIComponent(database.pathname.slice(1)) || "postgres";
-  const user = decodeURIComponent(database.username);
-  const password = decodeURIComponent(database.password);
-  const fields = [host, port, name, user, password];
-  if (fields.some((value) => /[\r\n\0]/.test(value)))
-    throw new ReleaseError("Invalid database connection field.");
-  const passfile = join(directory, "pgpass");
-  writeFileSync(
-    passfile,
-    fields.map((value) => value.replace(/[\\:]/g, "\\$&")).join(":") + "\n",
-    { mode: 0o600 },
-  );
-  return {
-    PATH: env.PATH,
-    HOME: env.HOME,
-    PGHOST: host,
-    PGPORT: port,
-    PGDATABASE: name,
-    PGUSER: user,
-    PGPASSFILE: passfile,
-    PGCONNECT_TIMEOUT: "10",
-    PGSSLMODE: "verify-full",
-    PGSSLROOTCERT: certificate,
-  };
 }
 
 export async function release({

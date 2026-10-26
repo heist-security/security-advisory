@@ -1,56 +1,35 @@
 # Heist Feed
 
-Heist Feed is a self-hosted security advisory reader built with Next.js, TypeScript, and Supabase. It imports OSV, the official CVE List, and CISA KEV, then publishes advisories, patches, mitigations, and corrections through a web interface, RSS, and a JSON API.
+Heist Feed collects security advisories and patches from OSV, the official CVE List, CISA KEV, and optional publisher feeds. The website, RSS, and JSON API read one canonical `feed_items` table.
 
-Structured ingestion runs without an LLM. Optional publisher feeds use model-assisted extraction with source quotations. Records retain their upstream identifiers, affected-version data, and revision history. Confirmed copies of an advisory are grouped in the reader; individual source events remain available through the API.
+Each item has directly queryable products, affected and fixed versions, CVEs, severity, and sources. Source evidence and native affected-package data remain attached. Patch releases combine only when the same publisher explicitly fixes the exact same vulnerabilities for the same products. Mere CVE mentions and publication dates do not establish a match.
 
-The project is in alpha. Coverage depends on the configured sources and ingestion checkpoints. Consult original advisories when assessing affected versions or remediation.
+The project is in alpha. Coverage depends on sources and checkpoints; consult original advisories for remediation decisions.
 
-## Requirements
+## Setup
 
-- Node.js 22.13 or later and npm.
-- A Supabase project and the Supabase CLI for database setup.
-- OpenAI credentials only if you enable publisher extraction.
-
-## Local setup
+Use Node.js 22.13 or later, PostgreSQL (Supabase is supported), and the Supabase CLI for migrations. OpenAI credentials are needed only for optional publisher extraction.
 
 ```sh
 npm ci
 cp .env.example .env.local
-```
-
-For a new Supabase project, authenticate with the CLI, link the project, and apply the migrations:
-
-```sh
 supabase login
 supabase link --project-ref YOUR_PROJECT_REF
 supabase db push
 ```
 
-Set these values in `.env.local`:
-
-| Variable                    | Purpose                                                 |
-| --------------------------- | ------------------------------------------------------- |
-| `SUPABASE_URL`              | Supabase project URL                                    |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-side database credential                         |
-| `CRON_SECRET`               | Bearer token for ingestion and health endpoints         |
-| `PUBLIC_BASE_URL`           | Public application URL; locally `http://localhost:3000` |
-
-Generate a cron secret with `openssl rand -hex 32`. Keep the service-role key and cron secret on the server. The remaining settings and ingestion limits are listed in [.env.example](.env.example).
-
-Review the source configuration, then apply it:
+Set `DATABASE_URL` to a server-side PostgreSQL connection string, `DATABASE_CA_CERT` if your provider requires its CA certificate, `CRON_SECRET` to a random bearer token, and `PUBLIC_BASE_URL` to your application URL. Remote database connections verify TLS certificates. Use a pooled connection for serverless hosting. These credentials must never reach the browser.
 
 ```sh
-npm run sources:configure
+npm run feed:migrate
+npm run sources:configure       # preview selection
 npm run sources:configure -- --apply
 npm run dev
 ```
 
-Open <http://localhost:3000>. Without database credentials, the interface and source catalog are accessible, but data endpoints return `503`.
+Open <http://localhost:3000>. Without database credentials the reader shows an unavailable state. Apply the [upgrade procedure](docs/operations.md) before deploying over an existing installation; this release changes the API and removes the old runtime schema.
 
-The configuration command enables the three structured sources and any explicitly selected publisher feeds. It preserves existing checkpoints. For checkpoint selection, recovery, and existing installations, see [structured ingestion](docs/structured-sources.md) and [operations](docs/operations.md).
-
-To populate the feed, export the same `CRON_SECRET` in your shell and call the stages in order:
+To ingest, call the stages in order with the same `CRON_SECRET` exported in your shell:
 
 ```sh
 curl --fail -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/poll
@@ -58,69 +37,53 @@ curl --fail -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cr
 curl --fail -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/process
 ```
 
-Repeat collection and processing while work remains queued. The protected `/api/cron/health` endpoint reports queue and source status.
+Repeat collection and processing while work remains. `/api/cron/health` reports queue status. Structured ingestion makes no model calls. Publisher feeds require `VENDOR_SOURCE_IDS`, `OPENAI_API_KEY`, and `OPENAI_MODEL`; see [publisher activation](docs/publisher-activation.md).
 
-### Optional publisher feeds
+## Interface
 
-Set `VENDOR_SOURCE_IDS` to a comma-separated list of registry IDs, or `all`, and configure `OPENAI_API_KEY` and `OPENAI_MODEL`. Run `sources:configure` again to reconcile the selection. An empty selection disables publisher extraction. Configure provider spending limits separately from the application's hourly attempt limit.
+| Endpoint                          | Purpose                                    |
+| --------------------------------- | ------------------------------------------ |
+| `/`                               | Reader and filters                         |
+| `/items/{id}`                     | Item, versions, and source evidence        |
+| `/feed.xml`                       | Recent item revisions                      |
+| `/api/v1/items`                   | Current items, newest first                |
+| `/api/v1/items?after=0&limit=100` | Current item states in change-cursor order |
+| `/api/v1/technologies`            | Observed technology suggestions            |
+| `/sources`, `/api/v1/sources`     | Configured source catalog                  |
+| `/docs`                           | Public API guide                           |
+| `/api/v1/risk?cve=CVE-2021-44228` | Optional dated risk enrichment             |
+| `/sitemap.xml`                    | Current item sitemap                       |
 
-See [publisher activation](docs/publisher-activation.md) and [extraction evaluation](docs/evaluation.md) before enabling this path.
+RSS and JSON share filters with the website. Read [API semantics](docs/api.md) for corrections and cursors: this is a current-state feed, not a historical event log.
 
-## Interface and API
+## Architecture
 
-| Endpoint                           | Description                                   |
-| ---------------------------------- | --------------------------------------------- |
-| `/`                                | Advisory reader and filters                   |
-| `/sources`                         | Configured source catalog                     |
-| `/docs`                            | API documentation                             |
-| `/feed.xml`                        | RSS of source events                          |
-| `/sitemap.xml`                     | Sitemap index for public pages and advisories |
-| `/api/v1/events`                   | JSON of source events                         |
-| `/api/v1/events?view=grouped`      | Grouped advisories                            |
-| `/api/v1/events?after=0&limit=100` | Source event archive, oldest first            |
-| `/api/v1/technologies`             | Technology suggestions                        |
-| `/api/v1/sources`                  | Source catalog as JSON                        |
-| `/api/v1/risk?cve=CVE-2021-44228`  | Exploitation and risk context                 |
+| Directory                   | Responsibility                                                      |
+| --------------------------- | ------------------------------------------------------------------- |
+| `src/domain`                | Evidence, feed items, identity and reconciliation; no I/O           |
+| `src/application`           | Ingestion and publication use cases; adapter interfaces             |
+| `src/adapters`              | PostgreSQL, publisher/structured sources, OpenAI and risk providers |
+| `src/server`                | Composition root wiring adapters to use cases                       |
+| `src/presentation`          | Filters, links, RSS and HTTP helpers                                |
+| `src/app`, `src/components` | Next.js routes and UI                                               |
+| `supabase/migrations`       | Append-only schema history                                          |
+| `scripts`                   | Import, source management and evaluation                            |
 
-RSS and JSON support shared filters such as `technology=node-js`, `type=advisory,patch`, `severity=critical,high`, `cve`, and `source`. The reader's subscription links use `view=grouped`. Source events and grouped updates have separate cursors and RSS identifiers; start a fresh cursor when switching views.
-
-Corrections retain earlier subscription keys so existing subscribers receive withdrawals and classification changes. See [API semantics](docs/api.md) and [advisory grouping](docs/advisory-grouping.md) for response formats, pagination, and revision behavior.
-
-The sitemap uses `PUBLIC_BASE_URL` and is advertised in `/robots.txt`. Submit `/sitemap.xml` to search engines; it links to the main pages and bounded parts covering all current advisory groups, including the older archive. Filter URLs, source revisions, and retired groups are omitted in favor of the current advisory URLs. Parts use ranges of 1,000 group update IDs; the index lists only occupied ranges, and empty parts return `404`. Successful responses are cached at the CDN for one hour (with up to five minutes of stale-while-revalidate); database failures return an uncached `503`. No rebuild is needed for new advisories. Modification dates are omitted because group updates do not track every change to the detail page. Migration `202610260017_advisory_sitemap.sql` adds the server-only query used by the index; the production release workflow applies it before deployment.
+See [the architecture and domain rules](docs/architecture.md). The original migration files remain unchanged for existing installations. Their former runtime projections are removed during cutover.
 
 ## Development
 
 ```sh
-npm run check          # ESLint, Prettier, TypeScript, unit/database and release tests
+npm run check
 npm run build
 npx playwright install chromium
-npm run test:browser
+# Disposable local PostgreSQL; browser tests create and remove their own database.
+TEST_DATABASE_URL=postgresql://localhost/postgres npm run test:browser
 npm run check:secrets
 ```
 
-Use `npm run lint:fix` for fixable lint errors and `npm run format` to format the project. CI checks both. Browser tests run against a local fixture server and the production build; they do not need Supabase or OpenAI credentials. Database tests use PGlite. The production workflow also exercises migrations and API queries against disposable PostgreSQL and PostgREST services.
+Unit/database tests use PGlite. CI reruns the database contract against PostgreSQL 17 and runs browser tests against the production build with a real PostgreSQL adapter. No provider or model credentials are needed. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-The UI uses shadcn/ui components and Tailwind CSS throughout. Shared components live in `src/components/ui`, and theme tokens are defined in `src/app/globals.css`.
+The production workflow applies migrations, imports the canonical feed, and then deploys the checked commit. Follow [operations](docs/operations.md) for the maintenance window and environment changes. No production action is performed by editing this repository.
 
-| Directory             | Contents                                            |
-| --------------------- | --------------------------------------------------- |
-| `src/app`             | Pages, public API routes, and protected cron routes |
-| `src/components`      | Reader components and shared UI primitives          |
-| `src/lib`             | Ingestion, validation, querying, and serialization  |
-| `sources`             | Publisher registry and verification data            |
-| `supabase/migrations` | Database schema and incremental migrations          |
-| `scripts`             | Source management and evaluation tools              |
-| `tests`               | Functional, database, and browser regression tests  |
-| `docs`                | API, deployment, and ingestion documentation        |
-
-## Deployment
-
-The repository includes Vercel schedules and a GitHub Actions workflow that validates changes, applies Supabase migrations, completes backfills, and deploys the checked commit. The release job is restricted to the upstream repository. Forks must configure their own repository guard, credentials, and hosting settings.
-
-Follow the [operations guide](docs/operations.md) for setup and deployment. Keep preview credentials separate from production. If your hosting plan does not support the bundled cron frequency, use another scheduler to invoke the protected endpoints.
-
-## Contributing and security
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development and source contribution guidelines. Report vulnerabilities through the private channel described in [SECURITY.md](SECURITY.md).
-
-The code is licensed under [MIT](LICENSE). Third-party notices, branding, and upstream data terms are described in [NOTICE.md](NOTICE.md).
+Original code is [MIT licensed](LICENSE). See [NOTICE.md](NOTICE.md) for third-party data and branding terms, and [SECURITY.md](SECURITY.md) for vulnerability reporting.

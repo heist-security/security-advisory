@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
-import { parseRiskQuery, riskContext } from "@/lib/structured/risk";
-import { cacheHeaders } from "@/lib/http";
+import { parseRiskQuery, riskContext } from "@/adapters/risk/provider";
+import { cacheHeaders } from "@/presentation/http";
 const context = unstable_cache(riskContext, ["vulnerability-risk-v1"], {
   revalidate: 900,
 });

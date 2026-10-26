@@ -1,4 +1,4 @@
-import { sourcePage } from "@/lib/registry";
+import { sourcePage } from "@/server/services";
 export async function GET(request: Request) {
   const result = sourcePage(new URL(request.url).searchParams);
   return Response.json(

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { baseUrl } from "@/lib/db";
+import { baseUrl } from "@/server/services";
 
 export const dynamic = "force-dynamic";
 

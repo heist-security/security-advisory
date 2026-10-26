@@ -23,7 +23,7 @@ const path =
 const cases: Case[] = JSON.parse(await readFile(path, "utf8"));
 if (process.argv.includes("--launch") && cases.length < 100)
   throw new Error("Launch evaluation requires at least 100 reviewed cases.");
-const { extract } = await import("../src/lib/extract");
+const { extract } = await import("../src/adapters/openai/extractor");
 const results = [];
 for (const item of cases) {
   try {

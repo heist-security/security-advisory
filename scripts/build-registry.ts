@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { sourceSchema } from "../src/lib/feed";
+import { sourceSchema } from "../src/adapters/sources/publisher";
 
 const root = new URL("../", import.meta.url);
 const raw = await readFile(new URL("sources/registry.json", root), "utf8");

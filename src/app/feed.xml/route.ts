@@ -1,32 +1,36 @@
-import { events, rss } from "@/lib/events";
-import { baseUrl } from "@/lib/db";
-import { parseEventQuery, filterQuery } from "@/lib/filters";
-import { eventHeaders, unavailable } from "@/lib/http";
+import { services, baseUrl } from "@/server/services";
+import { parseFeedQuery, filterQuery } from "@/presentation/filters";
+import { rss } from "@/presentation/rss";
+import { feedHeaders, unavailable } from "@/presentation/http";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   let query;
   try {
-    const params = new URL(request.url).searchParams;
-    if (params.has("after") || params.has("before"))
-      throw new Error("Use the JSON API for cursor pagination");
-    query = parseEventQuery(params, 100);
+    query = parseFeedQuery(new URL(request.url).searchParams, 100);
+    if (query.after !== undefined || query.before !== undefined)
+      throw new Error("Use JSON for cursors");
   } catch (error) {
     return Response.json(
       { error: (error as Error).message },
-      { status: 400, headers: { "Cache-Control": "no-store" } },
+      { status: 400, headers: feedHeaders },
     );
   }
   try {
-    const params = filterQuery(query);
-    if (query.limit !== 100) params.set("limit", String(query.limit));
-    const self = baseUrl() + "/feed.xml" + (params.size ? "?" + params : "");
-    return new Response(rss(await events(query, true), baseUrl(), self), {
-      headers: {
-        ...eventHeaders,
-        "Content-Type": "application/rss+xml; charset=utf-8",
-        "X-Content-Type-Options": "nosniff",
+    const rows = await services().feed.list(query, true);
+    const filters = filterQuery(query);
+    return new Response(
+      rss(
+        rows,
+        baseUrl(),
+        baseUrl() + "/feed.xml" + (filters.size ? "?" + filters : ""),
+      ),
+      {
+        headers: {
+          ...feedHeaders,
+          "Content-Type": "application/rss+xml; charset=utf-8",
+        },
       },
-    });
+    );
   } catch {
     return unavailable();
   }

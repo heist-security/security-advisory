@@ -1,8 +1,8 @@
-import { failureReason } from "../src/lib/errors";
-import { discover } from "../src/lib/structured/discover";
-import { structuredIds } from "../src/lib/structured/config";
-import { structuredDocument } from "../src/lib/structured/pipeline";
-import { riskContext } from "../src/lib/structured/risk";
+import { failureReason } from "../src/application/errors";
+import { discover } from "../src/adapters/sources/structured/discover";
+import { structuredIds } from "../src/adapters/sources/structured/config";
+import { structuredDocument } from "../src/adapters/sources/structured/documents";
+import { riskContext } from "../src/adapters/risk/provider";
 
 // Read-only transport/parser smoke check. No database access, model calls or quality claims.
 let failed = false;

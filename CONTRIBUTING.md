@@ -15,9 +15,10 @@ Before a pull request:
     npm run check:secrets
 
 Browser tests require a production build and Chromium: `npm run build` and
-`npx playwright install chromium`. They use a local fixture database API.
+`npx playwright install chromium`. Set `TEST_DATABASE_URL` to a disposable PostgreSQL instance with permission to create databases.
+They create and remove an isolated database, seed it through the real application, and use the production server.
 Unit and database tests run with Vitest and PGlite; release-script tests run with
-Node’s test runner. The PostgreSQL/PostgREST integration checks run in CI.
+Node’s test runner. The same database contract also runs against PostgreSQL 17 in CI.
 
 `npm run check` runs linting, formatting checks, type checking, and functional
 tests. Use `npm run lint:fix` for automatic lint fixes. ESLint uses the recommended
@@ -31,7 +32,7 @@ by typescript-eslint. Keep both until the parser supports the TypeScript 7 API.
 The entire UI uses [shadcn/ui](https://ui.shadcn.com/docs) with Tailwind CSS v4.
 Reusable components live in `src/components/ui`; add more with
 `npx shadcn@latest add <component>`. Keep shared colors and typography in
-`src/app/globals.css` and use the `cn` helper in `src/lib/utils.ts` when composing
+`src/app/globals.css` and use the `cn` helper in `src/presentation/utils.ts` when composing
 classes. Use those primitives and Tailwind utilities for pages, forms, navigation, and
 status messages; avoid introducing a parallel page-specific stylesheet.
 

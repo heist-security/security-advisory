@@ -2,14 +2,15 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Search, X } from "lucide-react";
+import { filterQuery, type Filters } from "@/presentation/filters";
 import {
-  eventTypes,
-  filterQuery,
-  type EventType,
-  type Filters,
-} from "@/lib/filters";
-import { severities, severityLabel, type Severity } from "@/lib/priority";
-import type { TechnologyOption } from "@/lib/technology";
+  itemKinds,
+  type ItemKind,
+  severities,
+  severityLabel,
+  type Severity,
+} from "@/domain/feed-item";
+import type { TechnologyOption } from "@/domain/technology";
 import { MultiSelectFilter } from "./multi-select-filter";
 import { TechnologyFilter } from "./technology-filter";
 import { useAutoFilters } from "./use-auto-filters";
@@ -43,12 +44,6 @@ export function FeedFilters({
           update({});
         }}
       >
-        {filters.view ? (
-          <input type="hidden" name="view" value={filters.view} />
-        ) : null}
-        {filters.group ? (
-          <input type="hidden" name="group" value={filters.group} />
-        ) : null}
         <div className="relative min-w-0 basis-full md:flex-1">
           <Search
             aria-hidden="true"
@@ -69,17 +64,17 @@ export function FeedFilters({
           name="type"
           label="Type"
           legend="Event type (matches any selected)"
-          options={eventTypes.map((value) => ({
+          options={itemKinds.map((value) => ({
             value,
             label: value[0].toUpperCase() + value.slice(1),
           }))}
-          selected={(filters.type?.split(",") ?? []) as EventType[]}
+          selected={(filters.type?.split(",") ?? []) as ItemKind[]}
           onChange={(values) => update({ type: values.join(",") })}
         />
         <MultiSelectFilter
           name="severity"
           label="Severity"
-          legend="Severity (publisher or linked CVE)"
+          legend="Severity reported by the source"
           options={severities.map((value) => ({
             value,
             label: severityLabel(value),
@@ -92,9 +87,7 @@ export function FeedFilters({
           initialOptions={technologies}
           onChange={(values) => update({ technology: values.join(",") })}
         />
-        {Object.entries(filters).some(
-          ([key, value]) => key !== "view" && value,
-        ) ? (
+        {Object.entries(filters).some(([, value]) => value) ? (
           <Button asChild variant="ghost" size="sm">
             <Link
               href="/"

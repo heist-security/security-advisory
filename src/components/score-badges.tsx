@@ -11,8 +11,8 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
-import type { advisoryCvss } from "@/lib/advisory-scores";
-import { epssPercent, loadEpss, type EpssScores } from "@/lib/epss";
+import type { FeedItem } from "@/domain/feed-item";
+import { epssPercent, loadEpss, type EpssScores } from "@/presentation/epss";
 import { Badge } from "./ui/badge";
 import {
   Tooltip,
@@ -105,7 +105,7 @@ export function ScoreBadges({
   cvss,
   cves,
 }: {
-  cvss: ReturnType<typeof advisoryCvss>;
+  cvss: FeedItem["cvss"];
   cves: string[];
 }) {
   const scores = useContext(EpssContext);
