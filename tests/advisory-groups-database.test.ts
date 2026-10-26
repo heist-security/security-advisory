@@ -409,11 +409,21 @@ it("bounds page reads on a populated feed, including cached plans and selective 
       "utf8",
     ),
   );
+  // Flush the bulk-load GIN pending list before measuring query plans.
+  await db.exec("vacuum analyze events");
   // Buffer accesses measure database work without flaky wall-clock thresholds.
-  // The old query touched over 18,000 buffers for a single 21-item page.
+  // Large search documents reproduce the production cost of testing every group.
+  // Sparse matches must use the search index, including the update/RSS path.
   await db.exec("set plan_cache_mode=force_generic_plan");
   try {
-    const cases = [
+    const cases: {
+      filters: Record<string, string>;
+      after: number | null;
+      before: number | null;
+      updates: boolean;
+      first: number | undefined;
+      count: number;
+    }[] = [
       {
         filters: {},
         after: null,
@@ -479,6 +489,42 @@ it("bounds page reads on a populated feed, including cached plans and selective 
         count: 21,
       },
     ];
+    for (const updates of [false, true]) {
+      cases.push(
+        {
+          filters: { q: "Brotli" },
+          after: null,
+          before: null,
+          updates,
+          first: 3000,
+          count: 2,
+        },
+        {
+          filters: { q: "Brotli" },
+          after: null,
+          before: 3000,
+          updates,
+          first: 1,
+          count: 1,
+        },
+        {
+          filters: { q: "Brotli" },
+          after: 0,
+          before: null,
+          updates,
+          first: 1,
+          count: 2,
+        },
+        {
+          filters: { q: "no-such-query-fixture" },
+          after: null,
+          before: null,
+          updates,
+          first: undefined,
+          count: 0,
+        },
+      );
+    }
     for (const entry of cases) {
       const rows = await groups(
         entry.filters,
@@ -502,11 +548,17 @@ it("bounds page reads on a populated feed, including cached plans and selective 
       );
       const plan = result.rows[0]["QUERY PLAN"][0].Plan;
       expect(plan["Actual Rows"]).toBe(entry.count);
+      // A broad query matches all 6,000 large documents. Sparse/empty searches
+      // must stay independent of that archive size (the previous plan exceeds
+      // 500 reads even for two matches, and scans every update snapshot).
       expect(
         plan["Shared Hit Blocks"] + plan["Shared Read Blocks"],
-      ).toBeLessThan(2000);
+        JSON.stringify(entry),
+      ).toBeLessThan(
+        entry.filters.q === "fixture" ? 25000 : entry.filters.q ? 500 : 2000,
+      );
     }
   } finally {
     await db.exec("reset plan_cache_mode");
   }
-}, 15000);
+}, 60000);

@@ -9,7 +9,9 @@ insert into advisories(source_id,source_url,latest_document_id)
 select source_id,source_url,id from documents;
 insert into events(advisory_id,revision,document_id,source_id,source_url,model,payload,cve_ids,technologies,event_types,group_id)
 select a.id,1,d.id,d.source_id,d.source_url,'structured',
-  jsonb_build_object('kind','advisory','severity','high','title','Query fixture '||d.id,'products','[]'::jsonb),
+  jsonb_build_object('kind','advisory','severity','high','title','Query fixture '||d.id,'products','[]'::jsonb,
+    'summary',case when d.id in (1,3000) then 'Brotli decoder ' else '' end ||
+      (select string_agg(md5(d.id::text||':'||n),' ') from generate_series(1,100) n)),
   array['CVE-2026-'||(10000+d.id)],array['core-cve'],array['advisory'],'advisory:'||a.id
 from advisories a join documents d on d.id=a.latest_document_id;
 insert into advisory_groups(id,member_ids,primary_event_id,signatures,context,revision)
