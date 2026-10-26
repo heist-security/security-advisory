@@ -68,22 +68,25 @@ See [publisher activation](docs/publisher-activation.md) and [extraction evaluat
 
 ## Interface and API
 
-| Endpoint                           | Description                        |
-| ---------------------------------- | ---------------------------------- |
-| `/`                                | Advisory reader and filters        |
-| `/sources`                         | Configured source catalog          |
-| `/docs`                            | API documentation                  |
-| `/feed.xml`                        | RSS of source events               |
-| `/api/v1/events`                   | JSON of source events              |
-| `/api/v1/events?view=grouped`      | Grouped advisories                 |
-| `/api/v1/events?after=0&limit=100` | Source event archive, oldest first |
-| `/api/v1/technologies`             | Technology suggestions             |
-| `/api/v1/sources`                  | Source catalog as JSON             |
-| `/api/v1/risk?cve=CVE-2021-44228`  | Exploitation and risk context      |
+| Endpoint                           | Description                                   |
+| ---------------------------------- | --------------------------------------------- |
+| `/`                                | Advisory reader and filters                   |
+| `/sources`                         | Configured source catalog                     |
+| `/docs`                            | API documentation                             |
+| `/feed.xml`                        | RSS of source events                          |
+| `/sitemap.xml`                     | Sitemap index for public pages and advisories |
+| `/api/v1/events`                   | JSON of source events                         |
+| `/api/v1/events?view=grouped`      | Grouped advisories                            |
+| `/api/v1/events?after=0&limit=100` | Source event archive, oldest first            |
+| `/api/v1/technologies`             | Technology suggestions                        |
+| `/api/v1/sources`                  | Source catalog as JSON                        |
+| `/api/v1/risk?cve=CVE-2021-44228`  | Exploitation and risk context                 |
 
 RSS and JSON support shared filters such as `technology=node-js`, `type=advisory,patch`, `severity=critical,high`, `cve`, and `source`. The reader's subscription links use `view=grouped`. Source events and grouped updates have separate cursors and RSS identifiers; start a fresh cursor when switching views.
 
 Corrections retain earlier subscription keys so existing subscribers receive withdrawals and classification changes. See [API semantics](docs/api.md) and [advisory grouping](docs/advisory-grouping.md) for response formats, pagination, and revision behavior.
+
+The sitemap uses `PUBLIC_BASE_URL` and is advertised in `/robots.txt`. Submit `/sitemap.xml` to search engines; it links to the main pages and bounded parts covering all current advisory groups, including the older archive. Filter URLs, source revisions, and retired groups are omitted in favor of the current advisory URLs. Parts use ranges of 1,000 group update IDs; the index lists only occupied ranges, and empty parts return `404`. Successful responses are cached at the CDN for one hour (with up to five minutes of stale-while-revalidate); database failures return an uncached `503`. No rebuild is needed for new advisories. Modification dates are omitted because group updates do not track every change to the detail page. Migration `202610260017_advisory_sitemap.sql` adds the server-only query used by the index; the production release workflow applies it before deployment.
 
 ## Development
 

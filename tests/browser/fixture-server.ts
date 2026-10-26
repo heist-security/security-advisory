@@ -212,6 +212,43 @@ const exampleMembers: FeedEvent[] = ["GHSA-7x63-xv5r-3p2x", "GO-2026-5236"].map(
 const liveStates = new Map<string, string>();
 createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1:3038");
+  if (url.pathname === "/rest/v1/rpc/advisory_sitemap_parts") {
+    res.writeHead(200, { "Content-Type": "application/json" }).end("[0]");
+    return;
+  }
+  if (url.pathname === "/rest/v1/advisory_groups") {
+    const groups = rows
+      .filter(
+        (row) =>
+          !rows.some(
+            (other) =>
+              other.advisory_id === row.advisory_id && other.id > row.id,
+          ),
+      )
+      .map((row) => ({
+        id: "advisory:" + row.advisory_id,
+        latest_update_id: row.id,
+      }))
+      .filter((row) =>
+        url.searchParams.getAll("latest_update_id").every((filter) => {
+          if (filter.startsWith("gt."))
+            return row.latest_update_id > Number(filter.slice(3));
+          if (filter.startsWith("lte."))
+            return row.latest_update_id <= Number(filter.slice(4));
+          return true;
+        }),
+      )
+      .sort((a, b) =>
+        url.searchParams.get("order")?.includes("desc")
+          ? b.latest_update_id - a.latest_update_id
+          : a.latest_update_id - b.latest_update_id,
+      )
+      .slice(0, Number(url.searchParams.get("limit") ?? 1000));
+    res
+      .writeHead(200, { "Content-Type": "application/json" })
+      .end(JSON.stringify(groups));
+    return;
+  }
   const grouped = url.pathname === "/rest/v1/rpc/query_advisory_groups";
   let updates = false;
   if (grouped) {
