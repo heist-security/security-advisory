@@ -58,9 +58,16 @@ export const sourceReader: SourceReader = {
       string,
       { url: string; fingerprint: string; item: Item; feed_title: string }
     >();
+    let rejected_entries = 0;
     for (const item of feed.items) {
-      const url = itemUrl(source, item),
-        title = feed.title ?? source.name;
+      let url: string;
+      try {
+        url = itemUrl(source, item);
+      } catch {
+        rejected_entries++;
+        continue;
+      }
+      const title = feed.title ?? source.name;
       if (!entries.has(url))
         entries.set(url, {
           url,
@@ -71,8 +78,9 @@ export const sourceReader: SourceReader = {
     }
     return {
       entries: [...entries.values()],
-      etag: resource.etag,
-      last_modified: resource.last_modified,
+      rejected_entries,
+      etag: rejected_entries ? null : resource.etag,
+      last_modified: rejected_entries ? null : resource.last_modified,
       not_modified: false,
     };
   },

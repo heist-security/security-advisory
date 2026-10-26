@@ -75,6 +75,40 @@ describe("application orchestration", () => {
       "collection_or_processing_failed",
     );
   });
+  it("stages valid entries but reports partial discovery failure without saving validators", async () => {
+    const { queue, reader, app } = fixture();
+    const source = {
+      id: "ruby",
+      definition: {},
+      lease_token: "lease",
+      etag: '"old"',
+      last_modified: null,
+    };
+    const entry = {
+      url: "https://www.ruby-lang.org/en/news/test",
+      fingerprint: "valid",
+      item: {},
+      feed_title: "Ruby",
+    };
+    vi.mocked(queue.claimSource).mockResolvedValueOnce(source);
+    vi.mocked(reader.discover).mockResolvedValue({
+      entries: [entry],
+      not_modified: false,
+      rejected_entries: 1,
+      etag: '"new"',
+    });
+    expect(await app.poll()).toMatchObject({
+      entries_staged: 1,
+      failed: 1,
+      sources: 0,
+    });
+    expect(queue.stage).toHaveBeenCalledExactlyOnceWith(source, [entry]);
+    expect(queue.finishSource).toHaveBeenCalledExactlyOnceWith(
+      source,
+      null,
+      "source_url_rejected",
+    );
+  });
   it("keeps structured claims outside the paid budget and skips disabled publishers", async () => {
     const { app, queue, reader, publish } = fixture();
     await app.process();

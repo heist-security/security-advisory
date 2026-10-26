@@ -65,10 +65,15 @@ export function ingestion(
                 throw new Error("Polling deadline exceeded");
               await queue.stage(source, result.entries.slice(i, i + 500));
             }
-            await queue.finishSource(source, result);
-            counts.sources++;
             counts.entries_staged += result.entries.length;
-            counts.not_modified += Number(result.not_modified);
+            if (result.rejected_entries) {
+              await queue.finishSource(source, null, "source_url_rejected");
+              counts.failed++;
+            } else {
+              await queue.finishSource(source, result);
+              counts.sources++;
+              counts.not_modified += Number(result.not_modified);
+            }
           } catch (error) {
             await queue.finishSource(source, null, failureReason(error));
             counts.failed++;

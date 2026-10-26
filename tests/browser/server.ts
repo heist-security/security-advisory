@@ -5,7 +5,7 @@ import { configureSources } from "../../scripts/configure-sources";
 import { feedRepository } from "../../src/adapters/postgres/feed-repository";
 import { ingestionQueue } from "../../src/adapters/postgres/ingestion-queue";
 import { publisher } from "../../src/application/publish";
-import { payload, record, at } from "../support/fixtures";
+import { payload, record, at, fact } from "../support/fixtures";
 const test = await testDatabase(true);
 try {
   await applyMigrations(test.db);
@@ -25,6 +25,18 @@ try {
             kind: "advisory" as const,
             title: "Older advisory " + i,
             severity: "high" as const,
+            ...(i === 24
+              ? {
+                  products: [
+                    {
+                      name: fact("Acme Server 4.2"),
+                      affected_versions: [],
+                      fixed_versions: [],
+                      prerequisites: [],
+                    },
+                  ],
+                }
+              : {}),
           },
         ] as const,
     ),

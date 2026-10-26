@@ -6,9 +6,10 @@ import { recollectOsv, parseOptions } from "../scripts/recollect-osv";
 import { feedRepository } from "../src/adapters/postgres/feed-repository";
 import { ingestionQueue } from "../src/adapters/postgres/ingestion-queue";
 import { publisher } from "../src/application/publish";
-import { record, payload, at } from "./support/fixtures";
+import { record, payload, at, fact } from "./support/fixtures";
 import type { DocumentJob } from "../src/application/ports";
 let test: Awaited<ReturnType<typeof testDatabase>>;
+let legacyPending: DocumentJob, legacyCompleted: DocumentJob;
 let feed: ReturnType<typeof feedRepository>,
   queue: ReturnType<typeof ingestionQueue>,
   publish: ReturnType<typeof publisher>;
@@ -33,6 +34,32 @@ beforeAll(async () => {
       JSON.stringify(payload()),
     ]);
   }
+  // The old writer can complete a newer non-security document without an event.
+  for (const revision of ["pending-security", "completed-non-security"]) {
+    await test.db.query(
+      "select enqueue_document('github-containerd-containerd',$1,$2,$2,null)",
+      [record("eventless").url, revision],
+    );
+    const {
+      rows: [{ job }],
+    } = await test.db.query<{ job: DocumentJob }>(
+      "select to_jsonb(d) job from claim_vendor_document(60,array['github-containerd-containerd']) d",
+    );
+    if (revision === "pending-security") legacyPending = job;
+    else legacyCompleted = job;
+  }
+  await test.db.query("select finish_document($1,$2,$3::jsonb,'fixture')", [
+    legacyCompleted.id,
+    legacyCompleted.lease_token,
+    JSON.stringify({ ...payload(), security_relevant: false }),
+  ]);
+  await test.db.query("select fail_document($1,$2,'retry')", [
+    legacyPending.id,
+    legacyPending.lease_token,
+  ]);
+  await test.db.query("update documents set available_at=now() where id=$1", [
+    legacyPending.id,
+  ]);
   await applyMigrations(test.db, migrations.slice(-1));
   feed = feedRepository(test.db);
   queue = ingestionQueue(test.db);
@@ -98,9 +125,29 @@ describe.sequential("canonical storage and upgrade", () => {
       archived: 2,
     });
     expect(
-      (await test.db.query("select extraction_result from documents")).rows[0]
-        .extraction_result,
+      (
+        await test.db.query(
+          "select extraction_result from documents where source_url=$1",
+          [record().url],
+        )
+      ).rows[0].extraction_result,
     ).toBeTruthy();
+  });
+  it("preserves newer non-security decisions when older documents retry after cutover", async () => {
+    const job = await queue.claimDocument(
+      ["github-containerd-containerd"],
+      10000,
+    );
+    expect(job!.id).toBe(legacyPending.id);
+    await finish(job!, payload("0.1.0", ["CVE-2026-99990"]));
+    expect(await feed.list({ limit: 10 })).toHaveLength(1);
+    const {
+      rows: [document],
+    } = await test.db.query(
+      "select status,extraction_result from documents where id=$1",
+      [legacyCompleted.id],
+    );
+    expect(document).toEqual({ status: "done", extraction_result: null });
   });
   it("publishes one flat item, idempotently, with one monotonic cursor", async () => {
     const [before] = await feed.list({ limit: 10 });
@@ -299,5 +346,79 @@ describe.sequential("canonical storage and upgrade", () => {
       selected: 0,
       queued: 0,
     });
+  });
+  it("loads the complete OSV peer scope after a mirror changes anchors", async () => {
+    const g1 = "GHSA-2345-cfgh-jmpq",
+      g2 = "GHSA-6789-qrvw-x234";
+    async function save(
+      id: string,
+      anchor: string,
+      packages: string[],
+      summary = "Initial claim",
+    ) {
+      const data = {
+        ...payload(),
+        kind: "advisory" as const,
+        title: id,
+        summary,
+        fixed_cves: [],
+        products: packages.map((name) => ({
+          name: fact(name),
+          affected_versions: [],
+          fixed_versions: [fact("1.2.3")],
+          prerequisites: [],
+        })),
+        structured: {
+          provider: "osv" as const,
+          id,
+          modified: at,
+          aliases: [anchor],
+          references: ["https://github.com/advisories/" + anchor],
+          provider_metadata: { github_reviewed: id === anchor },
+          affected: packages.map((name) => ({
+            package: { ecosystem: "npm", name },
+            ranges: [
+              {
+                type: "SEMVER",
+                events: [{ introduced: "0" }, { fixed: "1.2.3" }],
+              },
+            ],
+          })),
+        },
+      };
+      await test.db.query("select enqueue_document('core-osv',$1,$2,$2,null)", [
+        "https://osv.dev/vulnerability/" + id,
+        JSON.stringify(data),
+      ]);
+      const job = await queue.claimDocument(["core-osv"]);
+      await publish(job!, {
+        payload: data,
+        method: "structured",
+        model: "fixture",
+      });
+    }
+    await save(g1, g1, ["x", "y"]);
+    await save(g2, g2, ["x"]);
+    await save("MIRROR-M", g2, ["x"]);
+    await save("MIRROR-U", g2, ["x"]);
+    await save("MIRROR-U", g1, ["x"]);
+    await save("MIRROR-N", g1, ["y"]);
+    const before = await feed.list({ source: "core-osv", limit: 100 });
+    expect(before).toHaveLength(4);
+    const mirror = before.find((item) =>
+      item.records.some((r) => r.payload.structured?.id === "MIRROR-U"),
+    )!;
+    expect(mirror.records).toHaveLength(1);
+    await save("MIRROR-M", g2, ["x"], "Revised source details");
+    const after = await feed.list({ source: "core-osv", limit: 100 });
+    expect(after).toHaveLength(4);
+    expect(after.find((item) => item.id === mirror.id)?.records).toEqual(
+      mirror.records,
+    );
+    expect(
+      after.find((item) =>
+        item.records.some((r) => r.payload.structured?.id === g1),
+      )!.records,
+    ).toHaveLength(1);
   });
 });

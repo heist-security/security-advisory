@@ -92,3 +92,18 @@ test("serves current-state cursors, sitemap and validation errors", async ({
     page.getByRole("heading", { name: "API documentation" }),
   ).toBeVisible();
 });
+
+test("versioned product links keep the originating item in the filtered feed", async ({
+  page,
+}) => {
+  await page.goto("/?q=Older+advisory+24");
+  await expect(page.locator(".item-card")).toHaveCount(1);
+  await page
+    .getByRole("link", { name: "Acme Server 4.2", exact: true })
+    .click();
+  await expect(page).toHaveURL(/[?&]technology=acme-server(?:&|$)/);
+  await expect(page.locator(".item-card")).toHaveCount(1);
+  await expect(
+    page.getByRole("heading", { name: "Older advisory 24", exact: true }),
+  ).toBeVisible();
+});

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { FeedItem } from "@/domain/feed-item";
-import { technologyKey, type Filters } from "@/presentation/filters";
+import type { Filters } from "@/presentation/filters";
+import { technologyFamily } from "@/domain/technology";
 import { feedLink, feedTimestamp } from "@/presentation/feed-view";
 import { itemLink, summaryPreview } from "@/presentation/item-links";
 import { ItemBadges, ItemMetadata } from "./item-metadata";
@@ -69,7 +70,7 @@ export function ItemCard({
                       className="hover:text-primary hover:underline"
                       href={feedLink({
                         ...filters,
-                        technology: technologyKey(product),
+                        technology: technologyFamily(product),
                       })}
                     >
                       {product}

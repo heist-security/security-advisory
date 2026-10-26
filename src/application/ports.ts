@@ -67,6 +67,7 @@ export type DiscoveredEntry = {
 };
 export type Discovery = {
   entries: DiscoveredEntry[];
+  rejected_entries?: number;
   checkpoint?: unknown;
   etag?: string | null;
   last_modified?: string | null;

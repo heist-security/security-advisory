@@ -139,8 +139,10 @@ export function feedRepository(db: Database): FeedRepository {
             [job.id, job.lease_token],
           );
           if (!rows.length) throw new Error("Lease expired or replaced");
+          // Legacy non-security completions have no extraction JSON or event,
+          // but their durable done status still fences older source revisions.
           const later = await client.query(
-            "select id from documents where source_id=$1 and source_url=$2 and id>$3 and extraction_result is not null limit 1",
+            "select id from documents where source_id=$1 and source_url=$2 and id>$3 and (extraction_result is not null or status='done') limit 1",
             [job.source_id, job.source_url, job.id],
           );
           if (later.rows.length) {
@@ -162,21 +164,27 @@ export function feedRepository(db: Database): FeedRepository {
           )
             return;
         }
-        const ids = command.records.map((r) => r.id),
-          keys = unique(command.records.flatMap(identityKeys));
-        const prior = await client.query<{ identity_keys: string[] }>(
-          "select identity_keys from feed_items where active and record_ids && $1::text[]",
-          [ids],
-        );
-        const scopeKeys = unique([
-          ...keys,
-          ...prior.rows.flatMap((r) => r.identity_keys),
-        ]);
-        const scope = await client.query<{ item: StoredItem }>(
-          "select to_jsonb(f)-'search_document' item from feed_items f where identity_keys && $1::text[] or record_ids && $2::text[]",
-          [scopeKeys, ids],
-        );
-        const items = update(scope.rows.map((r) => r.item));
+        // Retained keys can connect several former groups. Reconciliation needs
+        // every reachable peer, including conflicts beyond the initial anchor.
+        const scope = new Map<string, StoredItem>(),
+          seenKeys = new Set<string>();
+        let keys = unique(command.records.flatMap(identityKeys));
+        while (keys.length) {
+          for (const key of keys) seenKeys.add(key);
+          const { rows } = await client.query<{ item: StoredItem }>(
+            "select to_jsonb(f)-'search_document' item from feed_items f where identity_keys && $1::text[] and id<>all($2::text[])",
+            [keys, [...scope.keys()]],
+          );
+          keys = [];
+          for (const { item } of rows) {
+            scope.set(item.id, item);
+            keys.push(
+              ...item.identity_keys.filter((key) => !seenKeys.has(key)),
+            );
+          }
+          keys = unique(keys);
+        }
+        const items = update([...scope.values()]);
         if (items.length)
           await client.query(
             `insert into feed_items(${columns.join(",")})
