@@ -5,6 +5,8 @@ import { feedLink, feedTimestamp } from "@/lib/feed-view";
 import { itemLink, summaryPreview } from "@/lib/item-links";
 import { EventBadges, EventMetadata } from "./event-metadata";
 import { Card, CardDescription, CardFooter, CardHeader } from "./ui/card";
+import { advisoryCvss, scoreCves } from "@/lib/advisory-scores";
+import { ScoreBadges } from "./score-badges";
 export function EventCard({
   event,
   filters = {},
@@ -29,7 +31,11 @@ export function EventCard({
     >
       <Card className="gap-3 rounded-lg py-5 shadow-none">
         <CardHeader className="gap-2 px-5">
-          <EventBadges event={event} />
+          <EventBadges event={event}>
+            {event.payload.kind !== "withdrawal" ? (
+              <ScoreBadges cvss={advisoryCvss(event)} cves={scoreCves(event)} />
+            ) : null}
+          </EventBadges>
           <h3 className="text-lg leading-snug font-medium tracking-tight">
             <Link href={href} className="hover:text-primary">
               {event.payload.title}

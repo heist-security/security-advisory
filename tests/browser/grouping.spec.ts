@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./test";
 
 test("grouped advisories retain source history, return filters and subscription links", async ({
   page,

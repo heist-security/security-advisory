@@ -18,7 +18,13 @@ const sourceNames = new Map(
   [...vendorRegistry, ...registry].map((source) => [source.id, source.name]),
 );
 
-export function EventBadges({ event }: { event: FeedEvent }) {
+export function EventBadges({
+  event,
+  children,
+}: {
+  event: FeedEvent;
+  children?: ReactNode;
+}) {
   const severity =
     event.payload.kind === "withdrawal"
       ? "unknown"
@@ -28,6 +34,7 @@ export function EventBadges({ event }: { event: FeedEvent }) {
       <Badge variant="outline" className={severityStyles[severity]}>
         {severityLabel(severity)}
       </Badge>
+      {children}
       {event.payload.kind !== "withdrawal" && event.priority?.fix_available ? (
         <Badge variant="secondary">Fix available</Badge>
       ) : null}

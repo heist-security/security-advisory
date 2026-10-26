@@ -1,4 +1,4 @@
-import { CVSS30, CVSS31, CVSS40 } from "@pandatix/js-cvss";
+import { osvCvssScore } from "../cvss";
 import type { Severity } from "../priority";
 
 // Use a validated scoring implementation; a vector is not itself a severity
@@ -8,25 +8,11 @@ export function osvSeverity(metrics: Record<string, unknown>[]) {
     | { score: number; severity: Exclude<Severity, "unknown">; index: number }
     | undefined;
   for (const [index, metric] of metrics.entries()) {
-    if (typeof metric.score !== "string") continue;
-    let score: number;
-    try {
-      if (metric.type === "CVSS_V4" && metric.score.startsWith("CVSS:4.0/"))
-        score = new CVSS40(metric.score).Score();
-      else if (
-        metric.type === "CVSS_V3" &&
-        metric.score.startsWith("CVSS:3.1/")
-      )
-        score = new CVSS31(metric.score).BaseScore();
-      else if (
-        metric.type === "CVSS_V3" &&
-        metric.score.startsWith("CVSS:3.0/")
-      )
-        score = new CVSS30(metric.score).BaseScore();
-      else continue;
-    } catch {
-      continue;
-    }
+    // Preserve the ingestion policy: only v3/v4 determine feed severity.
+    if (metric.type !== "CVSS_V3" && metric.type !== "CVSS_V4") continue;
+    const rating = osvCvssScore(metric);
+    if (!rating) continue;
+    const { score } = rating;
     // The feed has no "none" severity. Preserve zero in native metrics without
     // mislabelling it as a low-severity vulnerability.
     if (!Number.isFinite(score) || score <= 0 || score > 10) continue;
