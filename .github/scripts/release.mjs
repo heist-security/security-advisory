@@ -91,22 +91,43 @@ export async function migrate(
     writeFileSync(certificate, env.SUPABASE_DB_CA_CERT, { mode: 0o600 });
     database.searchParams.set("sslrootcert", certificate);
     // Only the database credential reaches the CLI, never GitHub/Vercel tokens.
-    const result = execute(
-      "supabase",
-      ["db", "push", "--db-url", database.toString(), "--yes"],
-      {
-        env: {
-          PATH: env.PATH,
-          HOME: env.HOME,
-          PGSSLMODE: "verify-full",
-          PGSSLROOTCERT: certificate,
+    const migrationDeadline = Date.now() + 8 * 60 * 1000;
+    let result = { error: { code: "ETIMEDOUT" } };
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const remaining = migrationDeadline - Date.now();
+      if (remaining <= 0) break;
+      result = execute(
+        "supabase",
+        ["db", "push", "--db-url", database.toString(), "--yes"],
+        {
+          env: {
+            PATH: env.PATH,
+            HOME: env.HOME,
+            PGSSLMODE: "verify-full",
+            PGSSLROOTCERT: certificate,
+          },
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          timeout: remaining,
+          maxBuffer: 2 * 1024 * 1024,
         },
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout: 8 * 60 * 1000,
-        maxBuffer: 2 * 1024 * 1024,
-      },
-    );
+      );
+      if (!result.error && result.status === 0) break;
+      // PostgreSQL rolls back the failed migration on lock timeout/deadlock.
+      // A new push rechecks migration history and skips committed files.
+      // Transport errors have ambiguous outcomes and must not be retried here.
+      const delay = Math.min(1000 * 2 ** attempt, 10000);
+      if (
+        result.error ||
+        !["database lock timeout", "database deadlock"].includes(
+          migrationFailure(result),
+        ) ||
+        attempt === 5 ||
+        Date.now() + delay >= migrationDeadline
+      )
+        break;
+      await pause(delay);
+    }
     // SQL/driver diagnostics may contain data or transformed credentials.
     if (result.error || result.status !== 0) {
       throw new ReleaseError(

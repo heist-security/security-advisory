@@ -1,5 +1,24 @@
 # Operations and launch checks
 
+## Schema migration lock retry — 26 October 2026
+
+Production run [40298637801](https://github.com/heist-security/security-advisory/actions/runs/40298637801)
+passed CI but stopped before deployment when the schema push hit a database lock
+timeout. Retrying the failed release completed migrations at 09:25 UTC and
+deployed commit `855cdaae94c69c8fca75dcdc3e5de256ab0e43ad` successfully.
+Post-release checks loaded the original critical-patches URL in 0.45–0.57
+seconds, but the broader `important=1` filter still returned unavailable
+responses. Migration recovery does not establish full feed reliability.
+
+The release runner now retries schema pushes only after PostgreSQL reports a
+lock timeout or deadlock, up to five retries with bounded backoff within the
+existing eight-minute schema deadline. Each push rechecks migration history;
+committed migrations are skipped and the failed transaction is retried.
+Connection failures, client timeouts, query cancellations, and other SQL errors
+still stop the release. Backfills and deployment start only after schema success.
+The successful production retry used the previous runner; automatic schema
+retries take effect after this follow-up is merged.
+
 ## Intermittent filtered-feed failures — 26 October 2026
 
 Read-only checks reproduced “Feed temporarily unavailable” twice for
