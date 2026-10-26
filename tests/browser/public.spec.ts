@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./test";
 import { load } from "cheerio";
 
 test("robots advertises a sitemap whose public and advisory URLs resolve", async ({

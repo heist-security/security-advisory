@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./test";
 test("structured source filters show references rather than extracted quotations", async ({
   page,
   request,
@@ -288,6 +288,8 @@ test("severity filters share RSS/JSON and keep correction delivery", async ({
   await expect(page.locator(".event-card")).toHaveCount(2);
   await expect(page.locator('#event-1 [data-slot="badge"]')).toHaveText([
     "Critical",
+    "CVSS 9.8",
+    "EPSS 12.3%",
     "Fix available",
   ]);
   await page.locator("#event-1 h3 a").click();

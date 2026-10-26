@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./test";
 
 test("identical feed requests see publications, empty cursor updates and outages", async ({
   request,

@@ -14,6 +14,8 @@ import { feedLink, groupEvents, dayLabel } from "@/lib/feed-view";
 import { FeedFilters } from "@/components/feed-filters";
 import { catalogOptions } from "@/lib/technology-catalog";
 import { EventCard } from "@/components/event-card";
+import { ScoreProvider } from "@/components/score-badges";
+import { scoreCves } from "@/lib/advisory-scores";
 import { ArrowDown, ArrowLeft, Braces, Rss } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -142,35 +144,37 @@ export default async function Feed({
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-6">
-              {groups.map((group, index) => (
-                <section
-                  className="event-day space-y-3"
-                  key={group.day + "-" + index}
-                  aria-labelledby={"day-" + index}
-                >
-                  <h2
-                    id={"day-" + index}
-                    className="day-heading border-b pb-3 font-mono text-xs font-normal text-muted-foreground"
+            <ScoreProvider cves={[...new Set(rows.flatMap(scoreCves))].sort()}>
+              <div className="space-y-6">
+                {groups.map((group, index) => (
+                  <section
+                    className="event-day space-y-3"
+                    key={group.day + "-" + index}
+                    aria-labelledby={"day-" + index}
                   >
-                    <time
-                      dateTime={group.day}
-                      title="Date added to the feed (UTC)"
+                    <h2
+                      id={"day-" + index}
+                      className="day-heading border-b pb-3 font-mono text-xs font-normal text-muted-foreground"
                     >
-                      {dayLabel(group.day)}
-                    </time>
-                  </h2>
-                  {group.events.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      filters={query}
-                      returnTo={returnTo}
-                    />
-                  ))}
-                </section>
-              ))}
-            </div>
+                      <time
+                        dateTime={group.day}
+                        title="Date added to the feed (UTC)"
+                      >
+                        {dayLabel(group.day)}
+                      </time>
+                    </h2>
+                    {group.events.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        filters={query}
+                        returnTo={returnTo}
+                      />
+                    ))}
+                  </section>
+                ))}
+              </div>
+            </ScoreProvider>
           )}
           {hasMore && rows.length ? (
             <div className="pt-6">
