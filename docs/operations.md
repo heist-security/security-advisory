@@ -1,5 +1,26 @@
 # Operations and launch checks
 
+## Release lock contention — 26 October 2026
+
+Production run [40275054364](https://github.com/heist-security/security-advisory/actions/runs/40275054364)
+failed during the technology backfill with a database lock timeout, before
+creating a Vercel deployment. Retrying the failed job completed migrations and
+confirmed commit `b54ecf2bad349594f0cd320903236c837dfba8d1` ready at 05:57 UTC.
+The homepage, source catalog, JSON feeds (ordinary and grouped), technology
+endpoint and RSS subsequently returned HTTP 200; RSS contained 100 items.
+
+The follow-up migration `202610260016_completed_backfills.sql` makes completed
+priority, technology and grouping backfills return their recorded checkpoint
+without acquiring the publication lock. Incomplete backfills retain the existing
+lock order and recheck completion under lock. It does not reset checkpoints or
+replay historical events. The release runner retries only database lock timeouts
+and deadlocks, at most five consecutive retries with bounded backoff, retaining
+the five-second lock timeout, 30-second statement timeout and overall deadline.
+Other failures still stop deployment. Migration CI holds the publication lock in
+a separate PostgreSQL session to verify both the completed fast path and recovery
+of unfinished work. This prevention change takes effect after its PR is merged;
+the successful production retry above used the previous release runner.
+
 ## Feed freshness follow-up — 25 October 2026
 
 Monitoring confirmed publisher publications, including the Ruby/GitLab regexp

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { migrate } from "../.github/scripts/release.mjs";
 
@@ -66,6 +66,93 @@ test(
     await migrate(new URL(database), env, execute, async () => {});
     assert.equal(batches, 66);
     assert.equal(lastProgress, "2000|0|t");
+
+    // Hold the real publication lock in another database session. Completed
+    // backfills must return without waiting for it; unfinished work must retry.
+    const holder = spawn(
+      "psql",
+      ["-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1"],
+      {
+        env: { ...process.env, PGSSLMODE: "disable" },
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    const closed = new Promise((resolve) => holder.once("close", resolve));
+    try {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error("lock holder did not become ready")),
+          5000,
+        );
+        let output = "";
+        holder.once("error", (error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+        holder.stdout.on("data", (chunk) => {
+          output += chunk;
+          if (output.includes("LOCK_HELD")) {
+            clearTimeout(timer);
+            resolve();
+          }
+        });
+        holder.stdin.write(
+          "select pg_advisory_lock(719432001);\n\\echo LOCK_HELD\n",
+        );
+      });
+      await migrate(new URL(database), env, execute, async () => {
+        assert.fail("completed backfills must not wait for publication");
+      });
+      assert.equal(batches, 69);
+      const reset = spawnSync(
+        "psql",
+        [
+          "-X",
+          "-v",
+          "ON_ERROR_STOP=1",
+          "-c",
+          "update technology_backfill set completed_at=null where singleton",
+        ],
+        { encoding: "utf8" },
+      );
+      assert.equal(reset.status, 0);
+      let retries = 0;
+      await migrate(
+        new URL(database),
+        env,
+        (command, args, options) => {
+          if (command === "supabase") return { status: 0 };
+          const result = spawnSync(command, args, {
+            ...options,
+            env: { ...options.env, PGSSLMODE: "disable" },
+          });
+          if (result.status !== 0) assert.match(result.stderr, /55P03/);
+          return result;
+        },
+        async () => {
+          retries++;
+          holder.stdin.end("\\q\n");
+          await closed;
+        },
+      );
+      assert.equal(retries, 1);
+      const counts = spawnSync(
+        "psql",
+        [
+          "-X",
+          "-t",
+          "-A",
+          "-c",
+          "select (select count(*) from events),last_id,completed_at is not null from technology_backfill",
+        ],
+        { encoding: "utf8" },
+      );
+      assert.equal(counts.status, 0);
+      assert.equal(counts.stdout.trim(), "2000|2000|t");
+    } finally {
+      holder.kill();
+      await closed;
+    }
     for (const path of files) assert.equal(existsSync(path), false);
   },
 );
