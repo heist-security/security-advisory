@@ -275,7 +275,10 @@ test("severity filters share RSS/JSON and keep correction delivery", async ({
   await page.getByRole("checkbox", { name: "High", exact: true }).check();
   await page.getByRole("button", { name: /^Severity/ }).click();
   await expect(page.locator(".event-card")).toHaveCount(2);
-  await expect(page.locator("#event-1")).toContainText("Linked Critical CVE");
+  await expect(page.locator('#event-1 [data-slot="badge"]')).toHaveText([
+    "Critical",
+    "Fix available",
+  ]);
   await page.locator("#event-1 h3 a").click();
   await expect(page.locator(".linked-ratings")).toContainText("GitLab");
   await page.getByRole("link", { name: "Back to feed", exact: false }).click();
