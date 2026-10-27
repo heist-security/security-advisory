@@ -1,4 +1,6 @@
 -- A small searchable dictionary; feed reads still use the canonical item table.
+-- Supabase CLI does not supply a transaction for the lock, backfill and triggers.
+begin;
 set local lock_timeout='5s';
 set local statement_timeout='2min';
 set local search_path=public,extensions;
@@ -50,3 +52,4 @@ revoke all on public.feed_technologies from public,anon,authenticated;
 grant all on public.feed_technologies to service_role;
 revoke all on function public.sync_feed_technologies() from public,anon,authenticated;
 grant execute on function public.sync_feed_technologies() to service_role;
+commit;
