@@ -5,6 +5,7 @@ import type { FeedItem, Severity } from "@/domain/feed-item";
 import { severityLabel } from "@/domain/feed-item";
 import type { Filters } from "@/presentation/filters";
 import { feedLink } from "@/presentation/feed-view";
+import { itemDescription } from "@/presentation/item-description";
 import { Badge } from "./ui/badge";
 const styles: Record<Severity, string> = {
   critical: "border-red-200 bg-red-50 text-red-800",
@@ -66,6 +67,11 @@ export function ItemMetadata({
       {item.records.length > 1 ? (
         <span>{item.records.length} source records</span>
       ) : null}
+      {itemDescription(item).identifiers.map(({ id, label }) => (
+        <span key={id}>
+          {label}: <span className="font-mono">{id}</span>
+        </span>
+      ))}
       {children}
     </div>
   );

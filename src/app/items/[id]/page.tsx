@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { services } from "@/server/services";
 import { validItemId, returnToFeed, itemPath } from "@/presentation/item-links";
 import { feedTimestamp } from "@/presentation/feed-view";
+import { itemDescription } from "@/presentation/item-description";
 import { ItemBadges, ItemMetadata } from "@/components/item-metadata";
 import { ScoreBadges, ScoreProvider } from "@/components/score-badges";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -30,6 +31,7 @@ export default async function Item({
     );
   }
   if (!item) notFound();
+  const description = itemDescription(item);
   return (
     <main
       id="main"
@@ -44,11 +46,15 @@ export default async function Item({
             <ScoreBadges cvss={item.cvss} cves={item.cve_ids} />
           ) : null}
         </ItemBadges>
-        <h1 className="text-3xl font-semibold tracking-tight">{item.title}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          {description.title}
+        </h1>
         <ItemMetadata item={item} />
-        <p className="whitespace-pre-wrap text-muted-foreground">
-          {item.summary}
-        </p>
+        {description.summary ? (
+          <p className="whitespace-pre-wrap text-muted-foreground">
+            {description.summary}
+          </p>
+        ) : null}
       </ScoreProvider>
       {!item.active ? (
         <Card>
