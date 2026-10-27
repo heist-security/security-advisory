@@ -4,6 +4,7 @@ import type { Filters } from "@/presentation/filters";
 import { technologyFamily } from "@/domain/technology";
 import { feedLink, feedTimestamp } from "@/presentation/feed-view";
 import { itemLink, summaryPreview } from "@/presentation/item-links";
+import { itemDescription } from "@/presentation/item-description";
 import { ItemBadges, ItemMetadata } from "./item-metadata";
 import { Card, CardDescription, CardFooter, CardHeader } from "./ui/card";
 
@@ -18,6 +19,7 @@ export function ItemCard({
   returnTo?: string;
 }) {
   const href = itemLink(item, returnTo);
+  const description = itemDescription(item);
   const products = item.product_names.slice(0, 3);
   const cves = item.cve_ids.slice(0, 2);
   const versions = item.fixed_versions;
@@ -40,7 +42,7 @@ export function ItemCard({
           </ItemBadges>
           <h3 className="text-lg leading-snug font-medium tracking-tight">
             <Link href={href} className="hover:text-primary">
-              {item.title}
+              {description.title}
             </Link>
           </h3>
           <ItemMetadata item={item} filters={filters}>
@@ -52,11 +54,13 @@ export function ItemCard({
               {feedTimestamp(item.updated_at)}
             </time>
           </ItemMetadata>
-          <CardDescription className="text-sm leading-relaxed">
-            <p className="item-summary line-clamp-2">
-              {summaryPreview(item.summary)}
-            </p>
-          </CardDescription>
+          {description.summary ? (
+            <CardDescription className="text-sm leading-relaxed">
+              <p className="item-summary line-clamp-2">
+                {summaryPreview(description.summary)}
+              </p>
+            </CardDescription>
+          ) : null}
         </CardHeader>
         {products.length || cves.length || versions.length || remaining > 0 ? (
           <CardFooter className="flex-wrap gap-x-4 gap-y-1 px-5 text-xs text-muted-foreground">

@@ -1,5 +1,6 @@
 import type { FeedItem } from "../domain/feed-item";
 import { itemPath } from "./item-links";
+import { itemDescription } from "./item-description";
 const xml = (value: string) =>
   value
     .replace(
@@ -28,11 +29,18 @@ export function rss(
     '" rel="self" type="application/rss+xml"/>' +
     items
       .map((item) => {
+        const display = itemDescription(item);
         const description =
           "Revision " +
           item.revision +
           "\n\n" +
-          item.summary +
+          display.summary +
+          (display.identifiers.length
+            ? "\n\n" +
+              display.identifiers
+                .map(({ id, label }) => `${label}: ${id}`)
+                .join("\n")
+            : "") +
           "\n\nFixed versions: " +
           item.fixed_versions.join(", ") +
           "\n\nSources:\n" +
@@ -45,7 +53,7 @@ export function rss(
               item.replaced_by.map((id) => base + itemPath({ id })).join(", "));
         return (
           "<item><title>" +
-          xml((item.active ? "" : "Grouping updated: ") + item.title) +
+          xml((item.active ? "" : "Grouping updated: ") + display.title) +
           "</title><link>" +
           xml(base + itemPath(item)) +
           '</link><guid isPermaLink="false">heist-item:' +
