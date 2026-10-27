@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Route } from "@playwright/test";
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/v1/risk?**", (route) =>
     route.fulfill({
@@ -106,4 +106,34 @@ test("versioned product links keep the originating item in the filtered feed", a
   await expect(
     page.getByRole("heading", { name: "Older advisory 24", exact: true }),
   ).toBeVisible();
+});
+
+test("keeps the feed usable while technology suggestions are loading", async ({
+  page,
+}) => {
+  let requests = 0;
+  let resolveRequest!: (route: Route) => void;
+  const lookup = new Promise<Route>((resolve) => {
+    resolveRequest = resolve;
+  });
+  await page.route("**/api/v1/technologies?**", (route) => {
+    requests++;
+    resolveRequest(route);
+  });
+  await page.goto("/?technology=containerd");
+  await expect(page.locator(".item-card")).toHaveCount(20);
+  expect(requests).toBe(0);
+  await page.getByRole("button", { name: "Technology (1)" }).click();
+  const route = await lookup;
+  await expect(page.getByText("Searching…", { exact: true })).toBeVisible();
+  await expect(page.locator(".item-card")).toHaveCount(20);
+  await expect(
+    page.getByRole("button", { name: "Remove containerd", exact: true }),
+  ).toBeVisible();
+  await route.fulfill({
+    json: { data: [{ value: "containerd", label: "containerd" }] },
+  });
+  await expect(
+    page.getByRole("checkbox", { name: "containerd", exact: true }),
+  ).toBeChecked();
 });

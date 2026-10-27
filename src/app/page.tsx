@@ -56,12 +56,6 @@ export default async function Feed({
       unavailable = true;
     }
   }
-  const technologies =
-    !unavailable && !error
-      ? await services()
-          .feed.technologies("", query.technology?.split(","))
-          .catch(() => [])
-      : [];
   const filters = filterQuery(query),
     suffix = filters.size ? "?" + filters : "";
   const hasFilters = filters.size > 0;
@@ -90,10 +84,7 @@ export default async function Feed({
           </Button>
         </nav>
       </section>
-      <FeedFilters
-        initialFilters={{ ...query, q: params.get("q") ?? "" }}
-        technologies={technologies}
-      >
+      <FeedFilters initialFilters={{ ...query, q: params.get("q") ?? "" }}>
         <section className="mb-8 min-w-0" aria-label="Security announcements">
           {query.before !== undefined && rows.length > 0 ? (
             <Button asChild variant="ghost" size="sm" className="mb-4">
