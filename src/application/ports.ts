@@ -6,6 +6,11 @@ import type {
   StoredItem,
 } from "../domain/feed-item";
 import type { TechnologyOption } from "../domain/technology";
+export type TechnologyQuery = { q: string; after?: string; limit: number };
+export type TechnologyPage = {
+  data: TechnologyOption[];
+  next_after: string | null;
+};
 export type DocumentJob = {
   id: number;
   source_id: string;
@@ -32,10 +37,7 @@ export interface FeedRepository {
     command: Publication,
     update: (scope: StoredItem[]) => StoredItem[],
   ): Promise<void>;
-  technologies(
-    search: string,
-    selected?: string[],
-  ): Promise<TechnologyOption[]>;
+  technologies(query: TechnologyQuery): Promise<TechnologyPage>;
   sitemapParts(): Promise<number[]>;
   sitemapItems(
     after: number,

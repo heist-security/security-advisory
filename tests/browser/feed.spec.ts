@@ -1,4 +1,5 @@
 import { test, expect, type Route } from "@playwright/test";
+import type { TechnologyPage } from "../../src/application/ports";
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/v1/risk?**", (route) =>
     route.fulfill({
@@ -131,9 +132,164 @@ test("keeps the feed usable while technology suggestions are loading", async ({
     page.getByRole("button", { name: "Remove containerd", exact: true }),
   ).toBeVisible();
   await route.fulfill({
-    json: { data: [{ value: "containerd", label: "containerd" }] },
+    json: {
+      data: [{ value: "containerd", label: "containerd" }],
+      next_after: null,
+    },
   });
   await expect(
     page.getByRole("checkbox", { name: "containerd", exact: true }),
   ).toBeChecked();
+});
+
+test("paginates technology suggestions, retries a page and starts each search at the beginning", async ({
+  page,
+}) => {
+  let moreAttempts = 0;
+  const searches: { q: string; after: string | null }[] = [];
+  await page.route("**/api/v1/technologies?**", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    const q = params.get("q") ?? "",
+      after = params.get("after");
+    searches.push({ q, after });
+    if (q === "nodejs")
+      return route.fulfill({
+        json: {
+          data: [{ value: "node-js", label: "Node.js" }],
+          next_after: null,
+        },
+      });
+    if (after) {
+      if (++moreAttempts === 1)
+        return route.fulfill({ status: 503, json: { error: "unavailable" } });
+      return route.fulfill({
+        json: {
+          data: [{ value: "containerd", label: "containerd" }],
+          next_after: null,
+        },
+      });
+    }
+    await route.fulfill({
+      json: {
+        data: [{ value: "acme-server", label: "Acme Server" }],
+        next_after: "acme-server",
+      },
+    });
+  });
+  await page.goto("/?technology=containerd");
+  await page.getByRole("button", { name: "Technology (1)" }).click();
+  await page.getByRole("button", { name: "Load more", exact: true }).click();
+  await expect(
+    page.getByRole("checkbox", { name: "Acme Server", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Retry suggestions", exact: true })
+    .click();
+  await expect(
+    page.getByRole("checkbox", { name: "containerd", exact: true }),
+  ).toBeChecked();
+  await expect(
+    page
+      .getByRole("group", { name: "Technologies", exact: true })
+      .getByRole("checkbox"),
+  ).toHaveCount(2);
+  await expect(
+    page.getByRole("button", { name: "Load more", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("searchbox", { name: "Search technologies" })
+    .fill("nodejs");
+  await expect(
+    page.getByRole("checkbox", { name: "Node.js", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: "Acme Server", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Remove containerd", exact: true }),
+  ).toBeVisible();
+  expect(searches).toEqual([
+    { q: "", after: null },
+    { q: "", after: "acme-server" },
+    { q: "", after: "acme-server" },
+    { q: "nodejs", after: null },
+  ]);
+});
+
+test("ignores an old technology page after the search changes", async ({
+  page,
+}) => {
+  let resolvePage!: (route: Route) => void;
+  const delayed = new Promise<Route>((resolve) => {
+    resolvePage = resolve;
+  });
+  await page.route("**/api/v1/technologies?**", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get("q") === "nodejs")
+      return route.fulfill({
+        json: {
+          data: [{ value: "node-js", label: "Node.js" }],
+          next_after: null,
+        },
+      });
+    if (params.has("after")) {
+      resolvePage(route);
+      return;
+    }
+    await route.fulfill({
+      json: {
+        data: [{ value: "acme-server", label: "Acme Server" }],
+        next_after: "acme-server",
+      },
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Technology", exact: true }).click();
+  await page.getByRole("button", { name: "Load more", exact: true }).click();
+  const oldPage = await delayed;
+  await page
+    .getByRole("searchbox", { name: "Search technologies" })
+    .fill("nodejs");
+  await expect(
+    page.getByRole("checkbox", { name: "Node.js", exact: true }),
+  ).toBeVisible();
+  await oldPage
+    .fulfill({
+      json: {
+        data: [{ value: "obsolete-result", label: "Obsolete result" }],
+        next_after: "obsolete-result",
+      },
+    })
+    .catch(() => {});
+  await expect(
+    page.getByRole("checkbox", { name: "Obsolete result", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Load more", exact: true }),
+  ).toHaveCount(0);
+});
+
+test("serves distinct database technology pages and searches identifiers", async ({
+  request,
+}) => {
+  const values: string[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < 3; page++) {
+    const result = await request.get(
+      "/api/v1/technologies?limit=1" + (after ? "&after=" + after : ""),
+    );
+    expect(result.status()).toBe(200);
+    const body: TechnologyPage = await result.json();
+    expect(body.data).toHaveLength(1);
+    values.push(body.data[0].value);
+    after = body.next_after;
+  }
+  expect(values).toEqual([
+    "acme-server",
+    "containerd",
+    "github-containerd-containerd",
+  ]);
+  expect(after).toBeNull();
+  const result = await request.get("/api/v1/technologies?q=ontainerd&limit=1");
+  expect((await result.json()).data[0].value).toBe("containerd");
 });

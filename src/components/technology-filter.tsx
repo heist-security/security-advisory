@@ -1,12 +1,9 @@
 "use client";
 import { useEffect, useId, useState } from "react";
 import { ChevronDown, Plus, X } from "lucide-react";
-import {
-  technologyFamily,
-  technologyLabel,
-  technologyMatches,
-} from "@/domain/technology";
+import { technologyFamily, technologyLabel } from "@/domain/technology";
 import type { TechnologyOption } from "@/domain/technology";
+import type { TechnologyPage } from "@/application/ports";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
@@ -20,56 +17,77 @@ export function TechnologyFilter({
   onChange: (values: string[]) => void;
 }) {
   const id = useId();
-  const [search, setSearch] = useState("");
+  const [request, setRequest] = useState<{ q: string; after?: string }>({
+    q: "",
+  });
+  const search = request.q;
   const [options, setOptions] = useState<TechnologyOption[]>([]);
   const [optionsSearch, setOptionsSearch] = useState("");
+  const [nextAfter, setNextAfter] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [status, setStatus] = useState("");
   const [open, setOpen] = useState(false);
   const [labels, setLabels] = useState(() => new Map<string, string>());
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setStatus("Searching…");
-      try {
-        const response = await fetch(
-          "/api/v1/technologies?q=" + encodeURIComponent(search),
-          { signal: controller.signal },
-        );
-        if (!response.ok) throw new Error();
-        const result: { data: TechnologyOption[] } = await response.json();
-        if (controller.signal.aborted) return;
-        setLabels(
-          (previous) =>
-            new Map([
-              ...previous,
-              ...result.data.map((o) => [o.value, o.label] as const),
-            ]),
-        );
-        setOptions(result.data);
-        setOptionsSearch(search);
-        setStatus(
-          result.data.length
-            ? ""
-            : "No suggestions. Enter a product name to add it.",
-        );
-      } catch {
-        if (!controller.signal.aborted)
-          setStatus(
-            "Suggestions unavailable. You can still enter a product name.",
+    const timer = setTimeout(
+      async () => {
+        setStatus(request.after ? "Loading more…" : "Searching…");
+        const params = new URLSearchParams({ q: request.q, limit: "20" });
+        if (request.after) params.set("after", request.after);
+        try {
+          const response = await fetch("/api/v1/technologies?" + params, {
+            signal: controller.signal,
+          });
+          if (!response.ok) throw new Error();
+          const result: TechnologyPage = await response.json();
+          if (controller.signal.aborted) return;
+          setLabels(
+            (previous) =>
+              new Map([
+                ...previous,
+                ...result.data.map((o) => [o.value, o.label] as const),
+              ]),
           );
-      }
-    }, 200);
+          setOptions((previous) =>
+            request.after ? [...previous, ...result.data] : result.data,
+          );
+          setOptionsSearch(request.q);
+          setNextAfter(result.next_after ?? null);
+          setStatus(
+            result.data.length || request.after
+              ? ""
+              : "No suggestions. Enter a product name to add it.",
+          );
+        } catch {
+          if (!controller.signal.aborted) {
+            setFailed(true);
+            setStatus(
+              "Suggestions unavailable. You can still enter a product name.",
+            );
+          }
+        } finally {
+          if (!controller.signal.aborted) setLoading(false);
+        }
+      },
+      request.after ? 0 : 200,
+    );
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [search, open]);
+  }, [request, open]);
+  const load = (q: string, after?: string) => {
+    setRequest({ q, after });
+    setLoading(true);
+    setFailed(false);
+    setStatus("");
+    if (!after) setNextAfter(null);
+  };
   const key = technologyFamily(search);
-  const matches =
-    optionsSearch === search
-      ? options
-      : options.filter((o) => technologyMatches(o.value, search));
+  const matches = optionsSearch === search ? options : [];
   const custom =
     key &&
     key.length <= 100 &&
@@ -81,11 +99,17 @@ export function TechnologyFilter({
         new Map(previous).set(key, technologyLabel(key) ?? search.trim()),
       );
       onChange([...values, key]);
-      setSearch("");
+      load("");
     }
   };
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) load(search);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" className="technology-filter">
           Technology{values.length ? ` (${values.length})` : ""}
@@ -110,7 +134,7 @@ export function TechnologyFilter({
           placeholder="Search technologies…"
           maxLength={100}
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => load(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
@@ -154,6 +178,7 @@ export function TechnologyFilter({
           className="mt-2 max-h-56 overflow-y-auto"
           role="group"
           aria-label="Technologies"
+          aria-busy={loading}
         >
           {matches.map((o) => (
             <label
@@ -179,6 +204,20 @@ export function TechnologyFilter({
             </label>
           ))}
         </div>
+        {(optionsSearch === search && nextAfter) || failed ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2 w-full"
+            disabled={loading}
+            onClick={() =>
+              load(search, failed ? request.after : (nextAfter ?? undefined))
+            }
+          >
+            {loading ? "Loading…" : failed ? "Retry suggestions" : "Load more"}
+          </Button>
+        ) : null}
         {custom ? (
           <Button
             variant="secondary"

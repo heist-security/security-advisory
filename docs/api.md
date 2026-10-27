@@ -39,7 +39,15 @@ Open `/items/{id}` to inspect all source claims. Native range semantics remain i
 | `limit`                | 1–100; default 30 JSON, 100 RSS                                                          |
 | `before`, `after`      | Nonnegative safe-integer change cursors; mutually exclusive; JSON only                   |
 
-Filters combine with AND; choices within type, severity and technology combine with OR. Repeated filter parameters and invalid values return 400. `view` and `group` are rejected: there is only one item model. `/api/v1/technologies?q=...` suggests observed technology families. The source catalog is configuration, not live source health.
+Filters combine with AND; choices within type, severity and technology combine with OR. Repeated filter parameters and invalid values return 400. `view` and `group` are rejected: there is only one item model. The source catalog is configuration, not live source health.
+
+## Technology suggestions
+
+`GET /api/v1/technologies?q=nodejs&limit=20` searches technology identifiers used by current items, including known family aliases such as `nodejs` → `node-js`. Search is case-insensitive and matches substrings after identifier normalization. Selected values remain in the dropdown independently of the current suggestions.
+
+Responses contain `data: [{ value, label }]` and `next_after`, an exclusive alphabetical cursor. Send that cursor as `after` with the same `q` to fetch the next page; `next_after: null` means there are no more results. Changing the search requires a fresh cursor. `limit` defaults to 20 and accepts 1–100; `q` accepts up to 100 characters. Invalid, repeated and unknown parameters return 400.
+
+Suggestions contain selectable identifiers of up to 100 characters and use a small indexed database lookup maintained with item changes. Pagination reads current values, so values inserted before an existing cursor appear on a fresh search. No total count or feed-item scan is needed for each page.
 
 ## Pagination and corrections
 

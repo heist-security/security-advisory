@@ -39,6 +39,15 @@ export default function Docs() {
           important=1 selects high/critical ratings, known exploitation or
           unrated fixes. Filters combine with AND.
         </p>
+        <h2>Technology suggestions</h2>
+        <p>
+          Use /api/v1/technologies?q=nodejs&amp;limit=20 to search observed
+          technology identifiers and known aliases. Results contain data with
+          value and label fields, plus next_after. Pass next_after as after with
+          the same search to load the next alphabetical page; null means there
+          are no more results. Start a new cursor when changing q. Limits are
+          1–100, with 20 results by default.
+        </p>
         <h2>JSON and cursors</h2>
         <Card>
           <CardContent>
