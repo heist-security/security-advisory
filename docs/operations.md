@@ -27,6 +27,8 @@ The importer reuses existing normalized evidence and makes no paid extraction ca
 
 ## Release workflow
 
+Migration `202610270022_technology_search.sql` builds the indexed technology dictionary from current items once and installs transactional maintenance triggers. It briefly blocks item writes during installation; normal feed reads continue. Apply it before the paginated suggestion endpoint is deployed. It does not rerun the canonical feed import.
+
 GitHub Actions checks formatting, types, tests, build and secrets. It validates a populated migration upgrade and a second no-op schema push against disposable PostgreSQL 17. Browser checks use the real PostgreSQL adapter. Production runs are serialized through migration and deployment readiness.
 
 The release job requires GitHub environment secrets `SUPABASE_DB_URL` (with `sslmode=verify-full`), `SUPABASE_DB_CA_CERT`, and `VERCEL_TOKEN`; `VERCEL_PROJECT_ID` and `VERCEL_TEAM_ID` are environment variables. It verifies the repository, main commit and Vercel link, applies migrations, imports items, and requests an exact-commit deployment. Runtime database settings must also be configured on Vercel. The workflow installs project dependencies before running the TypeScript importer.

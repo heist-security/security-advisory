@@ -48,7 +48,7 @@ Repeat collection and processing while work remains. `/api/cron/health` reports 
 | `/feed.xml`                       | Recent item revisions                      |
 | `/api/v1/items`                   | Current items, newest first                |
 | `/api/v1/items?after=0&limit=100` | Current item states in change-cursor order |
-| `/api/v1/technologies`            | Observed technology suggestions            |
+| `/api/v1/technologies`            | Technology search and pagination           |
 | `/sources`, `/api/v1/sources`     | Configured source catalog                  |
 | `/docs`                           | Public API guide                           |
 | `/api/v1/risk?cve=CVE-2021-44228` | Optional dated risk enrichment             |

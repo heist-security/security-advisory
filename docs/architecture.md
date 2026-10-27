@@ -27,7 +27,9 @@ Severity and CVSS use only the item's current source records. KEV status comes f
 
 ## Storage and consistency
 
-`feed_items` is the only public read model. Browsing, filtering, full-text search, details and change polling query it directly. Technology suggestions enumerate its arrays; they are not a separately maintained catalog. Indexes cover cursors, common filters, source identities and full-text search.
+`feed_items` is the canonical feed read model. Browsing, filtering, full-text search, details and change polling query it directly. Indexes cover cursors, common filters, source identities and full-text search.
+
+Technology suggestions use `feed_technologies`, a compact dictionary of selectable identifiers and active-item reference counts. A database trigger updates those counts in the same transaction as item inserts, corrections, retirements and deletions. A B-tree supports alphabetical cursor pagination; a trigram index supports substring search. Suggestions load when the dropdown opens, independently of feed rendering, and never need to enumerate all item arrays per request.
 
 For example, querying publisher patches needs no joins:
 
@@ -49,4 +51,4 @@ The importer uses the live reconciliation rules. It imports the latest source re
 
 ## Tradeoffs
 
-This favors a small current-state service over an event warehouse. Clients cannot replay every intermediate historical revision. A single publication lock bounds throughput; load-test before increasing ingestion concurrency substantially. Technology discovery scans active item arrays. Native affected-package matching belongs with consumers; display arrays are not an asset exposure engine. See [API semantics](api.md) and [cutover operations](operations.md).
+This favors a small current-state service over an event warehouse. Clients cannot replay every intermediate historical revision. A single publication lock bounds throughput; load-test before increasing ingestion concurrency substantially. Technology reference counts add a small write cost in exchange for indexed suggestion queries. Native affected-package matching belongs with consumers; display arrays are not an asset exposure engine. See [API semantics](api.md) and [cutover operations](operations.md).

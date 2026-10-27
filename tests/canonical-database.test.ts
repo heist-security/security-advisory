@@ -9,13 +9,14 @@ import { publisher } from "../src/application/publish";
 import { record, payload, at, fact } from "./support/fixtures";
 import type { DocumentJob } from "../src/application/ports";
 let test: Awaited<ReturnType<typeof testDatabase>>;
+const cutover = migrations.indexOf("202610260021_canonical_feed.sql");
 let legacyPending: DocumentJob, legacyCompleted: DocumentJob;
 let feed: ReturnType<typeof feedRepository>,
   queue: ReturnType<typeof ingestionQueue>,
   publish: ReturnType<typeof publisher>;
 beforeAll(async () => {
   test = await testDatabase();
-  await applyMigrations(test.db, migrations.slice(0, -1));
+  await applyMigrations(test.db, migrations.slice(0, cutover));
   await configureSources(test.db, ["github-containerd-containerd"], at);
   // Reproduce a populated upgrade using the prior writer, then fence it.
   for (const url of [record().url, record().url + "?notice=2"]) {
@@ -60,7 +61,7 @@ beforeAll(async () => {
   await test.db.query("update documents set available_at=now() where id=$1", [
     legacyPending.id,
   ]);
-  await applyMigrations(test.db, migrations.slice(-1));
+  await applyMigrations(test.db, migrations.slice(cutover, cutover + 1));
   feed = feedRepository(test.db);
   queue = ingestionQueue(test.db);
   publish = publisher(feed, () => new Date(at));
@@ -112,6 +113,17 @@ describe.sequential("canonical storage and upgrade", () => {
     await expect(feed.list({ limit: 10 })).rejects.toThrow("migration");
     await migrateFeed(test.db, () => {}, 1);
     await migrateFeed(test.db);
+    await applyMigrations(test.db, migrations.slice(cutover + 1));
+    expect(
+      (
+        await test.db.query(
+          "select value,item_count::int item_count from feed_technologies order by value",
+        )
+      ).rows,
+    ).toEqual([
+      { value: "containerd", item_count: 1 },
+      { value: "github-containerd-containerd", item_count: 1 },
+    ]);
     const items = await feed.list({ limit: 10 });
     expect(items).toHaveLength(1);
     expect(items[0].fixed_versions).toEqual(["2.4.1"]);
@@ -188,7 +200,9 @@ describe.sequential("canonical storage and upgrade", () => {
       ).toHaveLength(1);
     }
     expect(await feed.list({ q: "' OR true --", limit: 10 })).toEqual([]);
-    expect(await feed.technologies("container")).toContainEqual({
+    expect(
+      (await feed.technologies({ q: "container", limit: 20 })).data,
+    ).toContainEqual({
       value: "containerd",
       label: "containerd",
     });
@@ -420,5 +434,83 @@ describe.sequential("canonical storage and upgrade", () => {
         item.records.some((r) => r.payload.structured?.id === g1),
       )!.records,
     ).toHaveLength(1);
+  });
+  it("pages and searches active technologies, keeping shared terms until their last item disappears", async () => {
+    await configureSources(test.db, ["github-containerd-containerd"], at);
+    const products = [
+      ...Array.from(
+        { length: 25 },
+        (_, i) => "Widget-" + String(i).padStart(2, "0"),
+      ),
+      "Node.js",
+    ];
+    const data = {
+      ...payload(),
+      kind: "advisory" as const,
+      fixed_cves: [],
+      products: products.map((name) => ({
+        name: fact(name),
+        affected_versions: [],
+        fixed_versions: [],
+        prerequisites: [],
+      })),
+    };
+    await finish(await enqueue("technology-search"), data);
+    const seen: string[] = [];
+    let after: string | undefined;
+    for (let page = 0; page < 3; page++) {
+      const result = await feed.technologies({ q: "WIDGET", after, limit: 10 });
+      seen.push(...result.data.map((item) => item.value));
+      expect(result.data).toHaveLength(page < 2 ? 10 : 5);
+      expect(result.next_after).toBe(
+        page < 2 ? result.data.at(-1)!.value : null,
+      );
+      after = result.next_after ?? undefined;
+    }
+    expect(seen).toEqual(
+      products.slice(0, -1).map((value) => value.toLowerCase()),
+    );
+    expect(
+      (await feed.technologies({ q: "dget-1", limit: 20 })).data.map(
+        (item) => item.value,
+      ),
+    ).toEqual(seen.slice(10, 20));
+    expect(await feed.technologies({ q: "nodejs", limit: 1 })).toEqual({
+      data: [{ value: "node-js", label: "Node.js" }],
+      next_after: null,
+    });
+    expect(
+      await feed.technologies({ q: "widget", after: "zzzz", limit: 20 }),
+    ).toEqual({ data: [], next_after: null });
+    await finish(await enqueue("technology-shared"), {
+      ...data,
+      products: data.products.slice(-1),
+    });
+    await finish(await enqueue("technology-search", "withdrawn"), {
+      ...data,
+      security_relevant: false,
+    });
+    expect((await feed.technologies({ q: "widget", limit: 20 })).data).toEqual(
+      [],
+    );
+    expect(
+      (await feed.technologies({ q: "nodejs", limit: 20 })).data,
+    ).toHaveLength(1);
+    await test.db.query(
+      "delete from feed_items where record_ids @> $1::text[]",
+      [[record("technology-shared").id]],
+    );
+    expect((await feed.technologies({ q: "nodejs", limit: 20 })).data).toEqual(
+      [],
+    );
+  });
+  it("keeps technology reference counts consistent through imports, regrouping and corrections", async () => {
+    const actual = await test.db.query(
+      "select value,item_count::int item_count from feed_technologies order by value",
+    );
+    const expected = await test.db.query(
+      'select key value,count(*)::int item_count from feed_items f cross join lateral (select distinct unnest(f.technology_ids) key) t where active and length(key) between 1 and 100 group by key order by key collate "C"',
+    );
+    expect(actual.rows).toEqual(expected.rows);
   });
 });

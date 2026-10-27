@@ -208,25 +208,33 @@ export function feedRepository(db: Database): FeedRepository {
         }
       });
     },
-    async technologies(search, selected = []) {
+    async technologies({ q, after, limit }) {
       await ready(db);
-      // Catalog values come from the canonical table, not another maintained projection.
-      const { rows } = await db.query<{ value: string; label: string }>(
-        `select distinct key value,key label from feed_items f cross join lateral unnest(technology_ids) key
-        where active and ($1='' or key ilike '%'||$1||'%' or key=any($2::text[])) order by key limit 60`,
-        [
-          technologyKey(search),
-          [...selected, ...matchingTechnologyFamilies(search)],
-        ],
+      const values: unknown[] = [],
+        where: string[] = [];
+      const bind = (value: unknown) => {
+        values.push(value);
+        return "$" + values.length;
+      };
+      if (q)
+        where.push(
+          `(value like ${bind("%" + technologyKey(q) + "%")} or value=any(${bind(matchingTechnologyFamilies(q))}::text[]))`,
+        );
+      if (after) where.push(`value>${bind(after)}`);
+      const { rows } = await db.query<{ value: string }>(
+        `select value from feed_technologies ${where.length ? "where " + where.join(" and ") : ""} order by value limit ${bind(limit + 1)}`,
+        values,
       );
-      const choices: TechnologyOption[] = rows.map(({ value }) => ({
-        value,
-        label: technologyLabel(value) ?? value,
-      }));
-      for (const value of selected)
-        if (!choices.some((c) => c.value === value))
-          choices.push({ value, label: value });
-      return choices;
+      const choices: TechnologyOption[] = rows
+        .slice(0, limit)
+        .map(({ value }) => ({
+          value,
+          label: technologyLabel(value) ?? value,
+        }));
+      return {
+        data: choices,
+        next_after: rows.length > limit ? choices.at(-1)!.value : null,
+      };
     },
     async sitemapParts() {
       await ready(db);

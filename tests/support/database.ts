@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { Pool } from "pg";
 import {
   postgres,
@@ -39,7 +40,7 @@ export async function testDatabase(native = false) {
       await admin.end();
     };
   } else {
-    const pg = new PGlite();
+    const pg = new PGlite({ extensions: { pg_trgm } });
     db = {
       query: async (text, values) =>
         (values
