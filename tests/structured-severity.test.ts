@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { osvSeverity } from "../src/lib/structured/severity";
+import { osvSeverity } from "../src/adapters/sources/structured/severity";
 import upstreamOsv from "./fixtures/osv-upstream.json";
 
 it("matches the reported CVSS 4.0 score for the Chainguard advisory", () => {

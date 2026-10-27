@@ -1,21 +1,21 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { events } from "@/lib/events";
-import { configured } from "@/lib/db";
-import type { FeedEvent } from "@/lib/events";
+import { services } from "@/server/services";
+import { configured } from "@/server/services";
+import type { FeedItem } from "@/domain/feed-item";
 import {
   filterQuery,
   pageParams,
-  parseEventQuery,
-  type EventQuery,
+  parseFeedQuery,
+  type FeedQuery,
   type SearchParams,
-} from "@/lib/filters";
-import { feedLink, groupEvents, dayLabel } from "@/lib/feed-view";
+} from "@/presentation/filters";
+import { feedLink, groupByDay, dayLabel } from "@/presentation/feed-view";
 import { FeedFilters } from "@/components/feed-filters";
-import { catalogOptions } from "@/lib/technology-catalog";
-import { EventCard } from "@/components/event-card";
+
+import { ItemCard } from "@/components/item-card";
 import { ScoreProvider } from "@/components/score-badges";
-import { scoreCves } from "@/lib/advisory-scores";
+
 import { ArrowDown, ArrowLeft, Braces, Rss } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,23 +31,25 @@ export default async function Feed({
   searchParams: Promise<SearchParams>;
 }) {
   const params = pageParams(await searchParams);
-  let query: EventQuery = { limit: 20 },
+  let query: FeedQuery = { limit: 20 },
     error = "",
     unavailable = !configured();
   try {
-    query = parseEventQuery(params, 20);
-    query.view ??= "grouped";
+    query = parseFeedQuery(params, 20);
     if (query.after !== undefined)
       throw new Error("Use the JSON API for incremental cursors");
     query.limit = Math.min(query.limit, 50);
   } catch (cause) {
     error = (cause as Error).message;
   }
-  let rows: FeedEvent[] = [],
+  let rows: FeedItem[] = [],
     hasMore = false;
   if (!unavailable && !error) {
     try {
-      const result = await events({ ...query, limit: query.limit + 1 });
+      const result = await services().feed.list({
+        ...query,
+        limit: query.limit + 1,
+      });
       hasMore = result.length > query.limit;
       rows = result.slice(0, query.limit);
     } catch {
@@ -56,12 +58,14 @@ export default async function Feed({
   }
   const technologies =
     !unavailable && !error
-      ? await catalogOptions("", query.technology?.split(",")).catch(() => [])
+      ? await services()
+          .feed.technologies("", query.technology?.split(","))
+          .catch(() => [])
       : [];
   const filters = filterQuery(query),
     suffix = filters.size ? "?" + filters : "";
-  const hasFilters = [...filters.keys()].some((key) => key !== "view");
-  const groups = groupEvents(rows);
+  const hasFilters = filters.size > 0;
+  const groups = groupByDay(rows);
   const latest = feedLink(query);
   const returnTo = feedLink(query, {
     ...(query.before !== undefined ? { before: String(query.before) } : {}),
@@ -79,7 +83,7 @@ export default async function Feed({
             </a>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <a href={"/api/v1/events" + suffix}>
+            <a href={"/api/v1/items" + suffix}>
               <Braces aria-hidden="true" />
               JSON
             </a>
@@ -95,7 +99,7 @@ export default async function Feed({
             <Button asChild variant="ghost" size="sm" className="mb-4">
               <Link href={latest}>
                 <ArrowLeft aria-hidden="true" />
-                Back to latest events
+                Back to latest items
               </Link>
             </Button>
           ) : null}
@@ -128,23 +132,25 @@ export default async function Feed({
               <CardContent className="text-sm text-muted-foreground">
                 {query.before !== undefined ? (
                   <>
-                    No earlier events.{" "}
+                    No earlier items.{" "}
                     <Link
                       href={latest}
                       className="text-primary underline underline-offset-4"
                     >
-                      Back to latest events
+                      Back to latest items
                     </Link>
                   </>
                 ) : hasFilters ? (
-                  "No events match your filters."
+                  "No items match your filters."
                 ) : (
-                  "No events yet."
+                  "No items yet."
                 )}
               </CardContent>
             </Card>
           ) : (
-            <ScoreProvider cves={[...new Set(rows.flatMap(scoreCves))].sort()}>
+            <ScoreProvider
+              cves={[...new Set(rows.flatMap((item) => item.cve_ids))].sort()}
+            >
               <div className="space-y-6">
                 {groups.map((group, index) => (
                   <section
@@ -158,15 +164,15 @@ export default async function Feed({
                     >
                       <time
                         dateTime={group.day}
-                        title="Date added to the feed (UTC)"
+                        title="Latest feed update (UTC)"
                       >
                         {dayLabel(group.day)}
                       </time>
                     </h2>
-                    {group.events.map((event) => (
-                      <EventCard
-                        key={event.id}
-                        event={event}
+                    {group.items.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
                         filters={query}
                         returnTo={returnTo}
                       />
@@ -181,11 +187,11 @@ export default async function Feed({
               <Button asChild variant="outline">
                 <Link
                   href={feedLink(query, {
-                    before: String(rows.at(-1)!.id),
+                    before: String(rows.at(-1)!.cursor),
                     limit: String(query.limit),
                   })}
                 >
-                  Older events
+                  Older items
                   <ArrowDown aria-hidden="true" />
                 </Link>
               </Button>

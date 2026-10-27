@@ -32,15 +32,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-      postgrest:
-        image: postgrest/postgrest:v12.2.3
-        env:
-          PGRST_DB_URI: postgresql://postgres:ci-only-password@postgres:5432/postgres
-          PGRST_DB_SCHEMAS: public
-          # Only this disposable CI database permits anonymous service-role reads.
-          PGRST_DB_ANON_ROLE: service_role
-        ports:
-          - 3001:3000
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,49 +39,34 @@ jobs:
       - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         with:
           version: 2.122.0
-      - name: Apply migrations and verify a second push is a no-op
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify schema installation, cutover and idempotent retry
         env:
           PGHOST: localhost
           PGPORT: 5432
           PGUSER: postgres
           PGPASSWORD: ci-only-password
           PGDATABASE: postgres
+          DATABASE_URL: postgresql://postgres:ci-only-password@localhost:5432/postgres
         run: |
           psql -v ON_ERROR_STOP=1 -c 'create role anon; create role authenticated; create role service_role bypassrls;'
-          # Reproduce a populated upgrade, not just an empty schema installation.
-          upgrade_fixture=$(mktemp -d)
-          mkdir -p "$upgrade_fixture/supabase/migrations"
-          cp supabase/config.toml "$upgrade_fixture/supabase/config.toml"
-          cp supabase/migrations/20261023*.sql supabase/migrations/20261024*.sql "$upgrade_fixture/supabase/migrations/"
-          (cd "$upgrade_fixture" && supabase db push --db-url 'postgresql://postgres:ci-only-password@localhost:5432/postgres?sslmode=disable' --yes)
-          psql -v ON_ERROR_STOP=1 -f tests/fixtures/priority-upgrade.sql
-          supabase db push --db-url 'postgresql://postgres:ci-only-password@localhost:5432/postgres?sslmode=disable' --yes
+          supabase db push --db-url "$DATABASE_URL?sslmode=disable" --yes
           first=$(psql -At -c 'select count(*) from supabase_migrations.schema_migrations')
           expected=$(find supabase/migrations -name '*.sql' -type f | wc -l)
           test "$first" -eq "$expected"
-          supabase db push --db-url 'postgresql://postgres:ci-only-password@localhost:5432/postgres?sslmode=disable' --yes
-          # Run the real release script's psql connection/batching path against
-          # this disposable service; unit mocks alone missed the PGDATABASE bug.
-          BACKFILL_CLI_TEST=1 node --test tests/backfill-cli.test.mjs
-          test "$(psql -At -c "select count(*) from events where priority='{}'::jsonb")" -eq 0
-          test "$(psql -At -c 'select count(*) from events')" -eq 2000
-          test "$(psql -At -c 'select processed from public.backfill_event_priority(100)')" -eq 0
-          test "$(psql -At -c 'select processed from public.backfill_event_technologies(100)')" -eq 0
-          test "$(psql -At -c 'select processed from public.backfill_advisory_groups(100)')" -eq 0
-          test "$(psql -At -c 'select processed from public.backfill_advisory_feed(100)')" -eq 0
-          test "$(psql -At -c 'select count(*) from advisory_feed_members')" -eq 2000
-          test "$(psql -At -c 'select count(*) from advisory_update_members')" -eq 2000
+          npm run feed:migrate
+          npm run feed:migrate
+          supabase db push --db-url "$DATABASE_URL?sslmode=disable" --yes
           second=$(psql -At -c 'select count(*) from supabase_migrations.schema_migrations')
           test "$first" -eq "$second"
-          psql -v ON_ERROR_STOP=1 -f tests/fixtures/technology-catalog.sql
-          node --test tests/technology-postgrest.test.mjs
-          node --test tests/advisory-groups-postgrest.test.mjs
-          # Exercise sparse search on realistic, toasted advisory documents.
-          # PostgreSQL 17 and PGlite can choose different plans here.
-          psql -v ON_ERROR_STOP=1 -c 'truncate documents restart identity cascade;'
-          psql -v ON_ERROR_STOP=1 -f tests/fixtures/group-query.sql
-          psql -v ON_ERROR_STOP=1 -c 'vacuum analyze events;'
-          node --test tests/grouped-search-postgres.test.mjs
+      - name: Populated upgrade and repository contract on PostgreSQL 17
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:ci-only-password@localhost:5432/postgres
+        run: npx vitest run tests/canonical-database.test.ts
   release:
     needs: [check, browser, migrations]
     if: >-
@@ -111,6 +87,7 @@ jobs:
       - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         with:
           version: 2.122.0
+      - run: npm ci
       - name: Migrate, then deploy the checked commit
         env:
           GITHUB_TOKEN: ${{ github.token }}

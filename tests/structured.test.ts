@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { normalizeRecord } from "../src/lib/structured/normalize";
+import { normalizeRecord } from "../src/adapters/sources/structured/normalize";
 import {
   cveChanges,
   discover,
@@ -7,13 +7,13 @@ import {
   page,
   recordUrl,
   sourceUrl,
-} from "../src/lib/structured/discover";
+} from "../src/adapters/sources/structured/discover";
 import {
   structuredDocument,
   readStructuredDocument,
-} from "../src/lib/structured/pipeline";
-import { parseRiskQuery, riskContext } from "../src/lib/structured/risk";
-import { endpoints } from "../src/lib/structured/config";
+} from "../src/adapters/sources/structured/documents";
+import { parseRiskQuery, riskContext } from "../src/adapters/risk/provider";
+import { endpoints } from "../src/adapters/sources/structured/config";
 import upstreamOsv from "./fixtures/osv-upstream.json";
 
 const changed = "2026-10-24T10:00:00Z";

@@ -5,8 +5,8 @@ import {
   technologyFamily,
   technologyLabel,
   technologyMatches,
-} from "@/lib/technology";
-import type { TechnologyOption } from "@/lib/technology";
+} from "@/domain/technology";
+import type { TechnologyOption } from "@/domain/technology";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";

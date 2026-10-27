@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { epssPercent, loadEpss } from "../src/lib/epss";
+import { epssPercent, loadEpss } from "../src/presentation/epss";
 
 afterEach(() => vi.unstubAllGlobals());
 const signal = () => new AbortController().signal;

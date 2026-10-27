@@ -7,8 +7,8 @@ import {
   itemUrl,
   parseFeed,
   sourceSchema,
-} from "../src/lib/feed";
-import { fetchResource } from "../src/lib/http";
+} from "../src/adapters/sources/publisher";
+import { fetchResource } from "../src/adapters/http";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("feed adapters", () => {

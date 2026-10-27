@@ -1,8 +1,8 @@
 # Publisher source activation
 
-This release enables the 374 reviewed publisher sources in `sources/registry.json`, alongside OSV, the CVE List and CISA KEV (377 configured sources). The Production workflow applies `202610240007_enable_vendor_sources.sql` on merge, then deploys the checked commit. Opening this PR does not enable production sources or run paid extraction.
+Publisher sources in `sources/registry.json` are optional alongside OSV, the CVE List and CISA KEV. The October 24 activation details below are historical operator context; the current application defaults to no publisher extraction unless configured.
 
-The migration changes the reviewed source rows and adds a service-role-only `claim_vendor_document` RPC. It retains existing core checkpoints, source metadata, documents and events. Publisher extraction claims only the configured publisher IDs, so a structured extraction backlog cannot consume the publisher attempt budget. The legacy claim RPC remains compatible and shares the same transaction lock/counter.
+Publisher selection is reconciled with `sources:configure -- --apply`. The current runtime uses `claim_ingest_document` for both structured and publisher documents, with a shared hourly counter only for paid claims. The legacy claim functions are removed during canonical-feed cutover. See [operations](operations.md).
 
 ## Production configuration
 

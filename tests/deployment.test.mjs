@@ -1,10 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   configuration,
   migrate,
-  migrationFailure,
   release,
 } from "../.github/scripts/release.mjs";
 
@@ -236,370 +235,75 @@ test("does not include provider error bodies or transport errors in failure mess
     assert.ok(!f.calls.includes("migrate"));
   }
 });
-test("uses verified TLS, isolates CLI credentials, and removes the certificate", async () => {
-  const env = environment();
-  let certificate, passfile;
+test("uses verified TLS and isolated credentials for DDL and canonical import", async () => {
+  const env = environment(),
+    calls = [];
+  let certificate;
   await migrate(configuration(env), env, (command, args, options) => {
-    if (command === "psql") {
-      assert.equal(options.env.VERCEL_TOKEN, undefined);
-      assert.equal(options.env.GITHUB_TOKEN, undefined);
-      assert.ok(!args.some((a) => a.includes("fixture-password")));
-      assert.equal(options.env.PGDATABASE, "postgres");
-      assert.equal(options.env.PGHOST, "db.example.com");
-      assert.equal(options.env.PGPORT, "5432");
-      assert.equal(options.env.PGUSER, "postgres");
-      assert.equal(options.env.PGSSLMODE, "verify-full");
-      assert.equal(options.env.PGSSLROOTCERT, certificate);
-      assert.equal(options.env.PGPASSWORD, undefined);
-      passfile = options.env.PGPASSFILE;
-      assert.equal(statSync(passfile).mode & 0o777, 0o600);
-      assert.equal(
-        readFileSync(passfile, "utf8"),
-        "db.example.com:5432:postgres:postgres:fixture-password\n",
-      );
-      return { status: 0, stdout: "0|0|t" };
-    }
-    assert.equal(command, "supabase");
-    assert.deepEqual(args.slice(0, 3), ["db", "push", "--db-url"]);
-    const url = new URL(args[3]);
-    certificate = url.searchParams.get("sslrootcert");
-    assert.equal(url.searchParams.get("sslmode"), "verify-full");
-    assert.equal(readFileSync(certificate, "utf8"), env.SUPABASE_DB_CA_CERT);
+    calls.push(command);
     assert.equal(options.env.VERCEL_TOKEN, undefined);
     assert.equal(options.env.GITHUB_TOKEN, undefined);
     assert.deepEqual(options.stdio, ["ignore", "pipe", "pipe"]);
-    assert.ok(!args.includes("--include-seed"));
-    assert.ok(!args.includes("--include-all"));
+    if (command === "supabase") {
+      const url = new URL(args[3]);
+      certificate = url.searchParams.get("sslrootcert");
+      assert.equal(url.searchParams.get("sslmode"), "verify-full");
+      assert.equal(readFileSync(certificate, "utf8"), env.SUPABASE_DB_CA_CERT);
+    } else {
+      assert.deepEqual(args, ["--import", "tsx", "scripts/migrate-feed.ts"]);
+      assert.equal(options.env.DATABASE_CA_CERT, env.SUPABASE_DB_CA_CERT);
+      assert.ok(options.env.DATABASE_URL.includes("sslmode=verify-full"));
+      assert.ok(!args.join(" ").includes("fixture-password"));
+    }
     return { status: 0 };
   });
+  assert.deepEqual(calls, ["supabase", "node"]);
   assert.equal(existsSync(certificate), false);
-  assert.equal(existsSync(passfile), false);
 });
-test("decodes connection fields, escapes password-file delimiters, and cleans up after backfill failure", async () => {
-  const env = environment();
-  env.SUPABASE_DB_URL =
-    "postgresql://postgres.project:p%3Aa%5Css@db.example.com:6543/feed%20db?sslmode=verify-full";
-  let passfile;
-  await assert.rejects(
-    migrate(configuration(env), env, (command, _args, options) => {
-      if (command === "supabase") return { status: 0 };
-      assert.equal(options.env.PGPORT, "6543");
-      assert.equal(options.env.PGDATABASE, "feed db");
-      assert.equal(options.env.PGUSER, "postgres.project");
-      passfile = options.env.PGPASSFILE;
-      assert.equal(
-        readFileSync(passfile, "utf8"),
-        "db.example.com:6543:feed db:postgres.project:p\\:a\\\\ss\n",
-      );
-      return { status: 1, stderr: "private details" };
-    }),
-    /Priority backfill failed/,
-  );
-  assert.equal(existsSync(passfile), false);
-  assert.equal(
-    migrationFailure({ error: { code: "ENOENT" } }),
-    "database client not installed",
-  );
-  assert.equal(
-    migrationFailure({
-      stderr: "connection to server on socket private-location failed",
-    }),
-    "database connection failed",
-  );
-});
-test("suppresses migration diagnostics and removes the certificate on failure", async () => {
+test("a failed import stops deployment without exposing diagnostics", async () => {
   const env = environment();
   let certificate;
   await assert.rejects(
-    () =>
-      migrate(configuration(env), env, (_command, args) => {
+    migrate(configuration(env), env, (command, args) => {
+      if (command === "supabase") {
         certificate = new URL(args[3]).searchParams.get("sslrootcert");
-        return { status: 1, stderr: env.SUPABASE_DB_URL };
-      }),
+        return { status: 0 };
+      }
+      return { status: 1, stderr: "private database data fixture-password" };
+    }),
     (error) =>
-      error.message.includes("Migration failed") &&
+      /Canonical feed import failed/.test(error.message) &&
       !error.message.includes("fixture-password"),
   );
   assert.equal(existsSync(certificate), false);
 });
-
-test("retries schema lock timeouts and deadlocks before starting backfills", async () => {
-  for (const code of ["55P03", "40P01"]) {
-    const env = environment();
-    const commands = [],
-      delays = [];
-    let schemaCalls = 0;
-    await migrate(
-      configuration(env),
-      env,
-      (cmd, args) => {
-        commands.push(cmd);
-        if (cmd === "supabase") {
-          assert.deepEqual(args.slice(0, 3), ["db", "push", "--db-url"]);
-          return ++schemaCalls <= 2
-            ? { status: 1, stderr: `ERROR: private details (SQLSTATE ${code})` }
-            : { status: 0 };
-        }
-        return { status: 0, stdout: "100|0|t" };
-      },
-      async (ms) => delays.push(ms),
-    );
-    assert.deepEqual(commands, [
-      "supabase",
-      "supabase",
-      "supabase",
-      "psql",
-      "psql",
-      "psql",
-      "psql",
-    ]);
-    assert.deepEqual(delays, [1000, 2000]);
-  }
-});
-
-test("persistent schema contention stops before backfills or deployment", async () => {
-  const f = fixture();
-  let calls = 0,
-    certificate;
-  const delays = [];
-  f.options.apply = (database, env) =>
-    migrate(
-      database,
-      env,
-      (cmd, args) => {
-        assert.equal(cmd, "supabase");
-        calls++;
-        certificate = new URL(args[3]).searchParams.get("sslrootcert");
-        return { status: 1, stderr: "ERROR: private details (SQLSTATE 55P03)" };
-      },
-      async (ms) => delays.push(ms),
-    );
-  await assert.rejects(
-    release(f.options),
-    /Migration failed \(database lock timeout\)/,
-  );
-  assert.equal(calls, 6);
-  assert.deepEqual(delays, [1000, 2000, 4000, 8000, 10000]);
-  assert.equal(existsSync(certificate), false);
-  assert.ok(!f.calls.some((call) => call.method === "POST"));
-});
-
-test("schema retries retain the overall migration deadline", async (t) => {
-  t.mock.timers.enable({ apis: ["Date"], now: 0 });
-  const env = environment();
-  const timeouts = [];
-  await assert.rejects(
-    migrate(
-      configuration(env),
-      env,
-      (_cmd, _args, options) => {
-        timeouts.push(options.timeout);
-        t.mock.timers.tick(4 * 60 * 1000);
-        return { status: 1, stderr: "ERROR: 55P03 private details" };
-      },
-      async (ms) => t.mock.timers.tick(ms),
-    ),
-    /Migration failed \(database lock timeout\)/,
-  );
-  assert.deepEqual(timeouts, [480000, 239000]);
-});
-
-test("schema pushes do not retry ambiguous failures or permanent SQL errors", async () => {
-  for (const failure of [
-    { status: 1, stderr: "ERROR: private details (SQLSTATE 57014)" },
-    { status: 1, stderr: "ERROR: private details (SQLSTATE 42501)" },
-    { status: 1, stderr: "connection to server failed" },
-    { status: 1, stderr: "private diagnostic without SQLSTATE" },
-    { error: { code: "ETIMEDOUT" }, stderr: "ERROR: 55P03 private details" },
-  ]) {
-    const env = environment();
-    let calls = 0;
-    await assert.rejects(
-      migrate(
-        configuration(env),
-        env,
-        (cmd) => {
-          assert.equal(cmd, "supabase");
-          calls++;
-          return failure;
-        },
-        async () => assert.fail("must not retry"),
-      ),
-      /Migration failed/,
-    );
-    assert.equal(calls, 1);
-  }
-});
-
-test("backfill batches finish before deployment and retain safe failure categories", async () => {
-  const env = environment();
-  let calls = 0;
+test("retries rolled-back schema contention, then imports once", async () => {
+  const env = environment(),
+    calls = [],
+    delays = [];
   await migrate(
     configuration(env),
     env,
-    (cmd) => {
-      if (cmd === "supabase") return { status: 0 };
-      calls++;
-      return { status: 0, stdout: calls === 1 ? "100|100|f" : "101|1|t" };
+    (command) => {
+      calls.push(command);
+      return calls.length === 1
+        ? { status: 1, stderr: "ERROR: 55P03 private data" }
+        : { status: 0 };
     },
-    async () => {},
+    async (delay) => delays.push(delay),
   );
-  assert.equal(calls, 5);
-  await assert.rejects(
-    migrate(configuration(env), env, (cmd) =>
-      cmd === "supabase"
-        ? { status: 0 }
-        : { status: 1, stderr: "ERROR: 57014 secret data" },
-    ),
-    /query timeout or cancellation/,
-  );
-  assert.equal(
-    migrationFailure({ stderr: "ERROR: private database text and password" }),
-    "database command failed",
-  );
-  assert.equal(
-    migrationFailure({ stderr: "error (SQLSTATE 55P03) private data" }),
-    "database lock timeout",
-  );
-  assert.equal(
-    migrationFailure({ error: { code: "ETIMEDOUT" } }),
-    "client timeout",
-  );
-  await assert.rejects(
-    migrate(configuration(env), env, (cmd) =>
-      cmd === "supabase"
-        ? { status: 0 }
-        : { status: 0, stdout: "secret-invalid-response" },
-    ),
-    /Invalid backfill response/,
-  );
+  assert.deepEqual(calls, ["supabase", "supabase", "node"]);
+  assert.deepEqual(delays, [1000]);
 });
-
-test("both backfills must complete; a technology failure blocks release", async () => {
-  const env = environment();
-  const procedures = [];
+test("does not retry an ambiguous schema failure or run the import", async () => {
+  const env = environment(),
+    calls = [];
   await assert.rejects(
-    migrate(configuration(env), env, (cmd, args) => {
-      if (cmd === "supabase") return { status: 0 };
-      const sql = args.at(-1);
-      procedures.push(sql);
-      return sql.includes("backfill_event_priority")
-        ? { status: 0, stdout: "100|0|t" }
-        : { status: 1, stderr: "ERROR: 57014 private data" };
+    migrate(configuration(env), env, (command) => {
+      calls.push(command);
+      return { status: 1, stderr: "connection to server private data" };
     }),
-    /Technology backfill failed \(query timeout or cancellation\)/,
+    /database connection failed/,
   );
-  assert.equal(procedures.length, 2);
-  assert.match(procedures[1], /backfill_event_technologies/);
-});
-
-test("an advisory grouping backfill failure prevents deployment", async () => {
-  const env = environment();
-  await assert.rejects(
-    migrate(configuration(env), env, (cmd, args) => {
-      if (cmd === "supabase") return { status: 0 };
-      return args.at(-1).includes("backfill_advisory_groups")
-        ? { status: 1, stderr: "ERROR: 57014 private data" }
-        : { status: 0, stdout: "100|0|t" };
-    }),
-    /Advisory grouping backfill failed \(query timeout or cancellation\)/,
-  );
-});
-
-test("a feed read-model backfill failure prevents deployment", async () => {
-  const f = fixture();
-  f.options.apply = (database, env) =>
-    migrate(database, env, (cmd, args) => {
-      if (cmd === "supabase") return { status: 0 };
-      return args.at(-1).includes("backfill_advisory_feed")
-        ? { status: 1, stderr: "ERROR: 57014 private data" }
-        : { status: 0, stdout: "100|0|t" };
-    });
-  await assert.rejects(release(f.options), /Advisory feed backfill failed/);
-  assert.ok(!f.calls.some((call) => call.method === "POST"));
-});
-
-test("retries rolled-back contention on the same batch, with bounded backoff", async () => {
-  for (const code of ["55P03", "40P01"]) {
-    const env = environment();
-    const commands = [],
-      delays = [];
-    let calls = 0;
-    await migrate(
-      configuration(env),
-      env,
-      (cmd, args) => {
-        if (cmd === "supabase") return { status: 0 };
-        commands.push(args.at(-1));
-        if (++calls <= 2)
-          return { status: 1, stderr: `ERROR: ${code} private details` };
-        return { status: 0, stdout: "100|0|t" };
-      },
-      async (ms) => {
-        delays.push(ms);
-      },
-    );
-    assert.equal(calls, 6);
-    assert.equal(commands[0], commands[1]);
-    assert.equal(commands[1], commands[2]);
-    assert.deepEqual(delays, [1000, 2000]);
-  }
-});
-
-test("persistent contention stops before deployment and cleans up credentials", async () => {
-  const f = fixture();
-  let calls = 0,
-    passfile;
-  const delays = [];
-  f.options.apply = (database, env) =>
-    migrate(
-      database,
-      env,
-      (cmd, _args, options) => {
-        if (cmd === "supabase") return { status: 0 };
-        passfile = options.env.PGPASSFILE;
-        calls++;
-        return { status: 1, stderr: "ERROR: 55P03 private details" };
-      },
-      async (ms) => {
-        delays.push(ms);
-      },
-    );
-  await assert.rejects(
-    release(f.options),
-    /Priority backfill failed \(database lock timeout\)/,
-  );
-  assert.equal(calls, 6);
-  assert.deepEqual(delays, [1000, 2000, 4000, 8000, 10000]);
-  assert.equal(existsSync(passfile), false);
-  assert.ok(!f.calls.some((call) => call.method === "POST"));
-});
-
-test("does not retry ambiguous transport failures, query timeouts, or permanent SQL errors", async () => {
-  for (const failure of [
-    { status: 1, stderr: "ERROR: 57014 private details" },
-    { status: 1, stderr: "ERROR: 42501 private details" },
-    { status: 1, stderr: "ERROR: 42P01 private details" },
-    { status: 1, stderr: "connection to server failed" },
-    { error: { code: "ETIMEDOUT" }, stderr: "ERROR: 55P03 private details" },
-  ]) {
-    const env = environment();
-    let calls = 0;
-    await assert.rejects(
-      migrate(
-        configuration(env),
-        env,
-        (cmd) => {
-          if (cmd === "supabase") return { status: 0 };
-          calls++;
-          return failure;
-        },
-        async () => {
-          assert.fail("must not retry");
-        },
-      ),
-      /backfill failed/,
-    );
-    assert.equal(calls, 1);
-  }
+  assert.deepEqual(calls, ["supabase"]);
 });

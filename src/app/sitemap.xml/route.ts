@@ -1,11 +1,6 @@
-import { baseUrl } from "@/lib/db";
-import { unavailable } from "@/lib/http";
-import {
-  sitemapParts,
-  sitemapUrls,
-  sitemapXml,
-  validSitemapPart,
-} from "@/lib/sitemap";
+import { baseUrl, services } from "@/server/services";
+import { unavailable } from "@/presentation/http";
+import { sitemapXml, validSitemapPart } from "@/presentation/sitemap";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +19,20 @@ export async function GET(request: Request) {
   try {
     const urls =
       part === null
-        ? (await sitemapParts()).map(
+        ? [...new Set([0, ...(await services().feed.sitemapParts())])].map(
             (id) => baseUrl() + "/sitemap.xml?part=" + id,
           )
-        : await sitemapUrls(part);
+        : [
+            ...(part === "0"
+              ? [baseUrl() + "/", baseUrl() + "/sources", baseUrl() + "/docs"]
+              : []),
+            ...(
+              await services().feed.sitemapItems(
+                Number(part) * 1000,
+                (Number(part) + 1) * 1000,
+              )
+            ).map((item) => baseUrl() + "/items/" + item.id),
+          ];
     if (!urls.length)
       return new Response("Sitemap part not found", {
         status: 404,

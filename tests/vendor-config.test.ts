@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import sources from "../sources/registry.json";
-import { selectedVendorIds } from "../src/lib/vendor-config";
+import { selectedVendorIds } from "../src/adapters/sources/selection";
 afterEach(() => vi.unstubAllEnvs());
 it("keeps empty selection disabled and expands all to exactly the reviewed publishers", () => {
   expect(selectedVendorIds("")).toEqual([]);
@@ -14,7 +14,8 @@ it("keeps empty selection disabled and expands all to exactly the reviewed publi
 it("uses the same production selection in the public source catalog", async () => {
   vi.stubEnv("VENDOR_SOURCE_IDS", "all");
   vi.resetModules();
-  const { registry, sourcePage } = await import("../src/lib/registry");
+  const { registry, sourcePage } =
+    await import("../src/adapters/sources/registry");
   expect(registry).toHaveLength(377);
   expect(
     sourcePage(new URLSearchParams("q=Ruby")).rows.some((s) => s.id === "ruby"),

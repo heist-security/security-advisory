@@ -1,10 +1,9 @@
 import { expect, it } from "vitest";
-import { parseEventQuery } from "../src/lib/filters";
+import { parseFeedQuery } from "../src/presentation/filters";
 import {
   technologyFamily,
-  technologyMatches,
-  technologySearch,
-} from "../src/lib/technology";
+  matchingTechnologyFamilies,
+} from "../src/domain/technology";
 
 it("groups known runtime versions and aliases but preserves distinct dependencies", () => {
   for (const value of [
@@ -31,14 +30,12 @@ it("groups known runtime versions and aliases but preserves distinct dependencie
   ])
     expect(technologyFamily(value)).toBe(value);
   expect(
-    parseEventQuery(
+    parseFeedQuery(
       new URLSearchParams({ technology: "nodejs,Node.js 22,node,ruby" }),
     ).technology,
   ).toBe("node-js,ruby");
 });
 it("matches family aliases in technology searches", () => {
-  expect(technologyMatches("python", "cpy")).toBe(true);
-  expect(technologySearch("Node.js 22")).toBe(
-    "(node:*) | (nodejs:*) | (node:* & js:*)",
-  );
+  expect(matchingTechnologyFamilies("cpy")).toContain("python");
+  expect(matchingTechnologyFamilies("Node.js")).toContain("node-js");
 });

@@ -10,8 +10,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { sourcePage } from "@/lib/registry";
-import { pageParams, type SearchParams } from "@/lib/filters";
+import { sourcePage } from "@/server/services";
+import { pageParams, type SearchParams } from "@/presentation/filters";
 export const metadata: Metadata = { title: "Sources" };
 const channelLabels = {
   "security-advisories": "Advisories",

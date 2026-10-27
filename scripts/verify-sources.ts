@@ -7,8 +7,8 @@ import {
   itemUrl,
   inlineText,
   type Source,
-} from "../src/lib/feed";
-import { fetchText } from "../src/lib/http";
+} from "../src/adapters/sources/publisher";
+import { fetchText } from "../src/adapters/http";
 
 type Check = {
   id: string;

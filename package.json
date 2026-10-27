@@ -22,17 +22,18 @@
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "npm run lint -- --fix",
     "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run test:release",
-    "test:release": "node --test tests/deployment.test.mjs"
+    "test:release": "node --test tests/deployment.test.mjs",
+    "feed:migrate": "node --env-file-if-exists=.env.local --import tsx scripts/migrate-feed.ts"
   },
   "dependencies": {
     "@pandatix/js-cvss": "0.4.4",
-    "@supabase/supabase-js": "^2.0.0",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.61.0",
     "next": "16.4.3",
     "openai": "^7.39.0",
+    "pg": "^8.23.1",
     "radix-ui": "^1.8.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -47,6 +48,7 @@
     "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@typescript/native": "npm:typescript@^7.0.2",

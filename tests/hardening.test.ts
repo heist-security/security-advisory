@@ -1,11 +1,20 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import Parser from "rss-parser";
-import { parseEventQuery, filterQuery, pageParams } from "../src/lib/filters";
-import { sourcePage } from "../src/lib/registry";
-import { articleText, documentText, type Source } from "../src/lib/feed";
-import { validateEvidence, type Extraction } from "../src/lib/schema";
-import { rss, type FeedEvent } from "../src/lib/events";
-import { failureReason } from "../src/lib/errors";
+import {
+  parseFeedQuery,
+  filterQuery,
+  pageParams,
+} from "../src/presentation/filters";
+import { sourcePage } from "../src/adapters/sources/registry";
+import {
+  articleText,
+  documentText,
+  type Source,
+} from "../src/adapters/sources/publisher";
+import { validateEvidence, type Extraction } from "../src/domain/evidence";
+import { rss } from "../src/presentation/rss";
+import { itemFixture } from "./support/fixtures";
+import { failureReason } from "../src/application/errors";
 afterEach(() => vi.unstubAllGlobals());
 const text =
   "Widget security fixes. Fixed in 2.3.4. Severity: High. This improves workflow performance.";
@@ -30,7 +39,7 @@ const extraction: Extraction = {
 describe("validated subscription filters", () => {
   it("normalizes technology and CVE without changing event identity", () => {
     expect(
-      parseEventQuery(
+      parseFeedQuery(
         new URLSearchParams(
           "technology=Node.js&cve=cve-2026-12345&type=patch&after=0",
         ),
@@ -52,19 +61,19 @@ describe("validated subscription filters", () => {
       "after=1&before=2",
       "technology=!!!",
     ])
-      expect(() => parseEventQuery(new URLSearchParams(q))).toThrow();
+      expect(() => parseFeedQuery(new URLSearchParams(q))).toThrow();
   });
   it("canonicalizes type unions and keeps the kind alias compatible", () => {
-    const query = parseEventQuery(
+    const query = parseFeedQuery(
       new URLSearchParams("type=patch,advisory,patch"),
     );
     expect(query.type).toEqual(["advisory", "patch"]);
     expect(filterQuery(query).get("type")).toBe("advisory,patch");
     expect(
-      parseEventQuery(new URLSearchParams("kind=patch,advisory")).type,
+      parseFeedQuery(new URLSearchParams("kind=patch,advisory")).type,
     ).toEqual(query.type);
     expect(
-      parseEventQuery(
+      parseFeedQuery(
         new URLSearchParams("type=patch,advisory&kind=advisory,patch"),
       ).type,
     ).toEqual(query.type);
@@ -75,7 +84,7 @@ describe("validated subscription filters", () => {
       "type=patch&kind=advisory",
       "type=" + Array(6).fill("patch").join(","),
     ])
-      expect(() => parseEventQuery(new URLSearchParams(value))).toThrow();
+      expect(() => parseFeedQuery(new URLSearchParams(value))).toThrow();
   });
   it("handles repeated browser parameters and bounds source pagination", () => {
     expect(pageParams({ q: ["ruby", "node"] }).get("q")).toBe("ruby");
@@ -147,28 +156,15 @@ describe("source and publication boundaries", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
   it("keeps HTML examples inert after an RSS reader decodes XML", async () => {
-    const row: FeedEvent = {
-      id: 1,
-      advisory_id: "a",
-      revision: 1,
-      source_id: "widget",
-      source_url: "https://example.org",
-      source_published_at: null,
-      published_at: "2026-10-24T00:00:00Z",
-      extraction_method: "llm",
-      technologies: [],
-      cve_ids: [],
-      event_types: [],
-      payload: {
-        ...extraction,
-        summary: "Do not use <img src=x onerror=alert(1)>",
-      },
-    };
+    const row = itemFixture({
+      title: "Widget security update",
+      summary: 'Run <script>alert("x")</script> & upgrade.',
+    });
     const parsed = await new Parser().parseString(
       rss([row], "https://example.org"),
     );
-    expect(parsed.items[0].content).not.toContain("<img");
-    expect(parsed.items[0].content).toContain("&lt;img");
+    expect(parsed.items[0].content).not.toContain("<script");
+    expect(parsed.items[0].content).toContain("&lt;script");
   });
   it("never persists provider secrets or arbitrary messages in failure categories", () => {
     expect(
@@ -182,9 +178,9 @@ describe("source and publication boundaries", () => {
 
 it("normalizes C++ and C# without collapsing them into the same subscription", () => {
   expect(
-    parseEventQuery(new URLSearchParams({ technology: "C++" })).technology,
+    parseFeedQuery(new URLSearchParams({ technology: "C++" })).technology,
   ).toBe("c-plus-plus");
   expect(
-    parseEventQuery(new URLSearchParams({ technology: "C#" })).technology,
+    parseFeedQuery(new URLSearchParams({ technology: "C#" })).technology,
   ).toBe("c-sharp");
 });

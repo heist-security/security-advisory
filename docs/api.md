@@ -1,140 +1,60 @@
-# Consumer API
+# Feed API
 
-All publishers contribute to one event stream. The visual page at `/`, RSS and JSON expose the same events and filters; they are three representations of the same feed.
+The website, `/api/v1/items` and `/feed.xml` use one canonical feed item. Public reads require no API key. Data responses use CORS; item JSON/RSS use `Cache-Control: no-store`. Unavailable storage returns 503 with `Retry-After: 60`; it is never represented as an empty successful feed.
+
+## Items
+
+```text
+GET /api/v1/items?technology=containerd&type=patch
+GET /api/v1/items?after=0&limit=100
+```
+
+Responses contain `schema_version: "1"`, `data`, `next_after` and `next_before`. Each item has:
+
+| Fields                                                              | Meaning                                                                                 |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `id`, `revision`, `cursor`                                          | Stable SHA-256 identity, meaningful revision number, latest change sequence             |
+| `created_at`, `updated_at`, `source_published_at`                   | Feed timestamps and the selected source's original publication date                     |
+| `active`, `replaced_by`                                             | Whether this identity is current; replacement IDs after regrouping                      |
+| `kind`, `title`, `summary`                                          | Advisory, patch, mitigation, withdrawal or other                                        |
+| `product_names`, `affected_versions`, `fixed_versions`              | Flat display values; inspect source records for product/version associations            |
+| `cve_ids`, `fixed_cve_ids`                                          | Current related CVEs and explicitly confirmed fixed CVEs                                |
+| `technology_ids`, `source_ids`, `source_urls`                       | Direct filter and provenance fields                                                     |
+| `severity`, `cvss`, `known_exploited`, `fix_available`, `important` | Facts derived only from this item's current source records                              |
+| `records`                                                           | Source claims with original evidence, native package/range data and document references |
+
+Open `/items/{id}` to inspect all source claims. Native range semantics remain in `records[].payload.structured.affected`; display fields are not proof an asset is vulnerable. Missing ratings are `unknown`/null, not zero. `important` means high/critical severity, known exploitation, or an unrated item with an explicit fix.
 
 ## Filters
 
-| Parameter  | Meaning                                                     | Example        |
-| ---------- | ----------------------------------------------------------- | -------------- |
-| q          | Keyword search, up to 120 characters                        | authentication |
-| type       | Comma-separated event types (OR); kind is an alias          | advisory,patch |
-| technology | Up to 10 catalog IDs or legacy routing keys (OR)            | node-js        |
-| cve        | CVE identifier, case-insensitive input                      | CVE-2026-12345 |
-| source     | Exact source ID from the catalog                            | ruby           |
-| severity   | One or more publisher/linked severity ratings               | critical,high  |
-| important  | High/Critical OR known exploited OR unrated security fix    | 1              |
-| fix        | Documented fixed versions (including structured advisories) | 1              |
-| limit      | Number of events, 1-100                                     | 100            |
-| after      | JSON only: ascending incremental cursor, exclusive          | 0              |
-| before     | JSON only: newest-first pagination, exclusive               | 123            |
+| Parameter              | Accepted value                                                                           |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| `q`                    | 1–120 printable characters; full-text search of current title, summary and source claims |
+| `type`                 | Comma-separated advisory, patch, mitigation, withdrawal, other; `kind` is an alias       |
+| `severity`             | Comma-separated critical, high, medium, low, unknown                                     |
+| `technology`           | Up to ten comma-separated product families; matches any selected family                  |
+| `cve`                  | One CVE ID                                                                               |
+| `source`               | One exact source ID from `/api/v1/sources`                                               |
+| `fix=1`, `important=1` | Explicit fixed versions; important items                                                 |
+| `limit`                | 1–100; default 30 JSON, 100 RSS                                                          |
+| `before`, `after`      | Nonnegative safe-integer change cursors; mutually exclusive; JSON only                   |
 
-Select any combination of `advisory`, `patch`, `mitigation`, `withdrawal`, and `other` using `type=advisory,patch`. A record matches any selected type. Duplicate values are removed and subscriptions use a canonical order. Single-type URLs remain supported.
+Filters combine with AND; choices within type, severity and technology combine with OR. Repeated filter parameters and invalid values return 400. `view` and `group` are rejected: there is only one item model. `/api/v1/technologies?q=...` suggests observed technology families. The source catalog is configuration, not live source health.
 
-Different filters combine with AND. Repeated API parameters, conflicting type/kind, invalid values and simultaneous after/before produce 400. Technology input is lowercased, runs of non-ASCII-alphanumeric characters become hyphens, and edge hyphens are trimmed. For example Node.js becomes node-js, C++ becomes c-plus-plus and C# becomes c-sharp. Keys derive from evidenced product names; this is not a curated alias/ontology service. Source IDs provide a stable alternative.
+## Pagination and corrections
 
-## Visual browsing and keyword search
+Without `after`, JSON returns current identities newest first, including current withdrawals. Use `next_before` for older pages. Updates can move an item between browse pages; browsing is not a frozen snapshot.
 
-`/` provides a compact newest-first list, active-filter links and cursor navigation. Item titles open detail pages containing source evidence, affected versions and revision history. Dates use UTC and reflect when events were added to Heist Feed. It defaults to 20 events per page and caps visual pages at 50; RSS/JSON keep their existing limits. Existing `/feed` URLs redirect to `/` and preserve query parameters. The visual page uses `before` for older results; use JSON for `after` cursors.
+For incremental synchronization start at `after=0`. Process returned items in cursor order, upsert by stable `id`, remove identities with `active=false`, and persist `next_after` only after processing the batch. Empty batches preserve the cursor. Repeat with identical filters. Changed filters require a fresh cursor. Revisions can be skipped: only the latest state of each item is stored. Retired identities remain available so an offline client can discover replacements.
 
-`q` searches words in published event text, product/version evidence, source IDs and historical subscription keys. All supplied words must match; punctuation is handled by PostgreSQL's simple text-search dictionary. It searches the event archive, not just the currently displayed page, and does not search private raw documents. Use the structured technology/CVE filters for precise subscriptions. A correction retains historical routing keys but not all previous free-text wording, so a title-specific keyword search may omit a later correction.
+Change polling and RSS retain earlier type/severity/CVE/technology/source/fix/importance matches. A patch subscription can therefore receive a withdrawal, or a critical subscription a downgraded item. Inspect the returned current fields. Search terms do not retain historical matches; use unfiltered change polling for a complete local mirror.
 
-Examples: `/?q=authentication`, `/feed.xml?q=authentication&type=patch`, `/api/v1/events?q=authentication&after=0`.
+RSS contains recent changed item states, including correction and replacement notices, with GUID `heist-item:{id}:{revision}`. Multiple intermediate revisions between polls can coalesce. RSS is a bounded recent window, so use JSON cursors for reliable synchronization.
 
-## Incremental consumption
+## Upgrade from the previous API
 
-The website's JSON/RSS links use `view=grouped`. This opt-in view returns one current card per group, or immutable group updates when using JSON `after` or RSS. It has its own cursor/GUID namespace and exposes original source events in `group.members`. Existing URLs retain raw event semantics. Read [grouping, source evidence and subscription compatibility](advisory-grouping.md) before switching an existing consumer.
+This release intentionally removes `/api/v1/events`, raw/grouped views, immutable group-update history, and `/events/{id}` and `/advisories/{id}` detail URLs. Use `/api/v1/items` and `/items/{id}`. Start fresh cursors and RSS subscriptions; old IDs and cursors cannot be reused. `/api/v1/items` has its own schema version 1 because it is a new resource. Earlier source history remains privately archived, not exposed as a competing public model.
 
-Start at /api/v1/events?after=0&limit=100. Persist next_after only after processing the returned batch. Repeat with the same filters. Empty batches preserve the cursor. IDs can have gaps. Changing filters requires a new cursor to backfill the new subscription.
+## Risk context
 
-Without after, the latest events are returned newest first. Use next_before to browse older results. This snapshot mode is not a complete backfill.
-
-RSS returns the latest 100 matching events by default. GUIDs identify revisions. Use JSON for reliable backfill and catch-up after a long outage.
-
-## Example
-
-This event is illustrative, not live publisher data:
-
-    {
-      "schema_version": "1",
-      "data": [{
-        "id": 42,
-        "advisory_id": "f5c8823b-ffea-46a7-81eb-bec35cda329b",
-        "revision": 1,
-        "source_id": "example",
-        "source_url": "https://example.org/security/widget-2",
-        "source_published_at": "2026-10-20T10:00:00Z",
-        "published_at": "2026-10-20T10:05:00Z",
-        "extraction_method": "llm",
-        "technologies": ["example", "widget"],
-        "cve_ids": [],
-        "event_types": ["patch"],
-        "payload": {
-          "security_relevant": true,
-          "kind": "patch",
-          "title": "Widget security update",
-          "summary": "Widget 2.0 fixes a security issue.",
-          "evidence": "Widget security update. Fixed in 2.0.",
-          "products": [{
-            "name": {"value": "Widget", "evidence": "Widget security update."},
-            "affected_versions": [],
-            "fixed_versions": [{"value": "2.0", "evidence": "Fixed in 2.0."}],
-            "prerequisites": []
-          }],
-          "related_cves": [],
-          "severity": "unknown",
-          "severity_evidence": null
-        }
-      }],
-      "next_after": 42,
-      "next_before": 42
-    }
-
-Unknown fields remain empty or unknown. Never interpret version strings as semver constraints without a separate ecosystem-aware parser.
-
-## Corrections and subscription continuity
-
-technologies, cve_ids and event_types are subscription routing indexes. They accumulate prior keys for the advisory so corrections still reach consumers of an earlier revision. They do not assert that every historical product, CVE or type applies to the newest payload.
-
-Use payload for the current extracted claims. A type=patch subscription can contain a subsequent withdrawal or advisory revision.
-
-When a newer document is classified as non-security after a published event, extraction_method is system, payload.kind is withdrawal, correction_reason is reclassified_non_security, and supersedes_event_id identifies the preceding event. Products/evidence are empty instead of borrowing quotations from an outdated document. This corrects Heist's extraction; it is not a publisher retraction.
-
-## Caching, errors and source catalog
-
-Public event responses use `Cache-Control: no-store`; each request reads the database. No client key is required. Hosting rate limits can return 429; honor Retry-After. Malformed requests return 400. Unavailable data returns 503 and Retry-After: 60.
-
-The source catalog is paginated at /api/v1/sources?page=1, with 24 records per page and optional q, channel and category filters. It is the shipped catalog, not the live database enablement state or uptime. Source changes may be observed during pagination; this endpoint is not an immutable catalog snapshot API.
-
-Fields may be added in schema_version 1. Consumers should ignore unknown fields and handle unknown future event types conservatively.
-
-## Structured advisories and risk context
-
-Events from `core-osv`, `core-cve` and `core-kev` expose `extraction_method: "structured"` and `payload.structured` with upstream identity, aliases, native affected data and provenance. Their evidence fields are record identifiers/JSON pointers. Use native affected data for package/version matching; display technology tags alone do not establish exposure. Source records sharing a CVE remain separate attributable events.
-
-`GET /api/v1/risk?cve=CVE-2021-44228` returns KEV membership details and dated EPSS probability/percentile with explicit provider availability. Supply up to 40 comma-separated CVEs. Optional `nvd=1` adds NVD metrics/configurations for exactly one CVE. Null means no returned record or unavailable data, not zero risk. Results can be cached for 15 minutes; enrichment outages never block the event feed. See [semantics, checkpoints and limits](structured-sources.md).
-
-The source catalog defaults to core and opted-in vendor sources. `catalog=vendor` lists the historical vendor catalog for selection; it is not a live list of enabled database rows.
-
-## Severity and patch relationships
-
-`severity=critical,high` matches any selected severity; valid values are `critical`, `high`, `medium`, `low`, `unknown` (displayed as Unrated). Values are canonicalized and deduplicated. `important=1` and `fix=1` are independent filters and combine with other filters using AND. Adding a severity to Important updates narrows the preset and can exclude unrated fixes. All filtering happens in PostgreSQL before pagination.
-
-Every event includes a `priority` snapshot with `severity` (the highest publisher or linked CVE rating), `publisher_severity`, `linked_cves`, `fix_available`, `known_exploited` and `reasons`. `payload.severity` remains the publisher's original rating. Each linked rating preserves its CVE, source URL, affected product names, native metrics and relationship evidence. Conflicting current provider ratings are retained; the highest is used for filtering. Latest provider revisions are used, withdrawn records are excluded, and a rejected CVE cannot acquire severity through an older OSV record. KEV absence is not proof of no exploitation.
-
-A publisher's `related_cves` alone never establishes remediation. New extractions provide `fixed_cves` with a product and exact remediation quotation. The product must have an evidenced fixed version; mention-only, negated, future or unsupported relationships are rejected. The deterministic guard currently recognizes English remediation wording; otherwise a patch remains eligible as an unrated security fix. Structured CVE/OSV identities and aliases establish their own advisory relationships.
-
-Historical publisher patches are linked only when their extracted title is a verbatim opening source heading that explicitly names CVE fixes and the record has documented fixed versions. Mere mentions and later related-article headlines do not qualify. This conservative backfill covers the original Ruby/GitLab fix announcement without assigning every Ruby release the GitLab rating. Other historical records may remain unrated until a future source extraction supplies explicit relationship evidence. No paid re-extraction is queued by this migration.
-
-A Ruby patch linked to a Critical GitLab vulnerability is labelled **Linked Critical CVE**; this does not assert Ruby itself or every Ruby application has the same CVSS score. Native CVSS metrics stay attached to the originating product/record, not combined into a new score.
-
-Changes to linked severity, exploitation or displayed evidence append a context-only event with `context_update: true`, a new ID, revision and RSS GUID. It preserves the source announcement and original date; it does not consume a model attempt or pretend a new release was published. Unchanged context does not emit duplicates. Consumers should replace the previous revision for the same `advisory_id`. Initial migration enrichment does not replay historical notifications; existing consumers wanting the newly introduced filters must start a fresh backfill.
-
-Severity, important and fix routing retain prior subscription matches so downgrades and withdrawals reach existing subscribers. Thus a Critical subscription may receive a later Low revision or withdrawal; `priority` describes that revision's actual classification. Publisher dates appear on cards separately from feed publication dates so backfilled releases are not presented as newly announced fixes.
-
-### Technology multi-select
-
-`technology=node-js,ruby` matches any selected technology family. It combines with search, type, severity and other filters using AND, before pagination. Known aliases and numeric versions normalize to the same family: `node`, `nodejs`, `Node.js 8` and `Node.js 22` become `node-js`; `CPython` and `python3` become `python`. Legacy alias/version URLs therefore include all matching family records. Distinct packages such as `node-gyp`, `Node-RED`, `python-pillow` and `react-dom` remain separate. Unknown technologies retain their normalized exact key. Values are deduplicated and sorted; each must be at most 100 characters. Repeated `technology` parameters are rejected.
-
-The visual feed exposes Search, Type, Severity and a searchable technology multi-select. RSS, JSON and pagination retain those selections. Advanced URL/API filters remain supported; submitting the visual form replaces advanced filters not represented by its controls.
-
-`GET /api/v1/technologies?q=node` returns up to 50 `{value,label}` choices. Use the returned stable `value` as the technology filter. The picker also accepts explicit legacy product keys when suggestions are unavailable. No raw documents or credentials are exposed.
-
-### Technology catalog and stable subscriptions
-
-Technology suggestions now query `technology_catalog`, a database catalog of all observed products, rather than sampling 100 recent events. The endpoint returns up to 50 alphabetically ordered matches from an indexed full-catalog search. Event volume and recency do not determine whether a technology can be found. Source IDs are not suggestions unless an actual product has that name.
-
-Publisher product names use generic, conservative version separation before identity normalization: `Example Engine 1.2`, `Example Engine v3.4`, and future versions share `example-engine`. This works for previously unseen products without adding them to the reviewed semantic-alias list. Embedded numbers such as `log4j2`, `HTTP/2`, and `OAuth2` remain intact. Semantic synonyms cannot safely be guessed: reviewed aliases still handle names such as Node.js/nodejs; unrecognized synonyms remain separate until a rule is reviewed.
-
-OSV package identities use the exact ecosystem and package name, including namespace and numeric suffixes. These have stable opaque `pkg-…` IDs and labels such as `widget-2 (npm)`; similarly named packages in different ecosystems remain separate. Use the returned option `value` in subscriptions, not a slug made from its label. Original affected/fixed versions and evidence are unchanged. Older routing-key subscriptions remain accepted alongside canonical IDs.
-
-Migration 011 creates the catalog and indexed `events.technology_ids`; a publication trigger maintains them for future events. The release runner completes a separate, resumable 100-row historical metadata backfill after schema commit and before deployment. It retains previous product identities on correction events, creates no new events, and makes no model calls. Retry resumes from the committed checkpoint. Catalog reads and maintenance are service-role only. New semantic-alias rules require a versioned migration/reindex of affected metadata; do not edit applied migration snapshots.
+`/api/v1/risk?cve=CVE-2021-44228` accepts 1–40 CVEs. `nvd=1` accepts one CVE. Provider availability is explicit; missing data is null, partial results are allowed, and total failure returns 503. EPSS is dated global exploitation likelihood, not customer exposure. KEV absence does not prove no exploitation. Risk lookups do not alter stored item severity or create daily feed revisions.
