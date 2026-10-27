@@ -10,7 +10,6 @@ import {
   severityLabel,
   type Severity,
 } from "@/domain/feed-item";
-import type { TechnologyOption } from "@/domain/technology";
 import { MultiSelectFilter } from "./multi-select-filter";
 import { TechnologyFilter } from "./technology-filter";
 import { useAutoFilters } from "./use-auto-filters";
@@ -20,11 +19,9 @@ import { FeedSkeleton } from "./feed-skeleton";
 
 export function FeedFilters({
   initialFilters,
-  technologies,
   children,
 }: {
   initialFilters: Filters;
-  technologies: TechnologyOption[];
   children: ReactNode;
 }) {
   const { filters, update, pending } = useAutoFilters(
@@ -84,7 +81,6 @@ export function FeedFilters({
         />
         <TechnologyFilter
           selected={filters.technology?.split(",").filter(Boolean) ?? []}
-          initialOptions={technologies}
           onChange={(values) => update({ technology: values.join(",") })}
         />
         {Object.entries(filters).some(([, value]) => value) ? (

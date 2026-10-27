@@ -14,22 +14,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 export function TechnologyFilter({
   selected: values,
-  initialOptions,
   onChange,
 }: {
   selected: string[];
-  initialOptions: TechnologyOption[];
   onChange: (values: string[]) => void;
 }) {
   const id = useId();
   const [search, setSearch] = useState("");
-  const [options, setOptions] = useState(initialOptions);
+  const [options, setOptions] = useState<TechnologyOption[]>([]);
   const [optionsSearch, setOptionsSearch] = useState("");
   const [status, setStatus] = useState("");
   const [open, setOpen] = useState(false);
-  const [labels, setLabels] = useState(
-    () => new Map(initialOptions.map((o) => [o.value, o.label])),
-  );
+  const [labels, setLabels] = useState(() => new Map<string, string>());
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
