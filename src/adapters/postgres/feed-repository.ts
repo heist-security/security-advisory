@@ -1,9 +1,5 @@
 import type { FeedRepository, Publication } from "../../application/ports";
-import {
-  publicItem,
-  type FeedQuery,
-  type StoredItem,
-} from "../../domain/feed-item";
+import type { FeedItem, FeedQuery, StoredItem } from "../../domain/feed-item";
 import { identityKeys, unique } from "../../domain/identity";
 import {
   technologyKey,
@@ -12,8 +8,9 @@ import {
   type TechnologyOption,
 } from "../../domain/technology";
 import type { Database, SqlClient } from "./client";
-const columns = [
+const publicColumns = [
   "id",
+  "cursor",
   "revision",
   "created_at",
   "updated_at",
@@ -37,6 +34,9 @@ const columns = [
   "fix_available",
   "important",
   "records",
+] satisfies (keyof FeedItem)[];
+const columns = [
+  ...publicColumns.filter((column) => column !== "cursor"),
   "record_ids",
   "identity_keys",
   "type_keys",
@@ -47,6 +47,7 @@ const columns = [
   "fix_key",
   "important_key",
 ];
+const publicProjection = publicColumns.map((column) => `f.${column}`).join(",");
 async function completeDocument(
   client: SqlClient,
   document: NonNullable<Publication["document"]>,
@@ -83,13 +84,17 @@ export function feedRepository(db: Database): FeedRepository {
         where.push(
           updates
             ? `type_keys && ${bind(query.type)}::text[]`
-            : `kind=any(${bind(query.type)}::text[])`,
+            : query.type.length === 1
+              ? `kind=${bind(query.type[0])}`
+              : `kind=any(${bind(query.type)}::text[])`,
         );
       if (query.severity?.length)
         where.push(
           updates
             ? `severity_keys && ${bind(query.severity)}::text[]`
-            : `severity=any(${bind(query.severity)}::text[])`,
+            : query.severity.length === 1
+              ? `severity=${bind(query.severity[0])}`
+              : `severity=any(${bind(query.severity)}::text[])`,
         );
       if (query.technology)
         where.push(
@@ -109,22 +114,63 @@ export function feedRepository(db: Database): FeedRepository {
         where.push(
           `search_document @@ plainto_tsquery('simple',${bind(query.q)})`,
         );
-      if (query.after !== undefined) where.push(`cursor>${bind(query.after)}`);
+      // These single predicates have B-tree indexes in cursor order. In
+      // particular, equality (not ANY) lets (kind,cursor)/(severity,cursor)
+      // provide the order without walking unrelated, more recent items.
+      const filterCount = where.length - 1;
+      const orderedIndex =
+        filterCount === 0 ||
+        (filterCount === 1 &&
+          (query.fix ||
+            query.important ||
+            (!updates &&
+              (query.type?.length === 1 || query.severity?.length === 1))));
+      const bounds = [where[0]];
+      if (query.after !== undefined) bounds.push(`cursor>${bind(query.after)}`);
       if (query.before !== undefined)
-        where.push(`cursor<${bind(query.before)}`);
-      const { rows } = await db.query<{ item: StoredItem }>(
-        `select to_jsonb(f)-'search_document' item from feed_items f where ${where.join(" and ")} order by cursor ${query.after !== undefined ? "asc" : "desc"} limit ${bind(query.limit)}`,
-        values,
-      );
-      return rows.map((r) => publicItem(r.item));
+        bounds.push(`cursor<${bind(query.before)}`);
+      where.push(...bounds.slice(1));
+      const direction = query.after !== undefined ? "asc" : "desc";
+      const limit = bind(query.limit);
+      // Try a bounded recent window for common filters. If it cannot fill a
+      // page, resolve all matching cursors independently of LIMIT so PostgreSQL
+      // can use the filter indexes instead of scanning unrelated recent rows.
+      // The count guards skip the full search when the window fills the page;
+      // a partial window is replaced entirely to preserve pagination/order.
+      // Only load full public records after choosing the page's cursors.
+      const sql = orderedIndex
+        ? `select to_jsonb(item) item from (
+            select ${publicProjection} from feed_items f
+            where ${where.join(" and ")} order by f.cursor ${direction} limit ${limit}
+          ) item`
+        : `with recent as materialized (
+            select cursor from feed_items where ${bounds.join(" and ")}
+            order by cursor ${direction} limit ${bind(query.limit * 4)}
+          ), recent_matches as materialized (
+            select f.cursor from recent r join feed_items f using(cursor)
+            where ${where.join(" and ")} order by f.cursor ${direction} limit ${limit}
+          ), matching as materialized (
+            select cursor from feed_items where ${where.join(" and ")}
+            and (select count(*) from recent_matches)<${limit}
+          ), page as materialized (
+            select cursor from recent_matches where (select count(*) from recent_matches)=${limit}
+            union all
+            (select cursor from matching order by cursor ${direction} limit ${limit})
+          )
+          select to_jsonb(item) item from (
+            select ${publicProjection} from page p join feed_items f using(cursor)
+            order by p.cursor ${direction}
+          ) item`;
+      const { rows } = await db.query<{ item: FeedItem }>(sql, values);
+      return rows.map((r) => r.item);
     },
     async find(id) {
       await ready(db);
-      const { rows } = await db.query<{ item: StoredItem }>(
-        "select to_jsonb(f)-'search_document' item from feed_items f where id=$1",
+      const { rows } = await db.query<{ item: FeedItem }>(
+        `select to_jsonb(item) item from (select ${publicProjection} from feed_items f where id=$1) item`,
         [id],
       );
-      return rows[0] ? publicItem(rows[0].item) : null;
+      return rows[0]?.item ?? null;
     },
     async publish(command: Publication, update) {
       await db.transaction(async (client) => {
